@@ -1,2039 +1,1343 @@
-import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../services/api';
-import { sendAppointmentRequestEmail } from '../services/emailjs';
+import '../home.css';
 
-const ICONS = {
+const TZ = 'Africa/Nairobi';
+const TZ_OFFSET = '+03:00';
+const OPEN_HOUR = 8;
+const CLOSE_HOUR = 17;
+const SLOT_MINUTES = 30;
+const LEAD_MINUTES = 30;
+const BOOKABLE_DAYS = 10;
+const RECEPTION_KEY = 'gp_reception_mode';
+const UNAVAILABLE_KEY = 'staff_unavailable_by_date';
+const RECEPTION_RESET_SECONDS = 20;
+const SLIDE_SECONDS = 6;
+
+const STEPS = ['When', 'Host', 'Details', 'Review'];
+
+const VISIT_MODES = [
+  { id: 'now', icon: 'pin', title: "I'm here now", sub: 'Waiting at reception' },
+  { id: 'onway', icon: 'route', title: 'On my way', sub: 'Arriving shortly' },
+  { id: 'later', icon: 'calendar', title: 'Plan a visit', sub: 'Pick a day and time' },
+];
+
+const ETA_CHOICES = [10, 15, 30, 45, 60];
+const PURPOSES = ['Meeting', 'Interview', 'Delivery', 'Consultation', 'Personal'];
+
+const SLIDES = [
+  {
+    key: 'team',
+    eyebrow: 'Walk-ins',
+    title: 'At reception? Your host knows in seconds.',
+    text: 'Choose who you are here to see and we alert them by SMS, email and push.',
+    alt: 'Colleagues standing together in an office lobby',
+  },
+  {
+    key: 'meet',
+    eyebrow: 'Plan ahead',
+    title: 'Visiting later this week?',
+    text: 'Pick a day and a time slot. We text you once your host confirms, no internet needed.',
+    alt: 'Group of people greeting the sunrise together',
+  },
+  {
+    key: 'host',
+    eyebrow: 'Hosts',
+    title: 'Hosts respond from anywhere.',
+    text: 'Accept, reschedule or decline in one tap, and you hear back straight away.',
+    alt: 'Professional working late on a laptop with a cup of coffee',
+  },
+];
+
+const HOW_STEPS = [
+  { icon: 'clock', title: 'Choose when', text: "Here now, on your way, or a slot later this week. It's one tap." },
+  { icon: 'search', title: 'Pick your host', text: 'Search by name or browse departments. Availability is shown live.' },
+  { icon: 'message', title: 'Get a text back', text: 'Your host is alerted instantly and you get an SMS as soon as they reply.' },
+];
+
+const ICON_PATHS = {
+  pin: (
+    <>
+      <path d="M12 21s7-6.1 7-11.5a7 7 0 1 0-14 0C5 14.9 12 21 12 21z" />
+      <circle cx="12" cy="9.5" r="2.5" />
+    </>
+  ),
+  route: <path d="M3.5 11.2 20.5 3.5l-7.7 17-1.9-7.4-7.4-1.9z" />,
   calendar: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="4" y="5" width="16" height="16" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="2" />
-      <line x1="8" y1="3" x2="8" y2="7" stroke="currentColor" strokeWidth="2" />
-      <line x1="16" y1="3" x2="16" y2="7" stroke="currentColor" strokeWidth="2" />
-      <line x1="4" y1="11" x2="20" y2="11" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  ),
-  monitor: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="3" y="5" width="18" height="11" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="2" />
-      <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" strokeWidth="2" />
-      <line x1="12" y1="16" x2="12" y2="21" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  ),
-  close: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2" />
-      <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  ),
-  clipboard: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M9 3h6a2 2 0 0 1 2 2v2H7V5a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" strokeWidth="2" />
-      <rect x="7" y="7" width="10" height="14" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  ),
-  bolt: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M13 2L3 14h7l-1 8 12-14h-7l-1-6z" fill="none" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  ),
-  mail: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="3" y="5" width="18" height="14" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="2" />
-      <polyline points="3,7 12,13 21,7" fill="none" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  ),
-  bell: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 8-3 8h18s-3-1-3-8" fill="none" stroke="currentColor" strokeWidth="2" />
-      <path d="M10 21a2 2 0 0 0 4 0" fill="none" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  ),
-  alertCircle: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" />
-      <line x1="12" y1="7" x2="12" y2="13" stroke="currentColor" strokeWidth="2" />
-      <circle cx="12" cy="16.5" r="0.75" fill="currentColor" />
-    </svg>
-  ),
-  building: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M5 21V7l7-4 7 4v14" fill="none" stroke="currentColor" strokeWidth="2" />
-      <line x1="3" y1="21" x2="21" y2="21" stroke="currentColor" strokeWidth="2" />
-      <line x1="9" y1="9" x2="9" y2="11" stroke="currentColor" strokeWidth="2" />
-      <line x1="15" y1="9" x2="15" y2="11" stroke="currentColor" strokeWidth="2" />
-      <line x1="9" y1="13" x2="9" y2="15" stroke="currentColor" strokeWidth="2" />
-      <line x1="15" y1="13" x2="15" y2="15" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  ),
-  check: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <polyline points="5,13 9,17 19,7" fill="none" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  ),
-  checkCircle: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" />
-      <polyline points="8,12 11,15 16,9" fill="none" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  ),
-  hourglass: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <line x1="6" y1="2" x2="18" y2="2" stroke="currentColor" strokeWidth="2" />
-      <line x1="6" y1="22" x2="18" y2="22" stroke="currentColor" strokeWidth="2" />
-      <path d="M6 2c0 6 6 6 6 10s-6 4-6 10" fill="none" stroke="currentColor" strokeWidth="2" />
-      <path d="M18 2c0 6-6 6-6 10s6 4 6 10" fill="none" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  ),
-  map: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <polygon points="3,6 9,4 15,6 21,4 21,18 15,20 9,18 3,20" fill="none" stroke="currentColor" strokeWidth="2" />
-      <line x1="9" y1="4" x2="9" y2="18" stroke="currentColor" strokeWidth="2" />
-      <line x1="15" y1="6" x2="15" y2="20" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  ),
-  phone: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path
-        d="M22 16.92V21a2 2 0 0 1-2.18 2A19.8 19.8 0 0 1 11.2 19.9a19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 1 4.18 2 2 0 0 1 3 2h4.09a2 2 0 0 1 2 1.72 12.3 12.3 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.3 12.3 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      />
-    </svg>
-  ),
-  wrench: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-3 3-2-2 3-3z" fill="none" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  ),
-  cash: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="3" y="6" width="18" height="12" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="2" />
-      <circle cx="12" cy="12" r="2.5" fill="none" stroke="currentColor" strokeWidth="2" />
-      <line x1="6" y1="10" x2="6" y2="14" stroke="currentColor" strokeWidth="2" />
-      <line x1="18" y1="10" x2="18" y2="14" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  ),
-  users: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" fill="none" stroke="currentColor" strokeWidth="2" />
-      <circle cx="9" cy="7" r="4" fill="none" stroke="currentColor" strokeWidth="2" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87" fill="none" stroke="currentColor" strokeWidth="2" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" fill="none" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  ),
-  gear: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="2" />
-      <path d="M19.4 15a7.6 7.6 0 0 0 .1-2l2-1.1-2-3.4-2.2.4a7.6 7.6 0 0 0-1.7-1L13 2h-2l-.6 3a7.6 7.6 0 0 0-1.7 1l-2.2-.4-2 3.4 2 1.1a7.6 7.6 0 0 0 0 2l-2 1.1 2 3.4 2.2-.4a7.6 7.6 0 0 0 1.7 1l.6 3h2l.6-3a7.6 7.6 0 0 0 1.7-1l2.2.4 2-3.4-2-1.1z" fill="none" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  ),
-  scales: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <line x1="12" y1="3" x2="12" y2="21" stroke="currentColor" strokeWidth="2" />
-      <line x1="4" y1="7" x2="20" y2="7" stroke="currentColor" strokeWidth="2" />
-      <path d="M4 7l-3 6h6l-3-6z" fill="none" stroke="currentColor" strokeWidth="2" />
-      <path d="M20 7l-3 6h6l-3-6z" fill="none" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  ),
-  arrowRight: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" strokeWidth="2" />
-      <polyline points="13,6 19,12 13,18" fill="none" stroke="currentColor" strokeWidth="2" />
-    </svg>
+    <>
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+      <path d="M8 3v4M16 3v4M3.5 10h17" />
+    </>
   ),
   search: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" strokeWidth="2" />
-      <line x1="16.65" y1="16.65" x2="21" y2="21" stroke="currentColor" strokeWidth="2" />
-    </svg>
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m20 20-4.2-4.2" />
+    </>
+  ),
+  check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
+  arrowRight: <path d="M5 12h14M13 6l6 6-6 6" />,
+  arrowLeft: <path d="M19 12H5M11 6l-6 6 6 6" />,
+  chevronLeft: <path d="m14.5 6-6 6 6 6" />,
+  chevronRight: <path d="m9.5 6 6 6-6 6" />,
+  user: (
+    <>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4.5 20.5a7.5 7.5 0 0 1 15 0" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
+    </>
+  ),
+  message: <path d="M20.5 12a8.5 8.5 0 0 1-12.3 7.6L3.5 20.5l1-4.4A8.5 8.5 0 1 1 20.5 12z" />,
+  close: <path d="M6 6l12 12M18 6 6 18" />,
+  menu: <path d="M4 7h16M4 12h16M4 17h16" />,
+  building: <path d="M4 20.5V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v15.5M15 9h4a1 1 0 0 1 1 1v10.5M2.5 20.5h19M8 8h3M8 12h3M8 16h3" />,
+  desk: <path d="M3 10.5h18v3H3zM5.5 13.5v6.5M18.5 13.5v6.5M8.5 6.5h7v4h-7z" />,
+  download: <path d="M12 4v11M7 10.5l5 5 5-5M5 20h14" />,
+  info: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 11v5M12 8h.01" />
+    </>
   ),
 };
 
-const HERO_TYPEWRITER_LINES = [
-  { text: 'Let your host know', variant: 'plain' },
-  { text: "you're here.", variant: 'emphasized' },
-  { text: 'We will handle the rest.', variant: 'line2' },
-];
+function Icon({ name, className = '' }) {
+  return (
+    <svg
+      className={`gp-icon ${className}`}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {ICON_PATHS[name]}
+    </svg>
+  );
+}
 
-const VISIT_TYPE_OPTIONS = [
-  { value: 'now', label: 'I am here now', description: 'Let reception know you are waiting at the desk.', icon: ICONS.checkCircle },
-  { value: 'onway', label: 'I am on my way', description: 'Share an estimated arrival so your host can prepare.', icon: ICONS.arrowRight },
-  { value: 'scheduled', label: 'I have a scheduled visit', description: 'Pick a future check-in time within office hours (8 AM - 5 PM EAT).', icon: ICONS.calendar },
-];
-
-const ETA_OPTIONS = [
-  { label: '15 minutes', minutes: 15 },
-  { label: '30 minutes', minutes: 30 },
-  { label: '1 hour', minutes: 60 },
-];
-
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const isValidPhone = (value) => /^\+?\d{9,15}$/.test((value || '').replace(/[\s()-]/g, ''));
 
+function eatParts(date) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone: TZ,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      weekday: 'short',
+      hourCycle: 'h23',
+    })
+      .formatToParts(date)
+      .map((part) => [part.type, part.value])
+  );
+  return {
+    dateKey: `${parts.year}-${parts.month}-${parts.day}`,
+    hour: Number(parts.hour),
+    weekday: parts.weekday,
+  };
+}
+
+const isWeekend = (weekday) => weekday === 'Sat' || weekday === 'Sun';
+const formatInTz = (value, options, locale = 'en-GB') =>
+  new Intl.DateTimeFormat(locale, { timeZone: TZ, ...options }).format(new Date(value));
+const formatTime = (value) => formatInTz(value, { hour: 'numeric', minute: '2-digit' }, 'en-US');
+const formatDayLong = (value) => formatInTz(value, { weekday: 'long', day: 'numeric', month: 'long' });
+
+function isOfficeOpen(now) {
+  const { hour, weekday } = eatParts(now);
+  return !isWeekend(weekday) && hour >= OPEN_HOUR && hour < CLOSE_HOUR;
+}
+
+function buildSlots(dateKey, now) {
+  const earliest = now.getTime() + LEAD_MINUTES * 60 * 1000;
+  const slots = [];
+  for (let minutes = OPEN_HOUR * 60; minutes < CLOSE_HOUR * 60; minutes += SLOT_MINUTES) {
+    const hh = String(Math.floor(minutes / 60)).padStart(2, '0');
+    const mm = String(minutes % 60).padStart(2, '0');
+    const value = `${dateKey}T${hh}:${mm}:00${TZ_OFFSET}`;
+    slots.push({
+      value,
+      label: formatTime(value),
+      afternoon: minutes >= 12 * 60,
+      available: new Date(value).getTime() > earliest,
+    });
+  }
+  return slots;
+}
+
+function buildDays(now) {
+  const days = [];
+  for (let offset = 0; days.length < BOOKABLE_DAYS && offset < 21; offset += 1) {
+    const { dateKey, weekday } = eatParts(new Date(now.getTime() + offset * 86400000));
+    if (isWeekend(weekday) || !buildSlots(dateKey, now).some((slot) => slot.available)) continue;
+    const noon = `${dateKey}T12:00:00${TZ_OFFSET}`;
+    days.push({
+      key: dateKey,
+      label: offset === 0 ? 'Today' : offset === 1 ? 'Tmrw' : weekday,
+      date: formatInTz(noon, { day: 'numeric' }),
+      month: formatInTz(noon, { month: 'short' }),
+    });
+  }
+  return days;
+}
+
+const toStaff = (member) => ({
+  id: member.id,
+  name: (member.full_name || '').trim() || member.email || 'Staff member',
+  departmentId: member.department ?? null,
+  departmentName: member.department_name || '',
+  divisionId: member.division ?? null,
+  divisionName: member.division_name || '',
+  available: member.is_available !== false,
+  reason: (member.availability_reason || '').trim(),
+});
+
+const firstName = (name) => (name || '').trim().split(/\s+/)[0] || '';
+const initials = (name) =>
+  (name || '')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase();
+const placement = (host) => [host.departmentName, host.divisionName].filter(Boolean).join(' · ');
+const matchesQuery = (host, query) =>
+  !query || `${host.name} ${host.departmentName} ${host.divisionName}`.toLowerCase().includes(query);
+
+function hostBlockReason(host, mode, dayKey, unavailableByDate) {
+  if (!host.departmentId || !host.divisionId) return 'Not set up for visits yet';
+  if (mode === 'later') {
+    const blocked = dayKey && (unavailableByDate[String(host.id)] || []).includes(dayKey);
+    return blocked ? 'Unavailable on that day' : null;
+  }
+  if (!host.available) return host.reason || 'Unavailable right now';
+  return null;
+}
+
+function describeError(error) {
+  const detail = error?.response?.data;
+  if (detail && typeof detail === 'object') {
+    const [field, first] = Object.entries(detail)[0] || [];
+    const text = Array.isArray(first) ? first[0] : first;
+    if (typeof text === 'string') {
+      if (!field || field === 'detail' || field === 'non_field_errors') return text;
+      const label = field.replace(/_/g, ' ');
+      return `${label.charAt(0).toUpperCase()}${label.slice(1)}: ${text}`;
+    }
+  }
+  if (!error?.response) return "We couldn't reach the server. Check your connection and try again.";
+  return 'Something went wrong while sending your request. Please try again.';
+}
+
+const icsText = (value) => value.replace(/[\\,;]/g, (match) => `\\${match}`);
+
+function downloadCalendarInvite(visit) {
+  const start = new Date(visit.arrival);
+  const end = new Date(start.getTime() + 30 * 60 * 1000);
+  const stamp = (date) => date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Gatepass//Visit//EN',
+    'BEGIN:VEVENT',
+    `UID:${visit.reference}@gatepass`,
+    `DTSTAMP:${stamp(new Date())}`,
+    `DTSTART:${stamp(start)}`,
+    `DTEND:${stamp(end)}`,
+    `SUMMARY:${icsText(`Visit with ${visit.host.name}`)}`,
+    `DESCRIPTION:${icsText(`Gatepass reference ${visit.reference}`)}`,
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ];
+  const url = URL.createObjectURL(new Blob([lines.join('\r\n')], { type: 'text/calendar' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `gatepass-${visit.reference}.ics`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function readUnavailableByDate() {
+  try {
+    return JSON.parse(localStorage.getItem(UNAVAILABLE_KEY) || '{}') || {};
+  } catch {
+    return {};
+  }
+}
+
+function HeroCarousel() {
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const touchStart = useRef(null);
+  const count = SLIDES.length;
+  const goTo = useCallback((next) => setIndex((next + count) % count), [count]);
+  const slide = SLIDES[index];
+
+  useEffect(() => {
+    const onVisibility = () => setPaused(document.hidden);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
+
+  const onTouchEnd = (event) => {
+    if (touchStart.current === null) return;
+    const delta = event.changedTouches[0].clientX - touchStart.current;
+    touchStart.current = null;
+    if (Math.abs(delta) > 40) goTo(index + (delta < 0 ? 1 : -1));
+  };
+
+  return (
+    <div
+      className={`gp-showcase ${paused ? 'is-paused' : ''}`}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onTouchStart={(event) => {
+        touchStart.current = event.touches[0].clientX;
+      }}
+      onTouchEnd={onTouchEnd}
+      aria-roledescription="carousel"
+      aria-label="How Gatepass works"
+    >
+      {SLIDES.map((item, i) => (
+        <figure key={item.key} className={`gp-slide gp-slide--${item.key} ${i === index ? 'is-active' : ''}`} aria-hidden={i !== index}>
+          <img
+            src={`/images/carousel/${item.key}-1600.jpg`}
+            srcSet={`/images/carousel/${item.key}-800.jpg 800w, /images/carousel/${item.key}-1600.jpg 1600w`}
+            sizes="(min-width: 1100px) 56vw, 100vw"
+            alt={item.alt}
+            loading={i === 0 ? 'eager' : 'lazy'}
+            decoding="async"
+          />
+        </figure>
+      ))}
+      <div className="gp-showcase-shade" aria-hidden="true" />
+
+      <div className="gp-showcase-top">
+        <p className="gp-overline">Visitor management desk</p>
+        <h1>
+          Let your host know <em>you&apos;re here.</em>
+        </h1>
+      </div>
+
+      <div className="gp-showcase-bottom">
+        <div className="gp-caption" key={slide.key} aria-live="polite">
+          <span>{slide.eyebrow}</span>
+          <strong>{slide.title}</strong>
+          <p>{slide.text}</p>
+        </div>
+        <div className="gp-carousel-controls">
+          <button type="button" className="gp-carousel-btn" onClick={() => goTo(index - 1)} aria-label="Previous slide">
+            <Icon name="chevronLeft" />
+          </button>
+          <div className="gp-dots">
+            {SLIDES.map((item, i) => (
+              <button
+                key={item.key}
+                type="button"
+                className={`gp-dot ${i === index ? 'is-active' : ''}`}
+                onClick={() => goTo(i)}
+                aria-label={`Show slide ${i + 1}: ${item.eyebrow}`}
+                aria-current={i === index ? 'true' : undefined}
+              >
+                <span className="gp-dot-bar">
+                  {i === index && (
+                    <span
+                      key={index}
+                      className="gp-dot-fill"
+                      style={{ animationDuration: `${SLIDE_SECONDS}s` }}
+                      onAnimationEnd={() => goTo(index + 1)}
+                    />
+                  )}
+                </span>
+              </button>
+            ))}
+          </div>
+          <button type="button" className="gp-carousel-btn" onClick={() => goTo(index + 1)} aria-label="Next slide">
+            <Icon name="chevronRight" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatusTag({ host }) {
+  return (
+    <span className={`gp-status ${host.available ? '' : 'is-away'}`}>{host.available ? 'Available' : 'Away'}</span>
+  );
+}
+
+function Field({ label, optional, hint, error, full, children }) {
+  return (
+    <label className={`gp-field ${full ? 'gp-field--full' : ''}`}>
+      <span className="gp-label">
+        {label}
+        {optional && <small>optional</small>}
+      </span>
+      {children}
+      {(error || hint) && <span className={`gp-hint ${error ? 'is-error' : ''}`}>{error || hint}</span>}
+    </label>
+  );
+}
+
+function ReviewRow({ icon, label, value, sub, onEdit }) {
+  return (
+    <div className="gp-review-row">
+      <span className="gp-review-icon">
+        <Icon name={icon} />
+      </span>
+      <div className="gp-review-text">
+        <span>{label}</span>
+        <strong>{value}</strong>
+        {sub && <small>{sub}</small>}
+      </div>
+      <button type="button" className="gp-review-edit" onClick={onEdit}>
+        Edit
+      </button>
+    </div>
+  );
+}
+
+const emptyVisitor = { name: '', phone: '', email: '', purpose: '', message: '' };
+
 export default function HomePage() {
-  const EAT_TIMEZONE = 'Africa/Nairobi';
-  const STAFF_UNAVAILABLE_STORAGE_KEY = 'staff_unavailable_by_date';
-  const navigate = useNavigate();
-  const [currentStep, setCurrentStep] = useState(1);
-  const [departments, setDepartments] = useState([]);
-  const [allStaff, setAllStaff] = useState([]);
-  const [divisions, setDivisions] = useState([]);
+  const [receptionMode, setReceptionMode] = useState(() => localStorage.getItem(RECEPTION_KEY) === '1');
+  const [step, setStep] = useState(0);
+  const [mode, setMode] = useState(() => (localStorage.getItem(RECEPTION_KEY) === '1' ? 'now' : null));
+  const [eta, setEta] = useState(15);
+  const [dayKey, setDayKey] = useState(null);
+  const [slot, setSlot] = useState(null);
+  const [hostId, setHostId] = useState(null);
+  const [visitor, setVisitor] = useState(emptyVisitor);
+  const [touched, setTouched] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [visit, setVisit] = useState(null);
+  const [countdown, setCountdown] = useState(RECEPTION_RESET_SECONDS);
   const [staff, setStaff] = useState([]);
-  const [activeDeptId, setActiveDeptId] = useState(null);
-  const [activeDivisionId, setActiveDivisionId] = useState('all');
-  const [deptSearchTerm, setDeptSearchTerm] = useState('');
-  const [globalSearchTerm, setGlobalSearchTerm] = useState('');
-  const [drawerDivisions, setDrawerDivisions] = useState([]);
-  const [prefillSelection, setPrefillSelection] = useState(null);
+  const [departments, setDepartments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [hostQuery, setHostQuery] = useState('');
+  const [hostDept, setHostDept] = useState('all');
+  const [dirQuery, setDirQuery] = useState('');
+  const [dirDept, setDirDept] = useState('all');
+  const [now, setNow] = useState(() => new Date());
+  const [navOpen, setNavOpen] = useState(false);
   const [toast, setToast] = useState('');
-  const [unavailableByDate, setUnavailableByDate] = useState({});
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [showBookingModal, setShowBookingModal] = useState(false);
-  const [referenceNumber, setReferenceNumber] = useState('');
-  const [featureCarouselIndex, setFeatureCarouselIndex] = useState(0);
-  const [isReceptionistMode, setIsReceptionistMode] = useState(true);
-  const [homeNavOpen, setHomeNavOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    visitor_name: '',
-    visitor_email: '',
-    phone: '',
-    department: '',
-    division: '',
-    staff_member: '',
-    appointment_date: '',
-    visit_type: 'scheduled',
-    eta_minutes: 30,
-    message: '',
-  });
-  const [visitType, setVisitType] = useState('scheduled');
-  const [etaMinutes, setEtaMinutes] = useState(30);
-  const phoneValid = isValidPhone(formData.phone);
-  const [validation, setValidation] = useState({
-    nameValid: false,
-    emailValid: false,
-    emailError: false,
-    dateValid: false,
-    dateError: false,
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const totalSteps = 7;
-  const [typedLines, setTypedLines] = useState(HERO_TYPEWRITER_LINES.map(() => ''));
-  const [typingLine, setTypingLine] = useState(0);
-  const [typewriterDone, setTypewriterDone] = useState(false);
-  const getInitialMobileView = () => (typeof window !== 'undefined' ? window.innerWidth <= 900 : false);
-  const [isMobileView, setIsMobileView] = useState(getInitialMobileView);
-  const [isHeroFormVisible, setIsHeroFormVisible] = useState(() => !getInitialMobileView());
-  const heroRef = useRef(null);
+  const [unavailableByDate, setUnavailableByDate] = useState(readUnavailableByDate);
+  const flowRef = useRef(null);
+  const toastTimer = useRef(null);
 
   useEffect(() => {
     document.body.classList.add('home-background');
+    return () => document.body.classList.remove('home-background');
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([api.get('/staff/'), api.get('/departments/')])
+      .then(([staffRes, deptRes]) => {
+        if (!active) return;
+        setStaff((staffRes.data || []).map(toStaff));
+        setDepartments(deptRes.data || []);
+      })
+      .catch((error) => console.error('Failed to load hosts', error))
+      .finally(() => active && setLoading(false));
     return () => {
-      document.body.classList.remove('home-background');
+      active = false;
     };
   }, []);
 
   useEffect(() => {
-    const timers = [];
-    const buffer = HERO_TYPEWRITER_LINES.map(() => '');
-    let lineIndex = 0;
-    let charIndex = 0;
-
-    const finishTyping = () => {
-      setTypewriterDone(true);
-      setTypingLine(HERO_TYPEWRITER_LINES.length - 1);
-    };
-
-    const typeStep = () => {
-      if (lineIndex >= HERO_TYPEWRITER_LINES.length) {
-        finishTyping();
-        return;
-      }
-
-      setTypingLine(lineIndex);
-      const target = HERO_TYPEWRITER_LINES[lineIndex].text;
-      if (charIndex < target.length) {
-        charIndex += 1;
-        buffer[lineIndex] = target.slice(0, charIndex);
-        setTypedLines([...buffer]);
-        timers.push(setTimeout(typeStep, 65));
-      } else {
-        lineIndex += 1;
-        charIndex = 0;
-        if (lineIndex < HERO_TYPEWRITER_LINES.length) {
-          timers.push(setTimeout(typeStep, 420));
-        } else {
-          timers.push(setTimeout(finishTyping, 240));
-        }
-      }
-    };
-
-    timers.push(setTimeout(typeStep, 450));
-    return () => timers.forEach((timer) => clearTimeout(timer));
-  }, []);
-
-  useEffect(() => {
-    api.get('/departments/').then(({ data }) => setDepartments(data)).catch(console.error);
-  }, []);
-
-  useEffect(() => {
-    let isMounted = true;
-    const loadStaff = async () => {
-      try {
-        const { data } = await api.get('/staff/?include=active');
-        if (isMounted) setAllStaff((data || []).map(normalizeStaff));
-      } catch (error) {
-        try {
-          const { data } = await api.get('/staff/');
-          if (isMounted) setAllStaff((data || []).map(normalizeStaff));
-        } catch (innerError) {
-          console.error(innerError);
-        }
-      }
-    };
-    loadStaff();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleResize = () => {
-      if (typeof window === 'undefined') return;
-      const mobile = window.innerWidth <= 900;
-      setIsMobileView(mobile);
-    };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  useEffect(() => {
-    setIsHeroFormVisible(!isMobileView);
-  }, [isMobileView]);
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STAFF_UNAVAILABLE_STORAGE_KEY);
-      setUnavailableByDate(raw ? JSON.parse(raw) : {});
-    } catch {
-      setUnavailableByDate({});
-    }
-    const onStorage = (e) => {
-      if (e.key === STAFF_UNAVAILABLE_STORAGE_KEY) {
-        try {
-          setUnavailableByDate(e.newValue ? JSON.parse(e.newValue) : {});
-        } catch {
-          setUnavailableByDate({});
-        }
-      }
+    const timer = setInterval(() => setNow(new Date()), 60 * 1000);
+    const onStorage = (event) => {
+      if (event.key === UNAVAILABLE_KEY) setUnavailableByDate(readUnavailableByDate());
     };
     window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('storage', onStorage);
+    };
   }, []);
 
-  const scrollToHero = () => {
-    heroRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+  useEffect(() => () => clearTimeout(toastTimer.current), []);
 
-  const getEATNow = () => new Date(new Date().toLocaleString('en-US', { timeZone: EAT_TIMEZONE }));
-
-  const buildArrivalValue = (offsetMinutes = 0) => {
-    const base = getEATNow();
-    return new Date(base.getTime() + offsetMinutes * 60 * 1000).toISOString();
-  };
-
-  const updateAppointmentDateValue = (value, type = visitType, extra = {}) => {
-    setFormData((prev) => ({
-      ...prev,
-      appointment_date: value,
-      visit_type: type,
-      ...extra,
-    }));
-
-    if (!value) {
-      setValidation((prev) => ({ ...prev, dateValid: false, dateError: false }));
-      return;
-    }
-
-    if (type === 'scheduled') {
-      const selected = new Date(value);
-      if (Number.isNaN(selected.getTime())) {
-        setValidation((prev) => ({ ...prev, dateValid: false, dateError: true }));
-        return;
-      }
-      const now = getEATNow();
-      const selectedHours = selected.getHours();
-      const isOfficeHours = selectedHours >= 8 && selectedHours < 17;
-      if (formData.staff_member && isStaffUnavailableOnDate(formData.staff_member, value)) {
-        showToastMessage('This staff member is unavailable on that date. Please choose another date.');
-      }
-      setValidation((prev) => ({
-        ...prev,
-        dateValid: selected > now && isOfficeHours,
-        dateError: selected <= now || !isOfficeHours,
-      }));
-    } else {
-      setValidation((prev) => ({ ...prev, dateValid: true, dateError: false }));
-    }
-  };
-
-  const handleVisitTypeChange = (type) => {
-    if (visitType === type && type === 'scheduled') {
-      updateAppointmentDateValue(formData.appointment_date || '', 'scheduled');
-      return;
-    }
-    setVisitType(type);
-    if (type === 'now') {
-      updateAppointmentDateValue(buildArrivalValue(0), 'now');
-      return;
-    }
-    if (type === 'onway') {
-      updateAppointmentDateValue(buildArrivalValue(etaMinutes), 'onway', { eta_minutes: etaMinutes });
-      return;
-    }
-    updateAppointmentDateValue(formData.appointment_date || '', 'scheduled');
-  };
-
-  const handleEtaOptionChange = (minutes) => {
-    setEtaMinutes(minutes);
-    updateAppointmentDateValue(buildArrivalValue(minutes), 'onway', { eta_minutes: minutes });
-  };
-
-  const revealMobileHeroForm = () => {
-    setIsHeroFormVisible(true);
-    scrollToHero();
-  };
-
-  const hideMobileHeroForm = () => {
-    setIsHeroFormVisible(false);
-    scrollToHero();
-  };
-
-  useEffect(() => {
-    if (formData.department) {
-      api.get(`/divisions/?department_id=${formData.department}`).then(({ data }) => setDivisions(data)).catch(console.error);
-    } else {
-      setDivisions([]);
-    }
-  }, [formData.department]);
-
-  useEffect(() => {
-    if (!formData.division) {
-      setStaff([]);
-      return;
-    }
-    const divisionId = parseInt(formData.division, 10);
-    setStaff(allStaff.filter(s => getDivisionId(s) === divisionId));
-  }, [formData.division, allStaff]);
-
-  const showToastMessage = (message) => {
+  const showToast = useCallback((message) => {
     setToast(message);
-    setTimeout(() => setToast(''), 3500);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(''), 3200);
+  }, []);
+
+  const days = useMemo(() => buildDays(now), [now]);
+  const slots = useMemo(() => (dayKey ? buildSlots(dayKey, now) : []), [dayKey, now]);
+  const officeOpen = isOfficeOpen(now);
+  const host = staff.find((member) => member.id === hostId) || null;
+  const hostFirst = host ? firstName(host.name) : '';
+  const slotStillOpen = slot && slots.some((item) => item.value === slot && item.available);
+
+  useEffect(() => {
+    if (dayKey && !days.some((day) => day.key === dayKey)) {
+      setDayKey(null);
+      setSlot(null);
+    }
+  }, [days, dayKey]);
+
+  const nameOk = visitor.name.trim().length >= 2;
+  const phoneOk = isValidPhone(visitor.phone);
+  const emailOk = !visitor.email.trim() || EMAIL_RE.test(visitor.email.trim());
+  const whenOk = mode === 'now' || mode === 'onway' || (mode === 'later' && Boolean(slotStillOpen));
+  const blockFor = (member, visitMode = mode) =>
+    hostBlockReason(member, visitMode, visitMode === 'later' ? dayKey : null, unavailableByDate);
+  const hostOk = Boolean(host) && !blockFor(host);
+  const detailsOk = nameOk && phoneOk && emailOk;
+  const stepDone = [whenOk, hostOk, detailsOk, false];
+  const canOpenStep = (target) => stepDone.slice(0, target).every(Boolean);
+
+  const scrollFlowIntoView = () => {
+    const card = flowRef.current;
+    if (card && card.getBoundingClientRect().top < 0) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const getEATDateKey = (dateStr) =>
-    new Date(dateStr).toLocaleDateString('en-CA', { timeZone: EAT_TIMEZONE });
-
-  const isStaffUnavailableOnDate = (staffId, dateStr) => {
-    if (!staffId || !dateStr) return false;
-    const key = getEATDateKey(dateStr);
-    const dates = unavailableByDate[String(staffId)] || [];
-    return dates.includes(key);
+  const goToStep = (target) => {
+    if (target === step || !canOpenStep(target)) return;
+    setStep(target);
+    scrollFlowIntoView();
   };
 
-  const handleInputChange = (field, value) => {
-    if (field === 'appointment_date') {
-      setVisitType('scheduled');
-      updateAppointmentDateValue(value, 'scheduled');
-      return;
-    }
+  const advanceFromWhen = (visitMode) => {
+    const hostReady = host && !blockFor(host, visitMode);
+    setStep(hostReady ? 2 : 1);
+    scrollFlowIntoView();
+  };
 
-    setFormData(prev => ({ ...prev, [field]: value }));
-    if (['department', 'division', 'staff_member'].includes(field)) {
-      setPrefillSelection(null);
-    }
-
-    if (field === 'visitor_name') {
-      setValidation((prev) => ({ ...prev, nameValid: value.length > 2 }));
-    }
-    if (field === 'visitor_email') {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      setValidation((prev) => ({
-        ...prev,
-        emailValid: emailRegex.test(value),
-        emailError: value.length > 3 && !emailRegex.test(value),
-      }));
+  const selectMode = (visitMode) => {
+    setMode(visitMode);
+    if (visitMode === 'now') advanceFromWhen('now');
+    if (visitMode === 'later' && !dayKey) {
+      const firstOpen = days.find((day) => buildSlots(day.key, now).some((item) => item.available));
+      if (firstOpen) setDayKey(firstOpen.key);
     }
   };
 
-  const goToStep = (step) => {
-    if (step < 1 || step > totalSteps) return;
-    
-    if (step > currentStep) {
-      if (currentStep === 1 && (!validation.nameValid || !phoneValid)) return;
-      if (currentStep === 2 && !validation.emailValid) return;
-      if (currentStep === 6 && !isVisitStepReady()) return;
+  const pickHost = (member) => {
+    setHostId(member.id);
+    if (step === 1) {
+      setTimeout(() => {
+        setStep(2);
+        scrollFlowIntoView();
+      }, 180);
     }
-    
-    setCurrentStep(step);
   };
 
-  const submitBooking = async () => {
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-    const chosenStaff = allStaff.find((s) => String(s.id) === String(formData.staff_member));
-    if (chosenStaff?.is_available === false) {
-      const hostName = chosenStaff.full_name || chosenStaff.first_name || 'This host';
-      const reason = (chosenStaff.availability_reason || '').trim();
-      showToastMessage(
-        reason
-          ? `You can't alert ${hostName} right now: ${reason}`
-          : `You can't alert ${hostName} right now because they are unavailable.`
-      );
-      setIsSubmitting(false);
-      return;
+  const updateVisitor = (field, value) => setVisitor((prev) => ({ ...prev, [field]: value }));
+  const touch = (field) => setTouched((prev) => ({ ...prev, [field]: true }));
+
+  const goNext = () => {
+    if (step === 0 && whenOk) advanceFromWhen(mode);
+    else if (step === 1 && hostOk) goToStep(2);
+    else if (step === 2) {
+      setTouched({ name: true, phone: true, email: true });
+      if (detailsOk) goToStep(3);
     }
-    try {
-      const payload = {
-        visitor_name: formData.visitor_name,
-        visitor_email: formData.visitor_email,
-        visitor_phone: formData.phone || '',
-        department: formData.department,
-        division: formData.division,
-        staff_member: formData.staff_member,
-        appointment_date: formData.appointment_date,
-        message: formData.message || '',
-      };
-      
-      const { data } = await api.post('/appointments/create/', payload);
-      
-      // Send email notification to staff member via EmailJS
-      const selectedStaff = allStaff.find(s => String(s.id) === String(formData.staff_member));
-      if (selectedStaff?.email) {
-        const deptName = selectedStaff.department?.name || getDeptNameFromId(selectedStaff.department) || '';
-        const divName = selectedStaff.division?.name || selectedStaff.division_name || '';
-        
-        try {
-          await sendAppointmentRequestEmail({
-            to_email: selectedStaff.email,
-            to_name: selectedStaff.full_name || selectedStaff.first_name || '',
-            visitor_name: formData.visitor_name,
-            visitor_email: formData.visitor_email,
-            department_name: deptName,
-            division_name: divName,
-            appointment_date: formData.appointment_date,
-            message: formData.message || '',
-            staff_name: selectedStaff.full_name || selectedStaff.first_name || '',
-          });
-        } catch (emailError) {
-          console.error('Failed to send email notification:', emailError);
+  };
+
+  const resetFlow = useCallback(() => {
+    setStep(0);
+    setMode(receptionMode ? 'now' : null);
+    setEta(15);
+    setDayKey(null);
+    setSlot(null);
+    setHostId(null);
+    setVisitor(emptyVisitor);
+    setTouched({});
+    setSubmitError('');
+    setVisit(null);
+    setHostQuery('');
+    setHostDept('all');
+  }, [receptionMode]);
+
+  useEffect(() => {
+    if (!visit || !receptionMode) return undefined;
+    setCountdown(RECEPTION_RESET_SECONDS);
+    const timer = setInterval(() => {
+      setCountdown((value) => {
+        if (value <= 1) {
+          clearInterval(timer);
+          resetFlow();
+          return RECEPTION_RESET_SECONDS;
         }
-      }
-      
-      setReferenceNumber(data.reference_number || `GPX-${Date.now()}`);
-      setShowSuccess(true);
-      showToastMessage('Visit request submitted successfully!');
+        return value - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [visit, receptionMode, resetFlow]);
+
+  const toggleReception = () => {
+    const next = !receptionMode;
+    setReceptionMode(next);
+    localStorage.setItem(RECEPTION_KEY, next ? '1' : '0');
+    if (next && step === 0 && !mode) setMode('now');
+    setNavOpen(false);
+    showToast(next ? 'Reception mode on: checking in walk-in visitors' : 'Reception mode off');
+  };
+
+  const note = [visitor.purpose && `Purpose: ${visitor.purpose}`, visitor.message.trim()].filter(Boolean).join(' · ');
+
+  const submit = async () => {
+    if (!host || submitting) return;
+    const arrival =
+      mode === 'now' ? new Date() : mode === 'onway' ? new Date(Date.now() + eta * 60 * 1000) : new Date(slot);
+    setSubmitting(true);
+    setSubmitError('');
+    try {
+      const { data } = await api.post('/appointments/create/', {
+        visitor_name: visitor.name.trim(),
+        visitor_phone: visitor.phone.trim(),
+        visitor_email: visitor.email.trim(),
+        department: host.departmentId,
+        division: host.divisionId,
+        staff_member: host.id,
+        appointment_date: arrival.toISOString(),
+        message: note,
+      });
+      const id = data?.data?.id;
+      setVisit({
+        reference: id ? `GP-${String(id).padStart(5, '0')}` : `GP-${String(Date.now()).slice(-6)}`,
+        arrival: arrival.toISOString(),
+        mode,
+        eta,
+        host,
+        visitor: { ...visitor },
+      });
+      scrollFlowIntoView();
     } catch (error) {
-      console.error('Failed to submit visit request:', error);
-      const detail = error?.response?.data;
-      const firstField = detail && typeof detail === 'object' ? Object.keys(detail)[0] : null;
-      const fieldMessage = firstField ? `${firstField}: ${detail[firstField]}` : null;
-      showToastMessage(fieldMessage || 'Failed to submit visit request. Please try again.');
+      setSubmitError(describeError(error));
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
 
-  const resetForm = () => {
-    setCurrentStep(1);
-    setShowSuccess(false);
-    setReferenceNumber('');
-    setPrefillSelection(null);
-    setFormData({
-      visitor_name: '',
-      visitor_email: '',
-      phone: '',
-      department: '',
-      division: '',
-      staff_member: '',
-      appointment_date: '',
-      visit_type: 'scheduled',
-      eta_minutes: 30,
-      message: '',
-    });
-    setVisitType('scheduled');
-    setEtaMinutes(30);
-    setValidation({
-      nameValid: false,
-      emailValid: false,
-      emailError: false,
-      dateValid: false,
-      dateError: false,
-    });
+  const scrollToId = (id) => {
+    setNavOpen(false);
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const scrollToSection = (id) => {
-    const element = document.getElementById(id);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-    }
+  const visitFromDirectory = (member) => {
+    setHostId(member.id);
+    setVisit(null);
+    if (whenOk && !blockFor(member)) setStep(2);
+    else setStep(0);
+    scrollToId('check-in');
+    showToast(`${firstName(member.name)} selected. ${whenOk ? 'Add your details' : 'Now choose when'}.`);
   };
 
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  const whenLabel = () => {
+    if (mode === 'now') return 'Right now · at reception';
+    if (mode === 'onway') return `In about ${eta} minutes`;
+    if (mode === 'later' && slot) return `${formatDayLong(slot)}, ${formatTime(slot)}`;
+    return 'Not chosen yet';
   };
 
-  const toggleMode = () => {
-    setIsReceptionistMode(!isReceptionistMode);
-    showToastMessage(isReceptionistMode ? 'Visitor Mode ON' : 'Receptionist Mode ON');
-  };
+  const hostList = staff
+    .filter((member) => hostDept === 'all' || String(member.departmentId) === hostDept)
+    .filter((member) => matchesQuery(member, hostQuery.trim().toLowerCase()))
+    .sort((a, b) => Number(Boolean(blockFor(a))) - Number(Boolean(blockFor(b))) || a.name.localeCompare(b.name));
 
-  const getDeptName = (deptId) => {
-    const dept = departments.find(d => d.id === parseInt(deptId));
-    return dept ? dept.name : deptId;
-  };
+  const directory = staff
+    .filter((member) => dirDept === 'all' || String(member.departmentId) === dirDept)
+    .filter((member) => matchesQuery(member, dirQuery.trim().toLowerCase()))
+    .sort((a, b) => Number(b.available) - Number(a.available) || a.name.localeCompare(b.name));
 
-  const getStaffName = (staffId) => {
-    const s = staff.find(st => st.id === parseInt(staffId));
-    return s ? (s.full_name || `${s.first_name} ${s.last_name}`.trim()) : staffId;
-  };
+  const departmentChips = (value, onChange) => (
+    <div className="gp-chips gp-chips--scroll" role="tablist" aria-label="Filter by department">
+      {[{ id: 'all', name: 'All' }, ...departments].map((dept) => (
+        <button
+          key={dept.id}
+          type="button"
+          role="tab"
+          aria-selected={value === String(dept.id)}
+          className={`gp-chip ${value === String(dept.id) ? 'is-on' : ''}`}
+          onClick={() => onChange(String(dept.id))}
+        >
+          {dept.name}
+        </button>
+      ))}
+    </div>
+  );
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return 'TBC';
-    const date = new Date(dateStr);
-    return date.toLocaleString('en-GB', { 
-      timeZone: EAT_TIMEZONE,
-      day: '2-digit', 
-      month: 'short', 
-      year: 'numeric', 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
-  };
+  const titles = receptionMode
+    ? ['When is the visit?', 'Who are they here to see?', 'Visitor details', 'Review and send']
+    : ['When are you visiting?', 'Who are you here to see?', 'Your details', 'Review and send'];
 
-  const formatDateShort = (dateStr) => {
-    if (!dateStr) return 'TBC';
-    const date = new Date(dateStr);
-    return date.toLocaleString('en-GB', { 
-      timeZone: EAT_TIMEZONE,
-      day: '2-digit', 
-      month: 'short', 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
-  };
+  const primaryLabel =
+    step < 3
+      ? 'Continue'
+      : mode === 'now'
+        ? `Alert ${hostFirst} now`
+        : mode === 'onway'
+          ? `Let ${hostFirst} know`
+          : 'Send visit request';
 
-  const getVisitTypeLabel = () => {
-    if (visitType === 'now') return 'Here now';
-    if (visitType === 'onway') return 'On my way';
-    return 'Scheduled visit';
-  };
-
-  const getArrivalLabel = () => {
-    if (!formData.appointment_date) return 'TBC';
-    if (visitType === 'now') return 'Now (walk-in)';
-    if (visitType === 'onway') {
-      const minutesLabel = etaMinutes ? `${etaMinutes} minute${etaMinutes === 1 ? '' : 's'}` : 'soon';
-      return `In ${minutesLabel} · ${formatDateShort(formData.appointment_date)}`;
-    }
-    return formatDateShort(formData.appointment_date);
-  };
-
-  // Check if selected date is more than 30 days in advance (next day selection)
-  const isNextDaySelection = (dateStr) => {
-    if (!dateStr) return false;
-    const selected = new Date(dateStr);
-    // Use EAT timezone for comparison
-    const now = new Date();
-    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-    return selected > thirtyDaysFromNow;
-  };
-
-  const isVisitStepReady = () => {
-    if (!formData.appointment_date) return false;
-    if (visitType === 'scheduled') {
-      return validation.dateValid && !isNextDaySelection(formData.appointment_date);
-    }
-    return true;
-  };
-
-  const renderVisitStepBody = () => (
+  const renderWhen = () => (
     <>
-      <div className="visit-type-grid">
-        {VISIT_TYPE_OPTIONS.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            className={`visit-option ${visitType === option.value ? 'is-active' : ''}`}
-            onClick={() => handleVisitTypeChange(option.value)}
-          >
-            <span className="visit-option-icon icon" aria-hidden="true">
-              {option.icon}
-            </span>
-            <div className="visit-option-label">{option.label}</div>
-            <div className="visit-option-desc">{option.description}</div>
-          </button>
-        ))}
+      <div className="gp-modes" role="radiogroup" aria-label="Visit type">
+        {VISIT_MODES.map((option) => {
+          const disabled = option.id !== 'later' && host && !host.available;
+          return (
+            <button
+              key={option.id}
+              type="button"
+              role="radio"
+              aria-checked={mode === option.id}
+              className={`gp-mode ${mode === option.id ? 'is-on' : ''}`}
+              disabled={disabled}
+              onClick={() => selectMode(option.id)}
+            >
+              <span className="gp-mode-icon">
+                <Icon name={option.icon} />
+              </span>
+              <span className="gp-mode-text">
+                <strong>{option.title}</strong>
+                <small>{option.sub}</small>
+              </span>
+              <span className="gp-mode-check">
+                <Icon name="check" />
+              </span>
+            </button>
+          );
+        })}
       </div>
-      {visitType === 'onway' && (
-        <div className="eta-group">
-          <div className="eta-label">Arriving in</div>
-          <div className="eta-options">
-            {ETA_OPTIONS.map((item) => (
+
+      {host && !host.available && (
+        <p className="gp-note">
+          <Icon name="info" />
+          <span>
+            {hostFirst} is away right now{host.reason ? `: ${host.reason}` : ''}. You can still plan a visit for later.
+          </span>
+        </p>
+      )}
+      {!officeOpen && mode && mode !== 'later' && (
+        <p className="gp-note gp-note--warn">
+          <Icon name="clock" />
+          <span>The office is closed right now (open weekdays 8 AM to 5 PM). Your host may reply when they are back.</span>
+        </p>
+      )}
+
+      {mode === 'onway' && (
+        <div className="gp-sub">
+          <p className="gp-sub-label">Arriving in about</p>
+          <div className="gp-chips">
+            {ETA_CHOICES.map((minutes) => (
               <button
-                key={item.minutes}
+                key={minutes}
                 type="button"
-                className={`eta-option ${etaMinutes === item.minutes ? 'is-active' : ''}`}
-                onClick={() => handleEtaOptionChange(item.minutes)}
+                aria-pressed={eta === minutes}
+                className={`gp-chip ${eta === minutes ? 'is-on' : ''}`}
+                onClick={() => setEta(minutes)}
               >
-                {item.label}
+                {minutes} min
               </button>
             ))}
           </div>
         </div>
       )}
-      {visitType === 'scheduled' && (
-        <div className="field">
-          <label className="field-label">
-            Scheduled arrival time <span className="field-required">*</span> (EAT Timezone)
-          </label>
-          <input
-            type="datetime-local"
-            className={`field-input ${validation.dateValid ? 'valid' : ''} ${validation.dateError ? 'error' : ''}`}
-            value={formData.appointment_date}
-            onChange={(e) => handleInputChange('appointment_date', e.target.value)}
-            min={new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 16)}
-            max={new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
-          />
-          <div className={`field-hint ${validation.dateValid ? 'field-valid-msg' : ''} ${validation.dateError ? 'field-error' : ''}`}>
-            {validation.dateValid
-              ? formatDate(formData.appointment_date)
-              : 'Select a future time between 8 AM and 5 PM EAT.'
-            }
+
+      {mode === 'later' && (
+        <div className="gp-sub">
+          <p className="gp-sub-label">Pick a day</p>
+          <div className="gp-days">
+            {days.map((day) => (
+              <button
+                key={day.key}
+                type="button"
+                aria-pressed={dayKey === day.key}
+                className={`gp-day ${dayKey === day.key ? 'is-on' : ''}`}
+                onClick={() => {
+                  setDayKey(day.key);
+                  setSlot(null);
+                }}
+              >
+                <span>{day.label}</span>
+                <strong>{day.date}</strong>
+                <small>{day.month}</small>
+              </button>
+            ))}
           </div>
+
+          {dayKey && (
+            <>
+              <p className="gp-sub-label gp-sub-label--spaced">
+                Pick a time <span>East Africa Time</span>
+              </p>
+              {[
+                ['Morning', false],
+                ['Afternoon', true],
+              ].map(([label, afternoon]) => (
+                <div className="gp-slot-group" key={label}>
+                  <span className="gp-slot-group-label">{label}</span>
+                  <div className="gp-slots">
+                    {slots
+                      .filter((item) => item.afternoon === afternoon)
+                      .map((item) => (
+                        <button
+                          key={item.value}
+                          type="button"
+                          disabled={!item.available}
+                          aria-pressed={slot === item.value}
+                          className={`gp-slot ${slot === item.value ? 'is-on' : ''}`}
+                          onClick={() => setSlot(item.value)}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+
+          {slotStillOpen && (
+            <p className="gp-picked">
+              <Icon name="calendar" />
+              {formatDayLong(slot)} at {formatTime(slot)}
+            </p>
+          )}
         </div>
       )}
-      <div className="info-box">
-        <span className="icon" aria-hidden="true">{ICONS.bell}</span>
-        <span>Choose the option that best matches your visit so reception can notify your host with the right context.</span>
+    </>
+  );
+
+  const renderHost = () => (
+    <>
+      <div className="gp-search">
+        <Icon name="search" />
+        <input
+          className="gp-input"
+          type="search"
+          placeholder="Search name or department"
+          value={hostQuery}
+          onChange={(event) => setHostQuery(event.target.value)}
+          aria-label="Search for your host"
+        />
+      </div>
+      {departments.length > 1 && departmentChips(hostDept, setHostDept)}
+      <div className="gp-hosts" role="radiogroup" aria-label="Hosts">
+        {loading &&
+          [0, 1, 2].map((key) => <div key={key} className="gp-skeleton" aria-hidden="true" />)}
+        {!loading &&
+          hostList.map((member) => {
+            const block = blockFor(member);
+            return (
+              <button
+                key={member.id}
+                type="button"
+                role="radio"
+                aria-checked={hostId === member.id}
+                disabled={Boolean(block)}
+                className={`gp-host ${hostId === member.id ? 'is-on' : ''}`}
+                onClick={() => pickHost(member)}
+              >
+                <span className={`gp-avatar gp-tone-${member.id % 5}`}>{initials(member.name)}</span>
+                <span className="gp-host-text">
+                  <strong>{member.name}</strong>
+                  <small>{placement(member) || 'Staff'}</small>
+                  {block ? (
+                    <em>{block}</em>
+                  ) : (
+                    mode === 'later' && !member.available && <em className="is-soft">Away today, but you can book</em>
+                  )}
+                </span>
+                <StatusTag host={member} />
+              </button>
+            );
+          })}
+        {!loading && hostList.length === 0 && (
+          <div className="gp-empty">
+            {staff.length === 0
+              ? 'No hosts are listed yet. Please ask at the reception desk.'
+              : `No one matches "${hostQuery}". Try another name or department.`}
+          </div>
+        )}
       </div>
     </>
   );
 
-  const getInitials = (firstName, lastName) => {
-    return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
-  };
+  const renderDetails = () => (
+    <div className="gp-fields">
+      <Field
+        full
+        label={receptionMode ? "Visitor's full name" : 'Full name'}
+        error={touched.name && !nameOk ? 'Please enter a full name.' : ''}
+      >
+        <input
+          className={`gp-input ${touched.name && !nameOk ? 'is-invalid' : ''}`}
+          autoComplete={receptionMode ? 'off' : 'name'}
+          placeholder="e.g. Sarah Kiprono"
+          value={visitor.name}
+          onChange={(event) => updateVisitor('name', event.target.value)}
+          onBlur={() => touch('name')}
+        />
+      </Field>
+      <Field
+        label="Phone number"
+        hint="We text updates here, no internet needed."
+        error={touched.phone && !phoneOk ? 'Enter a valid number, e.g. 0712 345 678.' : ''}
+      >
+        <input
+          className={`gp-input ${touched.phone && !phoneOk ? 'is-invalid' : ''}`}
+          type="tel"
+          inputMode="tel"
+          autoComplete={receptionMode ? 'off' : 'tel'}
+          placeholder="0712 345 678"
+          value={visitor.phone}
+          onChange={(event) => updateVisitor('phone', event.target.value)}
+          onBlur={() => touch('phone')}
+        />
+      </Field>
+      <Field
+        label="Email"
+        optional
+        hint="Get an email copy of updates."
+        error={touched.email && !emailOk ? 'That email address looks incomplete.' : ''}
+      >
+        <input
+          className={`gp-input ${touched.email && !emailOk ? 'is-invalid' : ''}`}
+          type="email"
+          inputMode="email"
+          autoComplete={receptionMode ? 'off' : 'email'}
+          placeholder="you@example.com"
+          value={visitor.email}
+          onChange={(event) => updateVisitor('email', event.target.value)}
+          onBlur={() => touch('email')}
+        />
+      </Field>
+      <div className="gp-field gp-field--full">
+        <span className="gp-label">
+          Purpose <small>optional</small>
+        </span>
+        <div className="gp-chips">
+          {PURPOSES.map((purpose) => (
+            <button
+              key={purpose}
+              type="button"
+              aria-pressed={visitor.purpose === purpose}
+              className={`gp-chip ${visitor.purpose === purpose ? 'is-on' : ''}`}
+              onClick={() => updateVisitor('purpose', visitor.purpose === purpose ? '' : purpose)}
+            >
+              {purpose}
+            </button>
+          ))}
+        </div>
+      </div>
+      <Field full label={`Note for ${hostFirst || 'your host'}`} optional>
+        <textarea
+          className="gp-input"
+          rows={3}
+          maxLength={300}
+          placeholder="Anything they should know before you meet"
+          value={visitor.message}
+          onChange={(event) => updateVisitor('message', event.target.value)}
+        />
+      </Field>
+    </div>
+  );
 
-  const getStaffInitials = (member) => {
-    if (member.first_name || member.last_name) return getInitials(member.first_name, member.last_name);
-    const { first, last } = splitFullName(member.full_name || '');
-    return getInitials(first, last);
-  };
-
-  const getAvatarColor = (index) => {
-    const colors = [
-      { bg: '#dbeafe', color: '#1d4ed8' },
-      { bg: '#ede9fe', color: '#5b21b6' },
-      { bg: '#dcfce7', color: '#15803d' },
-      { bg: '#fef3c7', color: '#b45309' },
-      { bg: '#fce7f3', color: '#be185d' },
-    ];
-    return colors[index % colors.length];
-  };
-
-  const deptIcons = [ICONS.wrench, ICONS.cash, ICONS.users, ICONS.gear, ICONS.scales];
-
-  const normalize = (value) => (value || '').toString().toLowerCase();
-
-  const toId = (value) => {
-    if (value === null || value === undefined || value === '') return null;
-    const parsed = Number.parseInt(value, 10);
-    return Number.isNaN(parsed) ? null : parsed;
-  };
-
-  const getDeptId = (member) => toId(member.department?.id ?? member.department_id ?? member.departmentId ?? member.department ?? null);
-  const getDivisionId = (member) => toId(member.division?.id ?? member.division_id ?? member.divisionId ?? member.division ?? null);
-  const getDeptNameFromId = (deptId) => departments.find(d => d.id === deptId)?.name || '';
-  const getDivisionNameFromId = (divId) => divisions.find(d => d.id === divId)?.name || '';
-  const getStaffNameFromId = (staffId) => allStaff.find(s => s.id === staffId)?.full_name || allStaff.find(s => s.id === staffId)?.first_name || '';
-
-  const splitFullName = (value = '') => {
-    const parts = value.trim().split(' ').filter(Boolean);
-    if (parts.length === 0) return { first: '', last: '' };
-    if (parts.length === 1) return { first: parts[0], last: '' };
-    return { first: parts[0], last: parts.slice(1).join(' ') };
-  };
-
-  const normalizeStaff = (member) => {
-    const fullName = member.full_name || `${member.first_name || ''} ${member.last_name || ''}`.trim();
-    const { first, last } = splitFullName(fullName);
-    return {
-      ...member,
-      first_name: member.first_name || first,
-      last_name: member.last_name || last,
-      full_name: fullName,
-      department: member.department?.id ? member.department : {
-        id: getDeptId(member),
-        name: member.department_name || getDeptNameFromId(getDeptId(member)) || '',
-      },
-      division: member.division?.id ? member.division : {
-        id: getDivisionId(member),
-        name: member.division_name || '',
-      },
-      is_available: typeof member.is_available === 'boolean' ? member.is_available : !!member.is_active,
-      availability_reason: member.availability_reason || '',
-    };
-  };
-
-  const getStaffSearchText = (member) => {
-    const name = `${member.first_name || ''} ${member.last_name || ''}`.trim();
-    const deptName = member.department?.name || getDeptNameFromId(getDeptId(member)) || '';
-    const division = member.division?.name || '';
-    const title = member.title || member.role || '';
-    const desc = member.description || member.bio || member.specialty || '';
-    return normalize(`${name} ${deptName} ${division} ${title} ${desc}`);
-  };
-
-  const matchesTerm = (member, term) => getStaffSearchText(member).includes(term);
-
-  const getDepartmentStaff = (deptId) => allStaff.filter(s => getDeptId(s) === deptId);
-
-  const handleDepartmentClick = async (dept) => {
-    if (activeDeptId === dept.id) {
-      setActiveDeptId(null);
-      setDrawerDivisions([]);
-      setActiveDivisionId('all');
-      setDeptSearchTerm('');
-      return;
-    }
-    setActiveDeptId(dept.id);
-    setActiveDivisionId('all');
-    setDeptSearchTerm('');
-    try {
-      const { data } = await api.get(`/divisions/?department_id=${dept.id}`);
-      setDrawerDivisions(data);
-    } catch (error) {
-      console.error(error);
-      setDrawerDivisions([]);
-    }
-  };
-
-  const handleBookWithStaff = (member) => {
-    if (!member.is_available) {
-      const hostName = member.full_name || member.first_name || 'This host';
-      const reasonText = (member.availability_reason || '').trim();
-      showToastMessage(
-        reasonText
-          ? `You can't alert ${hostName} right now: ${reasonText}`
-          : `You can't alert ${hostName} right now because they're unavailable.`
-      );
-      return;
-    }
-    if (isStaffUnavailableOnDate(member.id, formData.appointment_date)) {
-      showToastMessage('That staff member is unavailable on the selected date.');
-      return;
-    }
-    const departmentId = (getDeptId(member) ?? '').toString();
-    const divisionId = (getDivisionId(member) ?? '').toString();
-    setFormData(prev => ({
-      ...prev,
-      department: departmentId,
-      division: divisionId,
-      staff_member: member.id,
-    }));
-    setPrefillSelection({
-      staffName: member.full_name || `${member.first_name} ${member.last_name}`.trim(),
-      departmentName: member.department?.name || getDeptNameFromId(getDeptId(member)) || 'Department',
-      divisionName: member.division?.name || '',
-    });
-    setCurrentStep(1);
-    if (isMobileView) {
-      setShowBookingModal(false);
-      revealMobileHeroForm();
-    } else {
-      setShowBookingModal(true);
-    }
-  };
-
-  const handleAlertHost = () => {
-    if (!hasAvailableStaff) {
-      const reason = (firstOfflineStaff?.availability_reason || '').trim();
-      const fallbackName = firstOfflineStaff?.full_name || 'your host';
-      showToastMessage(
-        reason
-          ? `You can't alert ${fallbackName} right now: ${reason}`
-        : 'You can\'t alert a host right now because everyone is unavailable. Please try again later.'
-      );
-      return;
-    }
-    if (isMobileView) {
-      revealMobileHeroForm();
-    } else {
-      setShowBookingModal(true);
-    }
-  };
-
-  const selectedStaff = formData.staff_member ? allStaff.find((member) => String(member.id) === String(formData.staff_member)) : null;
-  const hasAvailableStaff = allStaff.some((member) => member.is_available);
-  const firstOfflineStaff = allStaff.find((member) => !member.is_available);
-  const heroUnavailableStaff = selectedStaff?.is_available === false ? selectedStaff : (!hasAvailableStaff ? firstOfflineStaff : null);
-  const heroUnavailableLabel = heroUnavailableStaff
-    ? heroUnavailableStaff.full_name
-      ? `${heroUnavailableStaff.full_name} is offline`
-      : 'Hosts temporarily offline'
-    : '';
-  const heroUnavailableDetail = heroUnavailableStaff
-    ? heroUnavailableStaff.availability_reason || 'Visitors cannot alert this host right now.'
-    : '';
-
-  const normalizedGlobalTerm = normalize(globalSearchTerm).trim();
-  const normalizedDeptTerm = normalize(deptSearchTerm).trim();
-  const staffDateBlocked = (staffId) => isStaffUnavailableOnDate(staffId, formData.appointment_date);
-
-  const globalResults = normalizedGlobalTerm
-    ? allStaff.filter(member => matchesTerm(member, normalizedGlobalTerm))
-        .sort((a, b) => (b.is_available === a.is_available ? 0 : b.is_available ? 1 : -1))
-        .slice(0, 8)
-    : [];
-
-  const filteredDepartments = normalizedGlobalTerm
-    ? departments.filter(dept => {
-        if (normalize(dept.name).includes(normalizedGlobalTerm)) return true;
-        return getDepartmentStaff(dept.id).some(member => matchesTerm(member, normalizedGlobalTerm));
-      })
-    : departments;
-
-  const drawerStaff = activeDeptId ? getDepartmentStaff(activeDeptId) : [];
-  const filteredDrawerStaff = drawerStaff
-    .filter(member => {
-      if (activeDivisionId === 'all') return true;
-      return getDivisionId(member) === parseInt(activeDivisionId, 10);
-    })
-    .filter(member => (normalizedDeptTerm ? matchesTerm(member, normalizedDeptTerm) : true))
-    .sort((a, b) => (b.is_available === a.is_available ? 0 : b.is_available ? 1 : -1));
-
-  const heroClasses = ['hero'];
-  if (isMobileView) heroClasses.push('hero-mobile');
-  if (isMobileView && isHeroFormVisible) heroClasses.push('hero-mobile-active');
-  const heroTitleAnnounce = HERO_TYPEWRITER_LINES.map((line) => line.text).join(' ');
-
-  return (
-    <div className="home-page">
-      {/* Receptionist Mode Banner */}
-      {isReceptionistMode && (
-        <div className="reception-banner">
-          <span className="rb-icon icon" aria-hidden="true">{ICONS.monitor}</span>
-          <span className="rb-text">
-            <strong>Receptionist Mode Active</strong> - You are checking in on behalf of a walk-in visitor.
-            All fields are required. Visitor will receive email confirmation.
-          </span>
-          <span className="rb-switch" onClick={toggleMode}>Switch to Visitor Mode</span>
-          <span className="rb-close icon" aria-hidden="true" onClick={() => setIsReceptionistMode(false)}>
-            {ICONS.close}
-          </span>
+  const renderReview = () => (
+    <>
+      <div className="gp-review">
+        <ReviewRow icon="clock" label="When" value={whenLabel()} onEdit={() => goToStep(0)} />
+        <ReviewRow icon="user" label="Host" value={host?.name} sub={host && placement(host)} onEdit={() => goToStep(1)} />
+        <ReviewRow
+          icon="pin"
+          label="Visitor"
+          value={visitor.name.trim()}
+          sub={[visitor.phone.trim(), visitor.email.trim()].filter(Boolean).join(' · ')}
+          onEdit={() => goToStep(2)}
+        />
+        {note && <ReviewRow icon="message" label="Note" value={note} onEdit={() => goToStep(2)} />}
+      </div>
+      <p className="gp-fineprint">
+        <Icon name="message" />
+        <span>
+          {hostFirst} gets an SMS, email and push alert. {receptionMode ? 'The visitor' : 'You'} will get a text at{' '}
+          <strong>{visitor.phone.trim()}</strong> when they respond.
+        </span>
+      </p>
+      {submitError && (
+        <div className="gp-error" role="alert">
+          {submitError}
         </div>
       )}
+    </>
+  );
 
-      {/* Navbar */}
-      <nav className={`navbar ${homeNavOpen ? 'is-open' : ''}`}>
-        <div className="nav-brand" onClick={scrollToTop} style={{ cursor: 'pointer' }}>
-          <div className="nav-logo">
-            <span className="icon" aria-hidden="true">{ICONS.calendar}</span>
+  const renderSuccess = () => {
+    const visitorFirst = firstName(visit.visitor.name);
+    const visitHostFirst = firstName(visit.host.name);
+    const headline =
+      visit.mode === 'now'
+        ? `Take a seat, ${visitorFirst}.`
+        : visit.mode === 'onway'
+          ? `See you soon, ${visitorFirst}.`
+          : `You're booked in, ${visitorFirst}.`;
+    const body =
+      visit.mode === 'now'
+        ? `${visit.host.name} has been alerted that you're at reception.`
+        : visit.mode === 'onway'
+          ? `${visit.host.name} knows you're arriving in about ${visit.eta} minutes.`
+          : `${visit.host.name} will confirm your visit for ${formatDayLong(visit.arrival)} at ${formatTime(visit.arrival)}.`;
+    return (
+      <div className="gp-pass">
+        <span className="gp-pass-check">
+          <Icon name="check" />
+        </span>
+        <p className="gp-eyebrow">{visit.mode === 'later' ? 'Request sent' : 'Host alerted'}</p>
+        <h2>{headline}</h2>
+        <p className="gp-pass-body">
+          {body} We&apos;ll text <strong>{visit.visitor.phone.trim()}</strong> when they respond.
+        </p>
+
+        <div className="gp-ticket">
+          <dl className="gp-ticket-grid">
+            <div>
+              <dt>Visitor</dt>
+              <dd>{visit.visitor.name.trim()}</dd>
+            </div>
+            <div>
+              <dt>Host</dt>
+              <dd>{visit.host.name}</dd>
+            </div>
+            <div>
+              <dt>When</dt>
+              <dd>
+                {visit.mode === 'later'
+                  ? `${formatInTz(visit.arrival, { weekday: 'short', day: 'numeric', month: 'short' })}, ${formatTime(visit.arrival)}`
+                  : visit.mode === 'now'
+                    ? `Now, ${formatTime(visit.arrival)}`
+                    : `Around ${formatTime(visit.arrival)}`}
+              </dd>
+            </div>
+            <div>
+              <dt>Where</dt>
+              <dd>{placement(visit.host) || 'Reception'}</dd>
+            </div>
+          </dl>
+          <div className="gp-ticket-foot">
+            <span className="gp-ticket-status">
+              <span className="gp-pulse" aria-hidden="true" />
+              Waiting for {visitHostFirst}
+            </span>
+            <span className="gp-ticket-ref">{visit.reference}</span>
           </div>
-          <div>
-            <div className="nav-name">Gatepass</div>
-            <div className="nav-tagline">Visitor management system</div>
-          </div>
-        </div>
-        <button
-          className="nav-hamburger"
-          type="button"
-          aria-label="Toggle navigation"
-          aria-expanded={homeNavOpen}
-          onClick={() => setHomeNavOpen((prev) => !prev)}
-        >
-          <span></span>
-          <span></span>
-          <span></span>
-        </button>
-
-        <div className="nav-center">
-          <div className="nav-tab active" onClick={() => { setHomeNavOpen(false); scrollToTop(); }}>Visitor Check-in</div>
-          <div className="nav-tab" onClick={() => { setHomeNavOpen(false); scrollToSection('how'); }}>How It Works</div>
-          <div className="nav-tab" onClick={() => { setHomeNavOpen(false); scrollToSection('departments'); }}>Departments</div>
         </div>
 
-        <div className="nav-right">
-          <div className="nav-open-tag">
-            <div className="open-dot"></div>
-            Office Open
-          </div>
-          <button className="nav-btn nav-btn-ghost" onClick={() => { setHomeNavOpen(false); toggleMode(); }}>
-            {isReceptionistMode ? 'Visitor Mode' : 'Receptionist Mode'}
-          </button>
-          <button className="nav-btn nav-btn-dark" onClick={() => { setHomeNavOpen(false); navigate('/staff/login'); }}>
-            Staff Login
-          </button>
-        </div>
-        <div className={`nav-mobile ${homeNavOpen ? 'open' : ''}`}>
-          <button className="nav-tab" onClick={() => { setHomeNavOpen(false); scrollToTop(); }}>Visitor Check-in</button>
-          <button className="nav-tab" onClick={() => { setHomeNavOpen(false); scrollToSection('how'); }}>How It Works</button>
-          <button className="nav-tab" onClick={() => { setHomeNavOpen(false); scrollToSection('departments'); }}>Departments</button>
-          <button className="nav-btn nav-btn-ghost" onClick={() => { setHomeNavOpen(false); toggleMode(); }}>
-            {isReceptionistMode ? 'Visitor Mode' : 'Receptionist Mode'}
-          </button>
-          <button className="nav-btn nav-btn-dark" onClick={() => { setHomeNavOpen(false); navigate('/staff/login'); }}>
-            Staff Login
-          </button>
-        </div>
-      </nav>
-
-      {/* Hero Section */}
-      <section className={heroClasses.join(' ')} ref={heroRef}>
-        {/* Left: Copy */}
-        <div className="hero-left">
-          <div className="hero-overline">Visitor Management Desk</div>
-
-          <h1 className="hero-title" aria-label={heroTitleAnnounce}>
-            {typedLines.map((line, index) => {
-              const variant = HERO_TYPEWRITER_LINES[index]?.variant;
-              const classes = ['typewriter-line', variant ? `typewriter-line--${variant}` : undefined];
-              if (!typewriterDone && typingLine === index) classes.push('is-active');
-              if (typewriterDone && index === HERO_TYPEWRITER_LINES.length - 1) classes.push('is-active');
-              return (
-                <span key={`hero-line-${index}`} className={classes.filter(Boolean).join(' ')}>
-                  {line}
-                </span>
-              );
-            })}
-          </h1>
-
-          <p className="hero-desc">
-            Submit a quick visit request so reception can alert the right person instantly.
-          </p>
-
-          <div className="hero-cta-row">
-            <button
-              className={`cta-primary${!hasAvailableStaff ? ' cta-primary--disabled' : ''}`}
-              onClick={handleAlertHost}
-              disabled={!hasAvailableStaff}
-            >
-              <span className="icon" aria-hidden="true">{ICONS.clipboard}</span>
-              Alert My Host
+        <div className="gp-pass-actions">
+          {visit.mode === 'later' && (
+            <button type="button" className="gp-btn gp-btn--ghost" onClick={() => downloadCalendarInvite(visit)}>
+              <Icon name="download" />
+              Add to calendar
             </button>
-            <div className="cta-secondary" onClick={() => scrollToSection('how')}>
-              See how it works
-            </div>
-          </div>
-
-          {heroUnavailableStaff && (
-            <div className="hero-unavailable-panel" aria-live="polite">
-              <div className="hero-unavailable-pill" />
-              <div>
-                <p className="hero-unavailable-label">{heroUnavailableLabel}</p>
-                <p className="hero-unavailable-detail">{heroUnavailableDetail}</p>
-              </div>
-            </div>
           )}
-
-          <div className="hero-trust">
-            <div className="trust-item">
-              <span className="trust-icon icon" aria-hidden="true">{ICONS.bolt}</span>
-              <span>Instant delivery</span>
-            </div>
-            <div className="trust-sep"></div>
-            <div className="trust-item">
-              <span className="trust-icon icon" aria-hidden="true">{ICONS.mail}</span>
-              <span>Email confirmation</span>
-            </div>
-            <div className="trust-sep"></div>
-            <div className="trust-item">
-              <span className="trust-icon icon" aria-hidden="true">{ICONS.bell}</span>
-              <span>Push notifications</span>
-            </div>
-            <div className="trust-sep"></div>
-            <div className="trust-item">
-              <span className="trust-icon icon" aria-hidden="true">{ICONS.building}</span>
-              <span>{departments.length} departments</span>
-            </div>
-          </div>
+          <button type="button" className="gp-btn gp-btn--dark" onClick={resetFlow}>
+            {receptionMode ? 'Next visitor' : 'Done'}
+          </button>
         </div>
+        {receptionMode && <p className="gp-pass-auto">Starting a new check-in in {countdown}s</p>}
+      </div>
+    );
+  };
 
-        {/* Right: Visit request form */}
-        <div className="hero-right">
-          {isMobileView && isHeroFormVisible && (
+  return (
+    <div className="gp-root" id="top">
+      <header className={`gp-nav ${navOpen ? 'is-open' : ''}`}>
+        <div className="gp-nav-inner">
+          <a
+            href="#top"
+            className="gp-brand"
+            onClick={(event) => {
+              event.preventDefault();
+              setNavOpen(false);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          >
+            <span className="gp-brand-mark">
+              <Icon name="building" />
+            </span>
+            <span>
+              <strong>Gatepass</strong>
+              <small>Visitor desk</small>
+            </span>
+          </a>
+          <nav className="gp-nav-links" aria-label="Sections">
+            <button type="button" onClick={() => scrollToId('check-in')}>
+              Check in
+            </button>
+            <button type="button" onClick={() => scrollToId('how')}>
+              How it works
+            </button>
+            <button type="button" onClick={() => scrollToId('directory')}>
+              Directory
+            </button>
+          </nav>
+          <div className="gp-nav-actions">
             <button
               type="button"
-              className="hero-mobile-close"
-              onClick={hideMobileHeroForm}
-              aria-label="Back to visitor management desk"
+              role="switch"
+              aria-checked={receptionMode}
+              className={`gp-switch ${receptionMode ? 'is-on' : ''}`}
+              onClick={toggleReception}
             >
-              ← Back to desk
+              <span className="gp-switch-track" aria-hidden="true" />
+              Reception mode
             </button>
-          )}
-          <div className="form-panel">
-            {!showSuccess ? (
-              <>
-                <div className="form-panel-header">
-                  <div className="form-panel-title">Visit check-in</div>
-                  <div className="form-panel-sub">Let us know you're here so reception can notify your host.</div>
-                </div>
-                {prefillSelection && (
-                  <div className="prefill-banner">
-                    Visit request for <strong>{prefillSelection.staffName}</strong> · {prefillSelection.departmentName}
-                    {prefillSelection.divisionName ? ` · ${prefillSelection.divisionName}` : ''}
-                  </div>
-                )}
+            <Link to="/staff/login" className="gp-btn gp-btn--dark gp-btn--sm">
+              Staff login
+            </Link>
+          </div>
+          <button
+            type="button"
+            className="gp-nav-toggle"
+            aria-label={navOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={navOpen}
+            onClick={() => setNavOpen((open) => !open)}
+          >
+            <Icon name={navOpen ? 'close' : 'menu'} />
+          </button>
+        </div>
+        {navOpen && (
+          <div className="gp-nav-panel">
+            <button type="button" onClick={() => scrollToId('check-in')}>
+              Check in
+            </button>
+            <button type="button" onClick={() => scrollToId('how')}>
+              How it works
+            </button>
+            <button type="button" onClick={() => scrollToId('directory')}>
+              Directory
+            </button>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={receptionMode}
+              className={`gp-switch ${receptionMode ? 'is-on' : ''}`}
+              onClick={toggleReception}
+            >
+              <span className="gp-switch-track" aria-hidden="true" />
+              Reception mode
+            </button>
+            <Link to="/staff/login" className="gp-btn gp-btn--dark" onClick={() => setNavOpen(false)}>
+              Staff login
+            </Link>
+          </div>
+        )}
+      </header>
 
-                {/* Progress Steps */}
-                <div className="progress-steps" id="progressSteps">
-                  {[1, 2, 3, 4, 5, 6, 7].map((step) => (
-                    <div key={step}>
-                      <div 
-                        className={`step-dot ${currentStep === step ? 'active' : ''} ${currentStep > step ? 'done' : ''}`}
-                      >
-                        {currentStep > step ? '\u2713' : step}
-                      </div>
-                      {step < 7 && <div className="step-spacer"></div>}
-                    </div>
-                  ))}
-                  <div 
-                    className="progress-fill" 
-                    id="progressFill" 
-                    style={{ width: `${((currentStep - 1) / (totalSteps - 1)) * 82}%` }}
-                  ></div>
-                </div>
+      <main>
+        <section className="gp-hero">
+          <HeroCarousel />
 
-                {/* Step 1: Name */}
-                <div className={`step-view ${currentStep === 1 ? 'active' : ''}`} id="step1">
-                  <div className="step-label">Step 1 of 7 - Your Identity</div>
-                  <div className="field">
-                    <label className="field-label">Full Name <span className="field-required">*</span></label>
-                    <input 
-                      type="text" 
-                      className={`field-input ${validation.nameValid ? 'valid' : ''}`}
-                      placeholder="e.g. Sarah Kiprono"
-                      value={formData.visitor_name}
-                      onChange={(e) => handleInputChange('visitor_name', e.target.value)}
-                    />
-                    <div className="field-hint">Your name as you'd like to be announced</div>
-                  </div>
-                  <div className="field">
-                    <label className="field-label">Phone Number <span className="field-required">*</span></label>
-                    <input 
-                      type="tel" 
-                      className={`field-input ${phoneValid ? 'valid' : ''}`}
-                      placeholder="+254 700 000 000"
-                      value={formData.phone}
-                      onChange={(e) => handleInputChange('phone', e.target.value)}
-                    />
-                    <div className="field-hint">We'll text you when your host responds, no internet needed</div>
-                  </div>
-                  <div className="step-nav">
-                    <button 
-                      className="step-btn step-next" 
-                      onClick={() => validation.nameValid && phoneValid && goToStep(2)}
-                      disabled={!validation.nameValid || !phoneValid}
-                    >
-                      Continue
-                    </button>
-                  </div>
-                </div>
+          <section className="gp-flow" id="check-in" ref={flowRef} aria-labelledby="gp-flow-title">
+            {receptionMode && (
+              <div className="gp-flow-reception">
+                <Icon name="desk" />
+                <span>Reception mode: checking in a visitor</span>
+                <button type="button" onClick={toggleReception}>
+                  Turn off
+                </button>
+              </div>
+            )}
 
-                {/* Step 2: Email */}
-                <div className={`step-view ${currentStep === 2 ? 'active' : ''}`} id="step2">
-                  <div className="step-label">Step 2 of 7 - Contact Details</div>
-                  <div className="field">
-                    <label className="field-label">Email Address <span className="field-required">*</span></label>
-                    <input 
-                      type="email" 
-                      className={`field-input ${validation.emailValid ? 'valid' : ''} ${validation.emailError ? 'error' : ''}`}
-                      placeholder="your@email.com"
-                      value={formData.visitor_email}
-                      onChange={(e) => handleInputChange('visitor_email', e.target.value)}
-                    />
-                      <div className={`field-hint ${validation.emailValid ? 'field-valid-msg' : ''} ${validation.emailError ? 'field-error' : ''}`}>
-                        {validation.emailValid 
-                          ? `Confirmation will be sent to ${formData.visitor_email}`
-                          : 'Your visit confirmation and updates will be sent here'
-                        }
-                      </div>
-                  </div>
-                  <div className="step-nav">
-                    <button className="step-btn step-back" onClick={() => goToStep(1)}>Back</button>
-                    <button 
-                      className="step-btn step-next" 
-                      onClick={() => validation.emailValid && goToStep(3)}
-                      disabled={!validation.emailValid}
-                    >
-                      Continue
-                    </button>
-                  </div>
-                </div>
-
-                {/* Step 3: Host details */}
-                <div className={`step-view ${currentStep === 3 ? 'active' : ''}`} id="step3">
-                  <div className="step-label">Step 3 of 7 - Host details</div>
-                  <div className="field">
-                    <label className="field-label">Who are you here to see? <span className="field-required">*</span></label>
-                    <div className="select-wrap">
-                      <select 
-                        className="field-input"
-                        value={formData.department}
-                        onChange={(e) => handleInputChange('department', e.target.value)}
-                      >
-                        <option value="">Search by department or staff name</option>
-                        {departments.map((dept) => (
-                          <option key={dept.id} value={dept.id}>{dept.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="field-hint">Not sure? Check the Departments directory below</div>
-                  </div>
-                  <div className="step-nav">
-                    <button className="step-btn step-back" onClick={() => goToStep(2)}>Back</button>
-                    <button 
-                      className="step-btn step-next" 
-                      onClick={() => formData.department && goToStep(4)}
-                      disabled={!formData.department}
-                    >
-                      Continue
-                    </button>
-                  </div>
-                </div>
-
-                {/* Step 4: Division */}
-                <div className={`step-view ${currentStep === 4 ? 'active' : ''}`} id="step4">
-                  <div className="step-label">Step 4 of 7 - Division</div>
-                  <div className="field">
-                    <label className="field-label">Which division? <span className="field-required">*</span></label>
-                    <div className="select-wrap">
-                      <select 
-                        className="field-input"
-                        value={formData.division}
-                        onChange={(e) => handleInputChange('division', e.target.value)}
-                      >
-                        <option value="">Choose a division...</option>
-                        {divisions.map((div) => (
-                          <option key={div.id} value={div.id}>{div.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="step-nav">
-                    <button className="step-btn step-back" onClick={() => goToStep(3)}>Back</button>
-                    <button 
-                      className="step-btn step-next" 
-                      onClick={() => formData.division && goToStep(5)}
-                      disabled={!formData.division}
-                    >
-                      Continue
-                    </button>
-                  </div>
-                </div>
-
-                {/* Step 5: Staff */}
-                <div className={`step-view ${currentStep === 5 ? 'active' : ''}`} id="step5">
-                  <div className="step-label">Step 5 of 7 - Select your host</div>
-                  <div className="field">
-                    <label className="field-label">Select your host <span className="field-required">*</span></label>
-                    <div className="staff-cards">
-                      {staff.length > 0 ? (
-                        staff.map((s, index) => {
-                          const isSelectable = s.is_available && !staffDateBlocked(s.id);
-                          const statusText = !s.is_available
-                            ? 'Unavailable'
-                            : staffDateBlocked(s.id)
-                                ? 'Unavailable (date blocked)'
-                                : 'Available';
-                          const statusColor = isSelectable ? 'var(--green)' : 'var(--ink-faint)';
-                          return (
-                            <div 
-                              key={s.id}
-                              className={`staff-pick-card ${formData.staff_member === s.id ? 'selected' : ''} ${!isSelectable ? 'unavailable' : ''}`}
-                              onClick={() => isSelectable && handleInputChange('staff_member', s.id)}
-                              style={{ opacity: isSelectable ? 1 : 0.55, pointerEvents: isSelectable ? 'auto' : 'none' }}
-                            >
-                              <div 
-                                className="spc-avatar"
-                                style={{ background: getAvatarColor(index).bg, color: getAvatarColor(index).color }}
-                              >
-                                {getInitials(s.first_name, s.last_name)}
-                              </div>
-                              <div>
-                                <div className="spc-name">{s.first_name} {s.last_name}</div>
-                                <div className="spc-role">{s.division?.name || 'Staff'}</div>
-                              </div>
-                              <div className="spc-status">
-                                <div className="spc-dot" style={{ background: statusColor }}></div>
-                                <span style={{ color: statusColor }}>
-                                  {statusText}
-                                </span>
-                              </div>
-                              {!isSelectable && s.availability_reason && (
-                                <div className="spc-status-hint">{s.availability_reason}</div>
-                              )}
-                              <div className="spc-check icon" aria-hidden="true">{ICONS.check}</div>
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <div className="field-hint">Select a division first to see available staff</div>
-                      )}
-                    </div>
-                  </div>
-                  {formData.appointment_date && formData.staff_member && staffDateBlocked(formData.staff_member) && (
-                    <div className="field-hint field-error">Selected staff is unavailable on this date.</div>
-                  )}
-                  <div className="step-nav">
-                    <button className="step-btn step-back" onClick={() => goToStep(4)}>Back</button>
-                    <button 
-                      className="step-btn step-next" 
-                      onClick={() => formData.staff_member && goToStep(6)}
-                      disabled={!formData.staff_member}
-                    >
-                      Continue
-                    </button>
-                  </div>
-                </div>
-
-                {/* Step 6: Visit type */}
-                <div className={`step-view ${currentStep === 6 ? 'active' : ''}`} id="step6">
-                  <div className="step-label">Step 6 of 7 - When are you visiting?</div>
-                  {renderVisitStepBody()}
-                  <div className="step-nav">
-                    <button className="step-btn step-back" onClick={() => goToStep(5)}>Back</button>
-                    <button 
-                      className="step-btn step-next" 
-                      onClick={() => isVisitStepReady() && goToStep(7)}
-                      disabled={!isVisitStepReady()}
-                    >
-                      Continue
-                    </button>
-                  </div>
-                </div>
-
-                {/* Step 7: Message & Summary */}
-                <div className={`step-view ${currentStep === 7 ? 'active' : ''}`} id="step7">
-                  <div className="step-label">Step 7 of 7 - Your Message</div>
-
-                  {/* Summary Card */}
-                  <div className="summary-card">
-                    <div className="summary-title">Visit summary</div>
-                    <div className="summary-content">
-                      <div className="summary-row">
-                        <span className="summary-label">Visitor</span>
-                        <strong>{formData.visitor_name || 'N/A'}</strong>
-                      </div>
-                      <div className="summary-row">
-                        <span className="summary-label">Department</span>
-                        <strong>{getDeptName(formData.department)}</strong>
-                      </div>
-                      <div className="summary-row">
-                        <span className="summary-label">Staff Member</span>
-                        <strong>{getStaffName(formData.staff_member)}</strong>
-                      </div>
-                      <div className="summary-row">
-                        <span className="summary-label">Visit type</span>
-                        <strong>{getVisitTypeLabel()}</strong>
-                      </div>
-                      <div className="summary-row">
-                        <span className="summary-label">Arrival</span>
-                        <strong>{getArrivalLabel()}</strong>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="field">
-                    <label className="field-label">
-                      Message to staff 
-                      <span style={{ color: 'var(--ink-faint)', fontWeight: 400, letterSpacing: 0, textTransform: 'none', fontSize: '11px' }}>(optional)</span>
-                    </label>
-                    <textarea 
-                      className="field-input"
-                      rows="4"
-                      placeholder="Briefly describe the purpose of your visit or any details the staff should know..."
-                      value={formData.message}
-                      onChange={(e) => handleInputChange('message', e.target.value)}
-                      maxLength={500}
-                    />
-                    <div className="field-hint">{formData.message.length} / 500 characters</div>
-                  </div>
-
-                  <div className="info-box">
-                    <span className="icon" aria-hidden="true">{ICONS.mail}</span>
-                    <span>A confirmation will be sent to <strong>{formData.visitor_email}</strong>. Reception will notify you once your host responds.</span>
-                  </div>
-
-                  <div className="step-nav">
-                    <button className="step-btn step-back" onClick={() => goToStep(6)}>Back</button>
-                    <button
-                      className={`step-btn step-submit${isSubmitting ? ' submitting' : ''}`}
-                      onClick={submitBooking}
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting ? 'SUBMITTING REQUEST' : 'Submit visit request'}
-                      {isSubmitting && (
-                        <span className="loading-dots" aria-hidden="true">
-                          <span></span>
-                          <span></span>
-                          <span></span>
-                        </span>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </>
+            {visit ? (
+              renderSuccess()
             ) : (
-              /* Success Screen */
-                <div className="success-screen show">
-                <div className="success-icon icon" aria-hidden="true">{ICONS.checkCircle}</div>
-                <div className="success-title">Visit request submitted!</div>
-                <div className="success-sub">
-                  Your visit request has been sent to <strong>{getStaffName(formData.staff_member)}</strong>. 
-                  Reception will notify you by email and push when they respond.
+              <>
+                <header className="gp-flow-head">
+                  <div>
+                    <p className="gp-eyebrow">
+                      Step {step + 1} of {STEPS.length}
+                    </p>
+                    <h2 id="gp-flow-title">{titles[step]}</h2>
+                  </div>
+                  <span className={`gp-office ${officeOpen ? '' : 'is-closed'}`}>
+                    {officeOpen ? 'Office open' : 'Office closed'}
+                  </span>
+                </header>
+
+                <ol className="gp-stepper">
+                  {STEPS.map((label, i) => (
+                    <li
+                      key={label}
+                      className={`${i === step ? 'is-current' : ''} ${i < step && stepDone[i] ? 'is-done' : ''}`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => goToStep(i)}
+                        disabled={!canOpenStep(i)}
+                        aria-current={i === step ? 'step' : undefined}
+                      >
+                        <span className="gp-stepper-bar" />
+                        <span className="gp-stepper-label">
+                          {i < step && stepDone[i] && <Icon name="check" />}
+                          {label}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ol>
+
+                <div className="gp-flow-body" key={step}>
+                  {step === 0 && renderWhen()}
+                  {step === 1 && renderHost()}
+                  {step === 2 && renderDetails()}
+                  {step === 3 && renderReview()}
                 </div>
-                <div className="success-ref">REF: {referenceNumber}</div>
-                <div className="success-detail">
-                  <div className="sd-row">
-                    <span className="sd-label">Visitor</span>
-                    <span className="sd-value">{formData.visitor_name}</span>
+
+                <footer className="gp-flow-foot">
+                  {step > 0 && (
+                    <button
+                      type="button"
+                      className="gp-btn gp-btn--ghost gp-btn--icon"
+                      onClick={() => setStep(step - 1)}
+                      aria-label="Back"
+                    >
+                      <Icon name="arrowLeft" />
+                    </button>
+                  )}
+                  {step < 3 ? (
+                    <button
+                      type="button"
+                      className="gp-btn gp-btn--dark gp-btn--grow"
+                      onClick={goNext}
+                      disabled={step === 0 ? !whenOk : step === 1 ? !hostOk : false}
+                    >
+                      {primaryLabel}
+                      <Icon name="arrowRight" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="gp-btn gp-btn--gold gp-btn--grow"
+                      onClick={submit}
+                      disabled={submitting}
+                    >
+                      {submitting ? 'Sending…' : primaryLabel}
+                      {!submitting && <Icon name="arrowRight" />}
+                    </button>
+                  )}
+                </footer>
+              </>
+            )}
+          </section>
+        </section>
+
+        <section className="gp-section" id="how">
+          <div className="gp-section-head">
+            <p className="gp-overline gp-overline--dark">How it works</p>
+            <h2>
+              Three taps to <em>your host.</em>
+            </h2>
+            <p>Built for walk-ins at the desk and visits planned days ahead, on any phone, tablet or laptop.</p>
+          </div>
+          <div className="gp-how">
+            {HOW_STEPS.map((item, i) => (
+              <article className="gp-how-card" key={item.title}>
+                <span className="gp-how-num">{String(i + 1).padStart(2, '0')}</span>
+                <span className="gp-how-icon">
+                  <Icon name={item.icon} />
+                </span>
+                <h3>{item.title}</h3>
+                <p>{item.text}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="gp-section gp-section--tinted" id="directory">
+          <div className="gp-section-head">
+            <p className="gp-overline gp-overline--dark">Directory</p>
+            <h2>
+              Find the right <em>person.</em>
+            </h2>
+            <p>Browse by department, see who is available, and start a check-in with one tap.</p>
+          </div>
+          <div className="gp-dir-tools">
+            <div className="gp-search">
+              <Icon name="search" />
+              <input
+                className="gp-input"
+                type="search"
+                placeholder="Search staff by name, department or division"
+                value={dirQuery}
+                onChange={(event) => setDirQuery(event.target.value)}
+                aria-label="Search the staff directory"
+              />
+            </div>
+            {departments.length > 1 && departmentChips(dirDept, setDirDept)}
+          </div>
+          <div className="gp-dir-grid">
+            {loading && [0, 1, 2].map((key) => <div key={key} className="gp-skeleton gp-skeleton--card" aria-hidden="true" />)}
+            {!loading &&
+              directory.map((member) => (
+                <article className="gp-person" key={member.id}>
+                  <div className="gp-person-head">
+                    <span className={`gp-avatar gp-tone-${member.id % 5}`}>{initials(member.name)}</span>
+                    <div className="gp-host-text">
+                      <strong>{member.name}</strong>
+                      <small>{placement(member) || 'Staff'}</small>
+                    </div>
+                    <StatusTag host={member} />
                   </div>
-                  <div className="sd-row">
-                    <span className="sd-label">Department</span>
-                    <span className="sd-value">{getDeptName(formData.department)}</span>
-                  </div>
-                  <div className="sd-row">
-                    <span className="sd-label">Visit type</span>
-                    <span className="sd-value">{getVisitTypeLabel()}</span>
-                  </div>
-                  <div className="sd-row">
-                    <span className="sd-label">Arrival time</span>
-                    <span className="sd-value">{getArrivalLabel()}</span>
-                  </div>
-                  <div className="sd-row">
-                    <span className="sd-label">Status</span>
-                    <span className="sd-value" style={{ color: 'var(--gold)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span className="icon" aria-hidden="true">{ICONS.hourglass}</span>
-                      Awaiting response
-                    </span>
-                  </div>
-                </div>
-                <div className="success-actions">
-                  <button className="step-btn step-back" style={{ borderColor: 'var(--border2)' }} onClick={resetForm}>
-                    Submit another visit request
+                  {!member.available && member.reason && <p className="gp-person-reason">{member.reason}</p>}
+                  <button
+                    type="button"
+                    className="gp-btn gp-btn--ghost gp-btn--sm"
+                    onClick={() => visitFromDirectory(member)}
+                    disabled={!member.departmentId || !member.divisionId}
+                  >
+                    Visit {firstName(member.name)}
+                    <Icon name="arrowRight" />
                   </button>
-                  <button className="step-btn step-next" onClick={() => showToastMessage('Confirmation resent to your email!')}>
-                    Resend confirmation
-                  </button>
-                </div>
+                </article>
+              ))}
+            {!loading && directory.length === 0 && (
+              <div className="gp-empty gp-empty--wide">
+                {staff.length === 0 ? 'The staff directory is empty for now.' : 'No one matches that search.'}
               </div>
             )}
           </div>
+        </section>
+      </main>
+
+      <footer className="gp-footer">
+        <div className="gp-footer-inner">
+          <div>
+            <strong className="gp-footer-brand">Gatepass</strong>
+            <span>Visitor management system</span>
+          </div>
+          <nav aria-label="Footer">
+            <Link to="/staff/login">Staff login</Link>
+            <Link to="/admin/signup">Admin sign up</Link>
+          </nav>
+          <span className="gp-footer-copy">© {now.getFullYear()} Gatepass</span>
         </div>
-      </section>
-
-      {/* How It Works */}
-      <section className="section section-alt" id="how">
-        <div className="section-label">Process</div>
-        <div className="section-title">How it <em>works</em></div>
-        <div className="section-sub">Submit a visitor check-in and reception will alert your host within seconds.</div>
-        <div className="how-steps">
-          <div className="how-step">
-            <div className="how-num">1</div>
-            <div className="how-step-title">Enter your host&apos;s name</div>
-            <div className="how-step-desc">Type the person or department you are here to see so reception knows who to notify.</div>
-          </div>
-          <div className="how-step">
-            <div className="how-num">2</div>
-            <div className="how-step-title">Confirm your visit purpose</div>
-            <div className="how-step-desc">Let us know why you are visiting so the host gets the right context before they respond.</div>
-          </div>
-          <div className="how-step">
-            <div className="how-num">3</div>
-            <div className="how-step-title">Reception alerts the host instantly</div>
-            <div className="how-step-desc">Reception will page or message your host and keep you updated as soon as they respond.</div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features */}
-      <section className="section">
-        <div className="section-label">Features</div>
-        <div className="section-title">Everything you <em>need</em></div>
-        <div className="section-sub">A modern visitor management tool for receptionists and hosts coordinating walk-ins and scheduled visits.</div>
-        <div className="feature-grid">
-          <div className="feature-card">
-            <div className="fc-icon" style={{ background: 'var(--gold-light)' }}>
-              <span className="icon" aria-hidden="true">{ICONS.mail}</span>
-            </div>
-            <div className="fc-title">Instant Email Confirmation</div>
-            <div className="fc-desc">Get a confirmation email the moment your request is submitted. No waiting, no uncertainty.</div>
-          </div>
-          <div className="feature-card">
-            <div className="fc-icon" style={{ background: 'var(--teal-light)' }}>
-              <span className="icon" aria-hidden="true">{ICONS.bell}</span>
-            </div>
-            <div className="fc-title">Push Notifications</div>
-            <div className="fc-desc">Enable push notifications and get alerted the second your visitor check-in status changes.</div>
-          </div>
-          <div className="feature-card">
-            <div className="fc-icon" style={{ background: 'var(--green-light)' }}>
-              <span className="icon" aria-hidden="true">{ICONS.check}</span>
-            </div>
-            <div className="fc-title">Real-time Status Updates</div>
-            <div className="fc-desc">Track your visit request status - Pending, Accepted, Rescheduled, or Declined - in real time.</div>
-          </div>
-          <div className="feature-card">
-            <div className="fc-icon" style={{ background: '#fce7f3' }}>
-              <span className="icon" aria-hidden="true">{ICONS.map}</span>
-            </div>
-            <div className="fc-title">Department Routing</div>
-            <div className="fc-desc">Your request is routed directly to the right team and staff member - no misdirected emails.</div>
-          </div>
-          <div className="feature-card">
-            <div className="fc-icon" style={{ background: '#dbeafe' }}>
-              <span className="icon" aria-hidden="true">{ICONS.phone}</span>
-            </div>
-            <div className="fc-title">Works on Any Device</div>
-            <div className="fc-desc">Fully responsive PWA. Check in from your phone, tablet, or desktop - install it like a native app.</div>
-          </div>
-          <div className="feature-card">
-            <div className="fc-icon" style={{ background: 'var(--surface2)' }}>
-              <span className="icon" aria-hidden="true">{ICONS.monitor}</span>
-            </div>
-            <div className="fc-title">Receptionist Mode</div>
-            <div className="fc-desc">Receptionists can switch to an assisted check-in mode to help walk-in visitors notify their host quickly.</div>
-          </div>
-        </div>
-      </section>
-
-      {/* Departments */}
-      <section className="section section-alt" id="departments">
-        <div className="section-label">Directory</div>
-        <div className="section-title">Our <em>Departments</em></div>
-        <div className="section-sub">Find the right person fast, then jump straight to check-in.</div>
-
-        <div className="dept-search">
-          <div className="dept-search-title">Find your person</div>
-          <div className="dept-search-input">
-            <input
-              type="text"
-              placeholder="Search staff by name, department, or topic…"
-              value={globalSearchTerm}
-              onChange={(e) => setGlobalSearchTerm(e.target.value)}
-            />
-            <span className="icon" aria-hidden="true">{ICONS.search}</span>
-          </div>
-          {globalResults.length > 0 && (
-            <div className="dept-search-results">
-              {globalResults.map((member, index) => {
-                const isMemberSelectable = member.is_available && !staffDateBlocked(member.id);
-                const memberStatus = !member.is_available
-                  ? 'Unavailable'
-                  : staffDateBlocked(member.id)
-                      ? 'Unavailable (date blocked)'
-                      : 'Available';
-                return (
-                  <button
-                    key={`${member.id}-${index}`}
-                    className="search-result"
-                    type="button"
-                    onClick={() => handleBookWithStaff(member)}
-                    disabled={!isMemberSelectable}
-                  >
-                  <span
-                    className="search-avatar"
-                    style={{ background: getAvatarColor(index).bg, color: getAvatarColor(index).color }}
-                  >
-                    {getStaffInitials(member)}
-                  </span>
-                  <span className="search-info">
-                    <span className="search-name">{member.full_name || `${member.first_name} ${member.last_name}`.trim()}</span>
-                    <span className="search-meta">
-                      {member.department?.name || getDeptNameFromId(getDeptId(member)) || 'Department'} · {member.division?.name || 'Division'}
-                    </span>
-                  </span>
-                  <span className={`search-status ${isMemberSelectable ? 'available' : 'unavailable'}`}>
-                    <span className="status-dot" />
-                    {memberStatus}
-                  </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="dept-card-grid">
-          {filteredDepartments.map((dept, deptIndex) => {
-            const deptStaff = getDepartmentStaff(dept.id);
-            const previewStaff = deptStaff.slice(0, 3);
-            const availableCount = deptStaff.filter(member => member.is_available && !staffDateBlocked(member.id)).length;
-            const hasAvailable = availableCount > 0;
-
-            return (
-              <div key={dept.id} className="dept-card-wrap">
-                <button
-                  type="button"
-                  className={`dept-card ${activeDeptId === dept.id ? 'active' : ''}`}
-                  onClick={() => handleDepartmentClick(dept)}
-                >
-                  <div className="dept-card-head">
-                    <div
-                      className="dept-card-icon"
-                      style={{ background: ['#dbeafe', 'var(--green-light)', 'var(--gold-light)', '#ede9fe', '#fce7f3'][deptIndex % 5] }}
-                    >
-                      <span className="icon" aria-hidden="true">
-                        {deptIcons[deptIndex % deptIcons.length]}
-                      </span>
-                    </div>
-                    <div>
-                      <div className="dept-card-name">{dept.name}</div>
-                      <div className="dept-card-count">{dept.staff_count || deptStaff.length} people</div>
-                    </div>
-                    <div className={`dept-availability ${hasAvailable ? 'live' : ''}`} title={hasAvailable ? 'Someone available now' : 'All currently busy'} />
-                  </div>
-                  <div className="dept-card-preview">
-                    <div className="dept-avatar-stack">
-                      {previewStaff.map((member, index) => (
-                        <span
-                          key={`${member.id}-${index}`}
-                          className="dept-avatar"
-                          style={{ background: getAvatarColor(index).bg, color: getAvatarColor(index).color }}
-                        >
-                          {getStaffInitials(member)}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="dept-preview-text">
-                      {availableCount > 0
-                        ? `${availableCount} available now`
-                        : 'No one available right now'}
-                    </div>
-                  </div>
-                </button>
-
-                {activeDeptId === dept.id && (
-                  <div className="dept-drawer open">
-                    <div className="drawer-head">
-                      <div className="drawer-title">{dept.name}</div>
-                      <div className="drawer-sub">Who are you looking for?</div>
-                    </div>
-
-                    <div className="drawer-search">
-                      <input
-                        type="text"
-                        placeholder="Search by name or topic..."
-                        value={deptSearchTerm}
-                        onChange={(e) => setDeptSearchTerm(e.target.value)}
-                      />
-                      <span className="icon" aria-hidden="true">{ICONS.search}</span>
-                    </div>
-
-                    <div className="division-pills">
-                      <button
-                        type="button"
-                        className={`division-pill ${activeDivisionId === 'all' ? 'active' : ''}`}
-                        onClick={() => setActiveDivisionId('all')}
-                      >
-                        All
-                      </button>
-                      {drawerDivisions.map((division) => (
-                        <button
-                          key={division.id}
-                          type="button"
-                          className={`division-pill ${activeDivisionId === division.id.toString() ? 'active' : ''}`}
-                          onClick={() => setActiveDivisionId(division.id.toString())}
-                        >
-                          {division.name}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="dept-staff-grid">
-                      {filteredDrawerStaff.length > 0 ? (
-                        filteredDrawerStaff.map((member, index) => {
-                          const isMemberSelectable = member.is_available && !staffDateBlocked(member.id);
-                          const memberStatus = !member.is_available
-                            ? 'Unavailable'
-                            : staffDateBlocked(member.id)
-                                ? 'Unavailable (date blocked)'
-                                : 'Available';
-                          return (
-                            <div
-                              key={`${member.id}-${index}`}
-                              className={`dept-staff-card ${isMemberSelectable ? 'available' : 'unavailable'}`}
-                            >
-                            <div className="dept-staff-head">
-                              <span
-                                className="dept-staff-avatar"
-                                style={{ background: getAvatarColor(index).bg, color: getAvatarColor(index).color }}
-                              >
-                                {getStaffInitials(member)}
-                              </span>
-                              <div>
-                                <div className="dept-staff-name">{member.full_name || `${member.first_name} ${member.last_name}`.trim()}</div>
-                                <div className="dept-staff-division">{member.division?.name || 'Division'}</div>
-                              </div>
-                            </div>
-                            <div className="dept-staff-status">
-                              <span className="status-dot" />
-                              {memberStatus}
-                            </div>
-                          <div className="dept-staff-desc">
-                            {member.description || member.bio || member.specialty || member.role || 'Ready to help with your request.'}
-                          </div>
-                          {!isMemberSelectable && member.availability_reason && (
-                            <p className="dept-staff-reason">
-                              {member.availability_reason}
-                            </p>
-                          )}
-                          <button type="button" className="dept-book-btn" onClick={() => handleBookWithStaff(member)} disabled={!isMemberSelectable}>
-                              Check in with {(member.full_name || member.first_name || 'Staff').split(' ')[0]} →
-                            </button>
-                          </div>
-                          );
-                        })
-                      ) : (
-                        <div className="dept-empty">No staff match your search.</div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="footer">
-        <div>
-          <div className="footer-brand">Gatepass</div>
-          <div style={{ fontSize: '12px', marginTop: '4px' }}>Visitor Management System</div>
-        </div>
-        <div className="footer-links">
-          <a>Privacy Policy</a>
-          <a>Terms of Use</a>
-          <a>Contact Support</a>
-          <a onClick={() => navigate('/staff/login')}>Login</a>
-        </div>
-        <div className="footer-copy">2026 Gatepass. All rights reserved.</div>
       </footer>
 
-      {/* Toast */}
       {toast && (
-        <div className="toast" id="toast" role="status" aria-live="polite">
-          <span className="toast-icon" aria-hidden="true">{ICONS.alertCircle}</span>
-          <span>{toast}</span>
-        </div>
-      )}
-
-      {/* Visit Request Modal */}
-      {showBookingModal && (
-        <div className="booking-modal-overlay" onClick={() => setShowBookingModal(false)}>
-          <div className="booking-modal" onClick={(e) => e.stopPropagation()}>
-            <button 
-              className="booking-modal-close" 
-              onClick={() => setShowBookingModal(false)}
-              aria-label="Close modal"
-            >
-              {ICONS.close}
-            </button>
-            <div className="booking-modal-content">
-              {!showSuccess ? (
-                <>
-                  <div className="form-panel-header">
-                    <div className="form-panel-title">Confirm visit request</div>
-                    <div className="form-panel-sub">Answer a few steps so reception can notify your host.</div>
-                  </div>
-                  {prefillSelection && (
-                    <div className="prefill-banner">
-                      Visit request for <strong>{prefillSelection.staffName}</strong> · {prefillSelection.departmentName}
-                      {prefillSelection.divisionName ? ` · ${prefillSelection.divisionName}` : ''}
-                    </div>
-                  )}
-
-                  {/* Progress Steps */}
-                  <div className="progress-steps" id="progressSteps">
-                    {[1, 2, 3, 4, 5, 6, 7].map((step) => (
-                      <div key={step}>
-                        <div 
-                          className={`step-dot ${currentStep === step ? 'active' : ''} ${currentStep > step ? 'done' : ''}`}
-                        >
-                          {currentStep > step ? '\u2713' : step}
-                        </div>
-                        {step < 7 && <div className="step-spacer"></div>}
-                      </div>
-                    ))}
-                    <div 
-                      className="progress-fill" 
-                      id="progressFill" 
-                      style={{ width: `${((currentStep - 1) / (totalSteps - 1)) * 82}%` }}
-                    ></div>
-                  </div>
-
-                  {/* Step 1: Name */}
-                  <div className={`step-view ${currentStep === 1 ? 'active' : ''}`} id="step1">
-                    <div className="step-label">Step 1 of 7 - Your Identity</div>
-                    <div className="field">
-                      <label className="field-label">Full Name <span className="field-required">*</span></label>
-                      <input 
-                        type="text" 
-                        className={`field-input ${validation.nameValid ? 'valid' : ''}`}
-                        placeholder="e.g. Sarah Kiprono"
-                        value={formData.visitor_name}
-                        onChange={(e) => handleInputChange('visitor_name', e.target.value)}
-                      />
-                      <div className="field-hint">Your name as you'd like to be announced</div>
-                    </div>
-                    <div className="field">
-                      <label className="field-label">Phone Number <span className="field-required">*</span></label>
-                      <input 
-                        type="tel" 
-                        className={`field-input ${phoneValid ? 'valid' : ''}`}
-                        placeholder="e.g. +254712345678"
-                        value={formData.phone}
-                        onChange={(e) => handleInputChange('phone', e.target.value)}
-                      />
-                      <div className="field-hint">We'll text you when your host responds, no internet needed</div>
-                    </div>
-                  </div>
-
-                  {/* Step 2: Email */}
-                  <div className={`step-view ${currentStep === 2 ? 'active' : ''}`} id="step2">
-                    <div className="step-label">Step 2 of 7 - Contact Details</div>
-                    <div className="field">
-                      <label className="field-label">Email Address <span className="field-required">*</span></label>
-                      <input 
-                        type="email" 
-                        className={`field-input ${validation.emailValid ? 'valid' : ''} ${validation.emailError ? 'error' : ''}`}
-                        placeholder="e.g. sarah@example.com"
-                        value={formData.visitor_email}
-                        onChange={(e) => handleInputChange('visitor_email', e.target.value)}
-                      />
-                      <div className="field-hint">We'll send confirmation to this email</div>
-                    </div>
-                  </div>
-
-                  {/* Step 3: Host details */}
-                  <div className={`step-view ${currentStep === 3 ? 'active' : ''}`} id="step3">
-                    <div className="step-label">Step 3 of 7 - Host details</div>
-                    <div className="field">
-                      <label className="field-label">Who are you here to see? <span className="field-required">*</span></label>
-                      <select 
-                        className="field-input field-select"
-                        value={formData.department}
-                        onChange={(e) => handleInputChange('department', e.target.value)}
-                      >
-                        <option value="">Search by department or staff name</option>
-                        {departments.map(dept => (
-                          <option key={dept.id} value={dept.id}>{dept.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Step 4: Division */}
-                  <div className={`step-view ${currentStep === 4 ? 'active' : ''}`} id="step4">
-                    <div className="step-label">Step 4 of 7 - Division</div>
-                    <div className="field">
-                      <label className="field-label">Select Division (Optional)</label>
-                      <select 
-                        className="field-input field-select"
-                        value={formData.division}
-                        onChange={(e) => handleInputChange('division', e.target.value)}
-                      >
-                        <option value="">All Divisions</option>
-                        {divisions.map(div => (
-                          <option key={div.id} value={div.id}>{div.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Step 5: Staff */}
-                  <div className={`step-view ${currentStep === 5 ? 'active' : ''}`} id="step5">
-                  <div className="step-label">Step 5 of 7 - Select your host</div>
-                  <div className="field">
-                    <label className="field-label">Select your host <span className="field-required">*</span></label>
-                      <select 
-                        className="field-input field-select"
-                        value={formData.staff_member}
-                        onChange={(e) => handleInputChange('staff_member', e.target.value)}
-                      >
-                        <option value="">Choose a staff member...</option>
-                        {(formData.division 
-                          ? allStaff.filter(s => getDivisionId(s) === parseInt(formData.division, 10)) 
-                          : formData.department 
-                            ? allStaff.filter(s => getDeptId(s) === parseInt(formData.department, 10))
-                            : allStaff
-                        ).map(member => (
-                          <option key={member.id} value={member.id}>
-                            {member.full_name || member.first_name} {member.is_available ? '' : '(Unavailable)'}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Step 6: Visit type */}
-                  <div className={`step-view ${currentStep === 6 ? 'active' : ''}`} id="step6">
-                    <div className="step-label">Step 6 of 7 - When are you visiting?</div>
-                    {renderVisitStepBody()}
-                  </div>
-
-                  {/* Step 7: Message */}
-                  <div className={`step-view ${currentStep === 7 ? 'active' : ''}`} id="step7">
-                    <div className="step-label">Step 7 of 7 - Your Message</div>
-                    <div className="field">
-                      <label className="field-label">Message (Optional)</label>
-                      <textarea 
-                        className="field-input field-textarea"
-                        placeholder="Briefly describe the purpose of your visit..."
-                        value={formData.message}
-                        onChange={(e) => handleInputChange('message', e.target.value)}
-                        rows={4}
-                      />
-                    </div>
-
-                    {/* Summary */}
-                    <div className="booking-summary">
-                      <div className="summary-title">Visit summary</div>
-                      <div className="summary-row"><span>Name:</span> <strong>{formData.visitor_name || '-'}</strong></div>
-                      <div className="summary-row"><span>Email:</span> <strong>{formData.visitor_email || '-'}</strong></div>
-                      <div className="summary-row"><span>Phone:</span> <strong>{formData.phone || '-'}</strong></div>
-                      <div className="summary-row"><span>Department:</span> <strong>{getDeptNameFromId(formData.department) || '-'}</strong></div>
-                      <div className="summary-row"><span>Division:</span> <strong>{getDivisionNameFromId(formData.division) || 'All'}</strong></div>
-                      <div className="summary-row"><span>Staff:</span> <strong>{getStaffNameFromId(formData.staff_member) || '-'}</strong></div>
-                      <div className="summary-row"><span>Visit type:</span> <strong>{getVisitTypeLabel()}</strong></div>
-                      <div className="summary-row"><span>Arrival:</span> <strong>{getArrivalLabel()}</strong></div>
-                    </div>
-                  </div>
-
-                  {/* Navigation Buttons */}
-                  <div className="step-nav">
-                    {currentStep > 1 && (
-                      <button type="button" className="btn-secondary" onClick={() => setCurrentStep(currentStep - 1)}>
-                        Back
-                      </button>
-                    )}
-                    {currentStep < 7 ? (
-                      <button 
-                        type="button" 
-                        className="btn-primary"
-                        onClick={() => {
-                          if (currentStep === 1 && !validation.nameValid) {
-                            showToastMessage('Please enter your full name');
-                            return;
-                          }
-                          if (currentStep === 1 && !phoneValid) {
-                            showToastMessage('Please enter a valid phone number, e.g. 0712 345 678');
-                            return;
-                          }
-                          if (currentStep === 2 && !validation.emailValid) {
-                            showToastMessage('Please enter a valid email');
-                            return;
-                          }
-                          if (currentStep === 6 && !isVisitStepReady()) {
-                            showToastMessage('Please confirm how you are arriving so reception can notify your host.');
-                            return;
-                          }
-                          setCurrentStep(currentStep + 1);
-                        }}
-                      >
-                        Continue
-                      </button>
-                    ) : (
-                      <button 
-                        type="button" 
-                        className="btn-primary"
-                        onClick={submitBooking}
-                      >
-                        Submit visit request
-                      </button>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <div className="success-view">
-                  <div className="success-animation">
-                    <div className="success-circle">
-                      <svg viewBox="0 0 52 52" className="success-checkmark">
-                        <circle className="success-circle-bg" cx="26" cy="26" r="25" fill="none"/>
-                        <path className="success-checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="success-title">Visit request submitted!</div>
-                  <div className="success-desc">
-                    Your visit request has been sent to <strong>{getStaffNameFromId(formData.staff_member)}</strong>
-                  </div>
-                  <div className="success-email">
-                    A confirmation email has been sent to <br/><strong>{formData.visitor_email}</strong>
-                  </div>
-                  <div className="success-ref">
-                    <span className="ref-label">Reference Number</span>
-                    <span className="ref-number">{referenceNumber}</span>
-                  </div>
-                  <div className="success-actions">
-                    <button 
-                      type="button" 
-                      className="btn-secondary"
-                      onClick={() => {
-                        setShowBookingModal(false);
-                        setShowSuccess(false);
-                        setCurrentStep(1);
-                        setFormData({
-                          visitor_name: '',
-                          visitor_email: '',
-                          phone: '',
-                          department: '',
-                          division: '',
-                          staff_member: '',
-                          appointment_date: '',
-                          visit_type: 'scheduled',
-                          eta_minutes: 30,
-                          message: '',
-                        });
-                        setVisitType('scheduled');
-                        setEtaMinutes(30);
-                        setPrefillSelection(null);
-                      }}
-                    >
-                      Back to Home
-                    </button>
-                    <button 
-                      type="button" 
-                      className="btn-primary"
-                      onClick={() => {
-                        setShowSuccess(false);
-                        setCurrentStep(1);
-                        setFormData({
-                          visitor_name: '',
-                          visitor_email: '',
-                          phone: '',
-                          department: '',
-                          division: '',
-                          staff_member: '',
-                          appointment_date: '',
-                          visit_type: 'scheduled',
-                          eta_minutes: 30,
-                          message: '',
-                        });
-                        setVisitType('scheduled');
-                        setEtaMinutes(30);
-                        setPrefillSelection(null);
-                      }}
-                    >
-                      Submit another visit request
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+        <div className="gp-toast" role="status" aria-live="polite">
+          {toast}
         </div>
       )}
     </div>

@@ -335,7 +335,7 @@ export default function AdminDashboardPage() {
         <Avatar name={a.visitor_name} />
         <div className="ad-row-text">
           <strong>{a.visitor_name}</strong>
-          <span>{compact ? `with ${a.staff_name || 'Unassigned'}` : a.visitor_email}</span>
+          <span>{compact ? `with ${a.staff_name || 'Unassigned'}` : a.visitor_email || a.visitor_phone}</span>
         </div>
       </div>
       {!compact && (

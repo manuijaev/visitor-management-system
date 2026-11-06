@@ -421,7 +421,10 @@ export default function StaffDashboardPage() {
       response_note: note,
     });
 
-    if (appointment) {
+    if (appointment && !appointment.visitor_email) {
+      setNotice('Status updated. The visitor has no email, so they were notified by SMS.');
+      setToast(status === 'Accepted' ? "Visitor notified — they've been paged" : `Response submitted to ${appointment.visitor_name}.`);
+    } else if (appointment) {
       const emailResult = await sendVisitorResponseEmail({
         visitor_name: appointment.visitor_name,
         visitor_email: appointment.visitor_email,
@@ -1017,7 +1020,7 @@ export default function StaffDashboardPage() {
                           
                           <div className="sd-appt-body">
                             <h4 className="sd-appt-name">{apt.visitor_name}</h4>
-                            <p className="sd-appt-email">{apt.visitor_email}</p>
+                            <p className="sd-appt-email">{apt.visitor_email || apt.visitor_phone}</p>
                             
                             <div className="sd-appt-details">
                               <div className="sd-appt-detail">
@@ -1209,7 +1212,7 @@ export default function StaffDashboardPage() {
                 {getInitials(previewItem.visitor_name)}
               </div>
               <h4>{previewItem.visitor_name}</h4>
-              <p className="sd-modal-email">{previewItem.visitor_email}</p>
+              <p className="sd-modal-email">{previewItem.visitor_email || previewItem.visitor_phone}</p>
               
               <div className="sd-modal-details">
                 <div className="sd-modal-detail">

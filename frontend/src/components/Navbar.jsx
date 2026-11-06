@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function Navbar() {
   const { user } = useAuth();
+  const { pathname } = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
-  if (user) return null;
+  if (user || pathname === '/') return null;
 
   return (
     <nav className={`top-nav ${mobileOpen ? 'is-open' : ''}`}>

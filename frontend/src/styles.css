@@ -781,7 +781,7 @@ h1 {
 input,
 select,
 textarea,
-button {
+button:not(:where(.gp-root *)) {
   width: 100%;
   border-radius: 10px;
   padding: 11px 12px;
@@ -819,7 +819,8 @@ textarea {
   resize: vertical;
 }
 
-button {
+/* The home page (.gp-root) styles its own buttons; :where() keeps these selectors at element specificity. */
+button:not(:where(.gp-root *)) {
   border: 1.5px solid var(--border2);
   background: var(--surface);
   color: var(--ink);
@@ -829,12 +830,12 @@ button {
   transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
 }
 
-button:hover {
+button:hover:not(:where(.gp-root *)) {
   border-color: var(--ink);
   transform: translateY(-1px);
 }
 
-button:disabled {
+button:disabled:not(:where(.gp-root *)) {
   opacity: 0.55;
   cursor: wait;
   transform: none;
