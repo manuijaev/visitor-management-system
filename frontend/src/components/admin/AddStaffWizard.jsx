@@ -192,9 +192,9 @@ export default function AddStaffWizard({ open, onClose, onCreated, departments, 
                 <input type="email" value={details.email} onChange={updateDetails('email')} placeholder="jane@company.com" autoComplete="off" />
               </label>
               <label className="ad-field">
-                <span>Phone <em>optional</em></span>
+                <span>Phone <em>recommended</em></span>
                 <input type="tel" value={details.phone} onChange={updateDetails('phone')} placeholder="+254 700 000 000" autoComplete="off" />
-                <small>Used for SMS alerts when a visitor arrives.</small>
+                <small>They'll get an SMS when a visitor arrives, even without internet.</small>
               </label>
               <div className="ad-field">
                 <span>Access</span>

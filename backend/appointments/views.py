@@ -11,7 +11,7 @@ from notifications.emailjs_service import (
     RESPONSE_TEMPLATE_ID,
     send_emailjs,
 )
-from notifications.sms_service import send_staff_sms, send_visitor_sms
+from notifications.sms_service import send_staff_sms, send_visitor_received_sms, send_visitor_sms
 from users.models import UserDeviceToken
 
 from .models import Appointment
@@ -181,6 +181,7 @@ def _notify_appointment_response(appointment, staff_name=None):
             staff_name=resolved_staff_name,
             status=appointment.status,
             response_note=appointment.response_note or '',
+            visit_time=formatted_date,
         )
         logger.info("SMS dispatched for appointment_id=%s", appointment.id)
     except Exception:
@@ -199,6 +200,7 @@ class AppointmentCreateView(generics.CreateAPIView):
             'data': response.data,
             'push': getattr(self, '_push_result', {'sent': False, 'reason': 'unknown'}),
             'email': getattr(self, '_email_result', {'sent': False, 'reason': 'unknown'}),
+            'sms': getattr(self, '_sms_result', {'staff': False, 'visitor': False}),
         }
         return response
 
@@ -241,16 +243,28 @@ class AppointmentCreateView(generics.CreateAPIView):
             logger.exception('Failed to send push notification: %s', str(e))
             self._push_result = {'sent': False, 'reason': str(e)[:100]}
 
+        self._sms_result = {'staff': False, 'visitor': False}
         try:
             staff_phone = appointment.staff_member.phone
             if staff_phone:
-                send_staff_sms(
+                self._sms_result['staff'] = send_staff_sms(
                     phone_number=staff_phone,
                     staff_name=appointment.staff_member.full_name or appointment.staff_member.email,
                     message=notification_message,
                 )
         except Exception:
             logger.exception('Failed to send staff SMS for appointment_id=%s', appointment.id)
+
+        try:
+            if appointment.visitor_phone:
+                self._sms_result['visitor'] = send_visitor_received_sms(
+                    phone_number=appointment.visitor_phone,
+                    visitor_name=appointment.visitor_name,
+                    staff_name=appointment.staff_member.full_name or 'your host',
+                    visit_time=_format_local_time(appointment.appointment_date),
+                )
+        except Exception:
+            logger.exception('Failed to send visitor confirmation SMS for appointment_id=%s', appointment.id)
 
 
 class MyAppointmentsView(generics.ListAPIView):

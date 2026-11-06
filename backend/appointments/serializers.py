@@ -1,9 +1,18 @@
 from rest_framework import serializers
 
+from notifications.sms_service import normalize_phone
+
 from .models import Appointment
 
 
 class AppointmentCreateSerializer(serializers.ModelSerializer):
+    def validate_visitor_phone(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError('A phone number is required so we can text you updates.')
+        if not normalize_phone(value):
+            raise serializers.ValidationError('Enter a valid phone number, e.g. 0712 345 678.')
+        return value.strip()
+
     def validate(self, attrs):
         department = attrs.get('department')
         division = attrs.get('division')
@@ -36,6 +45,7 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
             'created_at',
         ]
         read_only_fields = ['id', 'status', 'response_note', 'created_at']
+        extra_kwargs = {'visitor_phone': {'required': True, 'allow_blank': True, 'allow_null': True}}
 
 
 class AppointmentListSerializer(serializers.ModelSerializer):

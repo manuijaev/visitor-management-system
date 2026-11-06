@@ -168,6 +168,8 @@ const ETA_OPTIONS = [
   { label: '1 hour', minutes: 60 },
 ];
 
+const isValidPhone = (value) => /^\+?\d{9,15}$/.test((value || '').replace(/[\s()-]/g, ''));
+
 export default function HomePage() {
   const EAT_TIMEZONE = 'Africa/Nairobi';
   const STAFF_UNAVAILABLE_STORAGE_KEY = 'staff_unavailable_by_date';
@@ -205,6 +207,7 @@ export default function HomePage() {
   });
   const [visitType, setVisitType] = useState('scheduled');
   const [etaMinutes, setEtaMinutes] = useState(30);
+  const phoneValid = isValidPhone(formData.phone);
   const [validation, setValidation] = useState({
     nameValid: false,
     emailValid: false,
@@ -467,7 +470,7 @@ export default function HomePage() {
     if (step < 1 || step > totalSteps) return;
     
     if (step > currentStep) {
-      if (currentStep === 1 && !validation.nameValid) return;
+      if (currentStep === 1 && (!validation.nameValid || !phoneValid)) return;
       if (currentStep === 2 && !validation.emailValid) return;
       if (currentStep === 6 && !isVisitStepReady()) return;
     }
@@ -1116,21 +1119,21 @@ export default function HomePage() {
                     <div className="field-hint">Your name as you'd like to be announced</div>
                   </div>
                   <div className="field">
-                    <label className="field-label">Phone Number</label>
+                    <label className="field-label">Phone Number <span className="field-required">*</span></label>
                     <input 
                       type="tel" 
-                      className="field-input"
+                      className={`field-input ${phoneValid ? 'valid' : ''}`}
                       placeholder="+254 700 000 000"
                       value={formData.phone}
                       onChange={(e) => handleInputChange('phone', e.target.value)}
                     />
-                    <div className="field-hint">Optional - for SMS reminders</div>
+                    <div className="field-hint">We'll text you when your host responds, no internet needed</div>
                   </div>
                   <div className="step-nav">
                     <button 
                       className="step-btn step-next" 
-                      onClick={() => validation.nameValid && goToStep(2)}
-                      disabled={!validation.nameValid}
+                      onClick={() => validation.nameValid && phoneValid && goToStep(2)}
+                      disabled={!validation.nameValid || !phoneValid}
                     >
                       Continue
                     </button>
@@ -1789,11 +1792,12 @@ export default function HomePage() {
                       <label className="field-label">Phone Number <span className="field-required">*</span></label>
                       <input 
                         type="tel" 
-                        className="field-input"
+                        className={`field-input ${phoneValid ? 'valid' : ''}`}
                         placeholder="e.g. +254712345678"
                         value={formData.phone}
                         onChange={(e) => handleInputChange('phone', e.target.value)}
                       />
+                      <div className="field-hint">We'll text you when your host responds, no internet needed</div>
                     </div>
                   </div>
 
@@ -1922,6 +1926,10 @@ export default function HomePage() {
                         onClick={() => {
                           if (currentStep === 1 && !validation.nameValid) {
                             showToastMessage('Please enter your full name');
+                            return;
+                          }
+                          if (currentStep === 1 && !phoneValid) {
+                            showToastMessage('Please enter a valid phone number, e.g. 0712 345 678');
                             return;
                           }
                           if (currentStep === 2 && !validation.emailValid) {

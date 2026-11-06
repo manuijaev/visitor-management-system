@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 
 import requests
 
@@ -8,21 +9,31 @@ logger = logging.getLogger(__name__)
 UMS_API_KEY = os.getenv("UMS_API_KEY")
 UMS_APP_ID = os.getenv("UMS_APP_ID")
 UMS_URL = "https://comms.umeskiasoftwares.com/api/v1/sms/send"
-SENDER_ID = "UMS_SMS"
+SENDER_ID = os.getenv("UMS_SENDER_ID", "UMS_SMS")
+SMS_MAX_LENGTH = 160
 
 print(f"SMS SERVICE INIT — UMS_API_KEY present: {bool(UMS_API_KEY)}")
 print(f"SMS SERVICE INIT — UMS_APP_ID: {UMS_APP_ID}")
 
 
 def normalize_phone(number):
+    """Return the number in 2547XXXXXXXX form, assuming Kenya when no country code is given."""
     if not number:
         return None
-    normalized = number.strip()
-    if normalized.startswith("0"):
-        normalized = "254" + normalized[1:]
-    elif normalized.startswith("+"):
-        normalized = normalized[1:]
-    return normalized
+    digits = re.sub(r"\D", "", str(number))
+    if digits.startswith("0") and len(digits) == 10:
+        digits = "254" + digits[1:]
+    elif len(digits) == 9 and digits[0] in "17":
+        digits = "254" + digits
+    if not 9 <= len(digits) <= 15:
+        return None
+    return digits
+
+
+def _fit(message):
+    if len(message) <= SMS_MAX_LENGTH:
+        return message
+    return message[:SMS_MAX_LENGTH - 3].rstrip() + "..."
 
 
 def send_sms(phone_number, message):
@@ -62,41 +73,47 @@ def send_sms(phone_number, message):
         return False
 
 
-def send_visitor_sms(phone_number, visitor_name, staff_name, status, response_note):
+def _first_name(name):
+    return (name or "").strip().split(" ")[0] or "there"
+
+
+def send_visitor_received_sms(phone_number, visitor_name, staff_name, visit_time):
+    """Confirm to the visitor that their request reached the host."""
+    message = (
+        f"Hi {_first_name(visitor_name)}, your visit request to see {staff_name} "
+        f"on {visit_time} has been received. We'll text you once they respond. - Gatepass"
+    )
+    return send_sms(phone_number, _fit(message))
+
+
+def send_visitor_sms(phone_number, visitor_name, staff_name, status, response_note, visit_time=""):
     """Send response notification to visitor."""
     print(f"SMS ATTEMPT — phone: {phone_number}, visitor: {visitor_name}, status: {status}")
 
-    if status == "Accepted":
-        message = (
-            f"Hi {visitor_name}, your visit request has been ACCEPTED "
-            f"by {staff_name}. They are expecting you. "
-            f"Message: {response_note}"
-        )
-    elif status == "Declined":
-        message = (
-            f"Hi {visitor_name}, your visit request was DECLINED "
-            f"by {staff_name}. Reason: {response_note}"
-        )
-    elif status == "Rescheduled":
-        message = (
-            f"Hi {visitor_name}, {staff_name} has requested to "
-            f"reschedule your visit. Details: {response_note}"
-        )
-    else:
-        message = (
-            f"Hi {visitor_name}, your visit status has been "
-            f"updated to {status} by {staff_name}."
-        )
+    first = _first_name(visitor_name)
+    note = (response_note or "").strip()
+    when = f" for {visit_time}" if visit_time else ""
 
-    message = message[:160]
-    return send_sms(phone_number, message)
+    if status == "Accepted":
+        message = f"Hi {first}, {staff_name} ACCEPTED your visit{when}. They are expecting you."
+        if note:
+            message += f' Note: "{note}"'
+    elif status == "Declined":
+        message = f"Hi {first}, {staff_name} DECLINED your visit request{when}."
+        if note:
+            message += f' Reason: "{note}"'
+    elif status == "Rescheduled":
+        message = f"Hi {first}, {staff_name} RESCHEDULED your visit{when}."
+        if note:
+            message += f' Note: "{note}"'
+    else:
+        message = f"Hi {first}, your visit with {staff_name} is now {status}."
+
+    return send_sms(phone_number, _fit(message + " - Gatepass"))
 
 
 def send_staff_sms(phone_number, staff_name, message):
     """Send alert to staff when a visitor checks in."""
     print(f"Staff SMS CALLED — phone: {phone_number}, staff: {staff_name}")
 
-    final_message = f"Hi {staff_name}, {message}"
-
-    final_message = final_message[:160]
-    return send_sms(phone_number, final_message)
+    return send_sms(phone_number, _fit(f"Hi {_first_name(staff_name)}, {message} - Gatepass"))
