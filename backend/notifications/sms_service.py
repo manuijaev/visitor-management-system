@@ -7,7 +7,7 @@ import requests
 logger = logging.getLogger(__name__)
 
 TALKSASA_API_TOKEN = os.getenv("TALKSASA_API_TOKEN")
-TALKSASA_SENDER_ID = os.getenv("TALKSASA_SENDER_ID", "TALKSASA")
+TALKSASA_SENDER_ID = os.getenv("TALKSASA_SENDER_ID", "TALK-SASA")
 TALKSASA_URL = "https://bulksms.talksasa.com/api/v3/sms/send"
 
 TEXTBEE_API_KEY = os.getenv("TEXTBEE_API_KEY")
