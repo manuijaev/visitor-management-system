@@ -1,17 +1,50 @@
+from django.contrib.auth.password_validation import validate_password as run_password_validators
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 import secrets
 
+from departments.models import Department, Division
+
 from .models import User
+
+
+def build_auth_payload(user):
+    refresh = StaffLoginSerializer.get_token(user)
+    return {
+        'refresh': str(refresh),
+        'access': str(refresh.access_token),
+        'user': session_user_payload(user),
+    }
+
+
+def session_user_payload(user):
+    return {
+        'id': user.id,
+        'email': user.email,
+        'full_name': user.full_name,
+        'role': user.role,
+        'department': user.department_id,
+        'department_name': user.department.name if user.department else '',
+        'division': user.division_id,
+        'division_name': user.division.name if user.division else '',
+        'is_available': user.is_available,
+        'availability_reason': user.availability_reason,
+    }
 
 
 class StaffListSerializer(serializers.ModelSerializer):
     department_name = serializers.CharField(source='department.name', read_only=True)
     division_name = serializers.CharField(source='division.name', read_only=True)
+    invite_pending = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'full_name', 'email', 'phone', 'department', 'department_name', 'division', 'division_name', 'role', 'is_active', 'is_available', 'availability_reason']
+        fields = ['id', 'full_name', 'email', 'phone', 'department', 'department_name', 'division', 'division_name', 'role', 'is_active', 'is_available', 'availability_reason', 'invite_pending']
+
+    def get_invite_pending(self, obj):
+        return not obj.has_usable_password()
 
 
 
@@ -96,11 +129,14 @@ class StaffManageSerializer(serializers.ModelSerializer):
 
 class StaffCreateSerializer(serializers.ModelSerializer):
     """
-    Serializer for admin to create staff accounts.
-    Generates a temporary password and can send welcome email.
+    Admin creates a staff account and places it in a department/division.
+    A department or division can be picked by id or created on the fly by name.
+    The account has no usable password until the staff member accepts the invite.
     """
-    password = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    send_welcome_email = serializers.BooleanField(default=False, write_only=True)
+    department = serializers.PrimaryKeyRelatedField(queryset=Department.objects.all(), required=False, allow_null=True)
+    division = serializers.PrimaryKeyRelatedField(queryset=Division.objects.all(), required=False, allow_null=True)
+    department_name = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=120)
+    division_name = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=120)
 
     class Meta:
         model = User
@@ -111,57 +147,77 @@ class StaffCreateSerializer(serializers.ModelSerializer):
             'phone',
             'department',
             'division',
+            'department_name',
+            'division_name',
             'role',
-            'password',
-            'send_welcome_email',
         ]
         read_only_fields = ['id']
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._temp_password = None
-
-    def get_temp_password(self):
-        return self._temp_password
-
-    def validate_password(self, value):
-        if value and len(value) < 8:
-            raise serializers.ValidationError('Password must be at least 8 characters.')
+    def validate_email(self, value):
+        value = value.strip().lower()
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError('A user with this email already exists.')
         return value
 
     def validate(self, attrs):
         department = attrs.get('department')
         division = attrs.get('division')
+        department_name = (attrs.get('department_name') or '').strip()
+        division_name = (attrs.get('division_name') or '').strip()
+
+        if not department and not department_name:
+            raise serializers.ValidationError({'department': 'Choose a department or enter a new one.'})
+        if not division and not division_name:
+            raise serializers.ValidationError({'division': 'Choose a division or enter a new one.'})
         if department and division and division.department_id != department.id:
             raise serializers.ValidationError({'division': 'Selected division does not belong to this department.'})
-        password = (attrs.get('password') or '').strip()
-        if not password:
-            password = self._generate_temp_password()
-        self._temp_password = password
-        attrs['password'] = password
+        if division and not department:
+            raise serializers.ValidationError({'division': 'A new department cannot use an existing division.'})
+
+        attrs['department_name'] = department_name
+        attrs['division_name'] = division_name
         return attrs
 
-    def _generate_temp_password(self):
-        """Generate a secure temporary password."""
-        chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#!'
-        return ''.join(secrets.choice(chars) for _ in range(10))
-
     def create(self, validated_data):
-        send_welcome = validated_data.pop('send_welcome_email', False)
-        password = validated_data.pop('password')
-        role = validated_data.get('role', User.Role.STAFF)
-        is_staff_flag = role == User.Role.ADMIN
+        department_name = validated_data.pop('department_name', '')
+        division_name = validated_data.pop('division_name', '')
+        department = validated_data.pop('department', None)
+        division = validated_data.pop('division', None)
 
-        user = User.objects.create_user(
-            password=password,
-            is_staff=is_staff_flag,
-            **validated_data
+        if not department:
+            department = Department.objects.filter(name__iexact=department_name).first() \
+                or Department.objects.create(name=department_name)
+        if not division:
+            division = Division.objects.filter(department=department, name__iexact=division_name).first() \
+                or Division.objects.create(department=department, name=division_name)
+
+        role = validated_data.get('role', User.Role.STAFF)
+        return User.objects.create_user(
+            password=None,
+            is_staff=role == User.Role.ADMIN,
+            department=department,
+            division=division,
+            **validated_data,
         )
 
-        # TODO: Send welcome email if send_welcome is True
-        # This would integrate with the notification service
 
-        return user
+class InviteAcceptSerializer(serializers.Serializer):
+    uid = serializers.CharField()
+    token = serializers.CharField()
+    password = serializers.CharField(write_only=True, min_length=8)
+
+    def validate(self, attrs):
+        from .invites import resolve_invite
+
+        user = resolve_invite(attrs['uid'], attrs['token'])
+        if user is None:
+            raise serializers.ValidationError({'detail': 'This link is invalid or has already been used. Ask your administrator for a new one.'})
+        try:
+            run_password_validators(attrs['password'], user=user)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({'password': list(exc.messages)})
+        attrs['user'] = user
+        return attrs
 
 
 class PasswordResetSerializer(serializers.Serializer):
@@ -208,17 +264,17 @@ class StaffLoginSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
-        data = super().validate(attrs)
-        data['user'] = {
-            'id': self.user.id,
-            'email': self.user.email,
-            'full_name': self.user.full_name,
-            'role': self.user.role,
-            'department': self.user.department_id,
-            'division': self.user.division_id,
-            'is_available': self.user.is_available,
-            'availability_reason': self.user.availability_reason,
-        }
+        try:
+            data = super().validate(attrs)
+        except AuthenticationFailed:
+            email = str(attrs.get(self.username_field, '')).strip()
+            pending = User.objects.filter(email__iexact=email, is_active=True).first()
+            if pending and not pending.has_usable_password():
+                raise AuthenticationFailed(
+                    'Your account is not set up yet. Open the invite link in your email to set a password.'
+                )
+            raise
+        data['user'] = session_user_payload(self.user)
         return data
 
 

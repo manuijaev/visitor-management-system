@@ -9,6 +9,7 @@ SERVICE_ID = os.getenv("EMAILJS_SERVICE_ID")
 REQUEST_TEMPLATE_ID = os.getenv("EMAILJS_REQUEST_TEMPLATE_ID")
 RESPONSE_TEMPLATE_ID = os.getenv("EMAILJS_RESPONSE_TEMPLATE_ID")
 PUBLIC_KEY = os.getenv("EMAILJS_PUBLIC_KEY") or os.getenv("EMAILJS_USER_ID")
+PRIVATE_KEY = os.getenv("EMAILJS_PRIVATE_KEY")
 EMAILJS_URL = "https://api.emailjs.com/api/v1.0/email/send"
 
 
@@ -29,6 +30,8 @@ def send_emailjs(template_id, template_params):
         "user_id": PUBLIC_KEY,
         "template_params": template_params,
     }
+    if PRIVATE_KEY:
+        payload["accessToken"] = PRIVATE_KEY
     try:
         response = requests.post(EMAILJS_URL, json=payload, timeout=10)
         response.raise_for_status()

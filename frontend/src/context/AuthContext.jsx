@@ -45,14 +45,23 @@ export function AuthProvider({ children }) {
     return () => window.removeEventListener('storage', onStorage);
   }, []);
 
-  const login = async (email, password) => {
-    const { data } = await api.post('/staff/login/', { email, password });
+  const startSession = (data) => {
     localStorage.setItem('access_token', data.access);
     localStorage.setItem('refresh_token', data.refresh);
     localStorage.setItem('user', JSON.stringify(data.user));
     setUser(data.user);
     channelRef.current?.postMessage({ type: 'auth:login', user: data.user });
     return data.user;
+  };
+
+  const login = async (email, password) => {
+    const { data } = await api.post('/staff/login/', { email, password });
+    return startSession(data);
+  };
+
+  const acceptInvite = async (uid, token, password) => {
+    const { data } = await api.post('/staff/invite/accept/', { uid, token, password });
+    return startSession(data);
   };
 
   const logout = () => {
@@ -72,7 +81,10 @@ export function AuthProvider({ children }) {
     });
   }, []);
 
-  const value = useMemo(() => ({ user, login, logout, updateUser }), [user, updateUser, login, logout]);
+  const value = useMemo(
+    () => ({ user, login, acceptInvite, logout, updateUser }),
+    [user, updateUser, login, acceptInvite, logout]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

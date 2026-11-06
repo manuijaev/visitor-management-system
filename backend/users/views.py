@@ -1,13 +1,18 @@
 from rest_framework import generics, permissions, status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.conf import settings
+from django.db import transaction
 
 from .models import User
 from .models import UserDeviceToken
+from .invites import resolve_invite, send_staff_invite
 from .permissions import IsAdminRole
 from .serializers import (
+    InviteAcceptSerializer,
+    build_auth_payload,
     FCMTokenUpdateSerializer,
     StaffListSerializer,
     StaffAvailabilitySerializer,
@@ -119,8 +124,8 @@ class StaffActivateView(generics.UpdateAPIView):
 
 class StaffCreateView(generics.CreateAPIView):
     """
-    Admin-only endpoint to create staff or admin accounts.
-    Generates a temporary password that must be changed on first login.
+    Admin-only endpoint to create a staff or admin account.
+    The new user receives an email link to set their own password.
     """
     serializer_class = StaffCreateSerializer
     permission_classes = [IsAdminRole]
@@ -128,12 +133,56 @@ class StaffCreateView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        staff_user = serializer.save()
+        with transaction.atomic():
+            staff_user = serializer.save()
+        invite = send_staff_invite(staff_user, request, invited_by=request.user)
         return Response({
-            'message': 'Staff account created successfully',
-            'staff': StaffManageSerializer(staff_user).data,
-            'temp_password': serializer.get_temp_password()
+            'message': 'Staff account created',
+            'staff': StaffListSerializer(staff_user).data,
+            'invite': invite,
         }, status=status.HTTP_201_CREATED)
+
+
+class StaffSendInviteView(APIView):
+    """Admin-only: email a fresh set-password link to a staff member."""
+    permission_classes = [IsAdminRole]
+
+    def post(self, request, pk):
+        staff_user = generics.get_object_or_404(
+            User.objects.filter(role__in=[User.Role.STAFF, User.Role.ADMIN]), pk=pk
+        )
+        if staff_user.id == request.user.id:
+            return Response({'detail': 'You cannot send a password link to yourself.'}, status=403)
+        if not staff_user.is_active:
+            return Response({'detail': 'Activate this account before sending a link.'}, status=400)
+        return Response({'invite': send_staff_invite(staff_user, request, invited_by=request.user)})
+
+
+class InviteValidateView(APIView):
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        user = resolve_invite(request.query_params.get('uid'), request.query_params.get('token'))
+        if user is None:
+            return Response(
+                {'detail': 'This link is invalid or has already been used. Ask your administrator for a new one.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({'full_name': user.full_name, 'email': user.email})
+
+
+class InviteAcceptView(APIView):
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = InviteAcceptSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['user']
+        user.set_password(serializer.validated_data['password'])
+        user.save(update_fields=['password'])
+        return Response(build_auth_payload(user))
 
 
 class StaffResetPasswordView(generics.UpdateAPIView):

@@ -13,6 +13,9 @@ from .views import (
     UpdateFCMTokenView,
     StaffAvailabilityUpdateView,
     VapidPublicKeyView,
+    StaffSendInviteView,
+    InviteValidateView,
+    InviteAcceptView,
 )
 
 urlpatterns = [
@@ -24,6 +27,9 @@ urlpatterns = [
     path('staff/<int:pk>/deactivate/', StaffDeactivateView.as_view(), name='staff-deactivate'),
     path('staff/<int:pk>/activate/', StaffActivateView.as_view(), name='staff-activate'),
     path('staff/<int:pk>/reset-password/', StaffResetPasswordView.as_view(), name='staff-reset-password'),
+    path('staff/<int:pk>/send-invite/', StaffSendInviteView.as_view(), name='staff-send-invite'),
+    path('staff/invite/', InviteValidateView.as_view(), name='staff-invite-validate'),
+    path('staff/invite/accept/', InviteAcceptView.as_view(), name='staff-invite-accept'),
     path('staff/token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
     path('staff/me/fcm-token/', UpdateFCMTokenView.as_view(), name='update-fcm-token'),
     path('staff/me/availability/', StaffAvailabilityUpdateView.as_view(), name='staff-availability'),

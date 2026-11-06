@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import StaffLoginPage from './pages/StaffLoginPage';
 import StaffDashboardPage from './pages/StaffDashboardPage';
@@ -20,7 +20,10 @@ function ProtectedRoute({ children, roles, loginPath = '/staff/login' }) {
 
 function PublicOnlyRoute({ children }) {
   const { user } = useAuth();
-  if (user) return <Navigate to={roleHomePath(user)} replace />;
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const isInviteLink = params.has('uid') && params.has('token');
+  if (user && !isInviteLink) return <Navigate to={roleHomePath(user)} replace />;
   return children;
 }
 
