@@ -101,7 +101,8 @@ export default function StaffLoginPage() {
     setIsSubmitting(true);
     try {
       const user = await login(form.email, form.password);
-      await tryRegisterDevice();
+      // An unanswered notification prompt never resolves, so it must not hold up the redirect.
+      tryRegisterDevice();
       setToast(`Welcome back, ${user?.full_name || 'Staff'}!`);
       setTimeout(() => navigateByRole(user), 1200);
     } catch (err) {
@@ -121,7 +122,7 @@ export default function StaffLoginPage() {
     setIsSubmitting(true);
     try {
       const user = await acceptInvite(inviteUid, inviteToken, newPassword.password);
-      await tryRegisterDevice();
+      tryRegisterDevice();
       setToast(`You're all set, ${user?.full_name?.split(' ')[0] || 'there'}!`);
       setTimeout(() => navigateByRole(user), 900);
     } catch (err) {

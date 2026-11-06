@@ -20,13 +20,27 @@ export function isTokenExpired(token) {
   return exp - EXPIRY_SKEW_SECONDS <= Date.now() / 1000;
 }
 
-export function readStoredUser() {
+export const ROLES = ['Admin', 'Staff'];
+
+export function isValidUser(user) {
+  return Boolean(user && typeof user === 'object' && user.id != null && ROLES.includes(user.role));
+}
+
+function readRawUser() {
   try {
-    const user = JSON.parse(localStorage.getItem('user'));
-    return user && typeof user === 'object' ? user : null;
+    return JSON.parse(localStorage.getItem('user'));
   } catch {
     return null;
   }
+}
+
+export function hasStoredUser() {
+  return localStorage.getItem('user') !== null;
+}
+
+export function readStoredUser() {
+  const user = readRawUser();
+  return isValidUser(user) ? user : null;
 }
 
 // The refresh token outlives the access token, so it decides whether the session can still be resumed.

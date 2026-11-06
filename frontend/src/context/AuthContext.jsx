@@ -1,6 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../services/api';
-import { clearSession, flashSessionExpired, hasUsableSession, readStoredUser } from '../services/session';
+import {
+  clearSession,
+  flashSessionExpired,
+  hasStoredUser,
+  hasUsableSession,
+  isValidUser,
+  readStoredUser,
+} from '../services/session';
 
 const AuthContext = createContext(null);
 const AUTH_SYNC_CHANNEL = 'auth-sync-channel';
@@ -9,7 +16,7 @@ export function AuthProvider({ children }) {
   const channelRef = useRef(null);
   const [user, setUser] = useState(() => {
     if (hasUsableSession()) return readStoredUser();
-    if (readStoredUser()) flashSessionExpired();
+    if (hasStoredUser()) flashSessionExpired();
     clearSession();
     return null;
   });
@@ -42,7 +49,7 @@ export function AuthProvider({ children }) {
 
     channel.onmessage = (event) => {
       const payload = event?.data || {};
-      if (payload.type === 'auth:login' && payload.user) {
+      if (payload.type === 'auth:login' && isValidUser(payload.user)) {
         setUser(payload.user);
       }
       if (payload.type === 'auth:logout') {
