@@ -1,11 +1,36 @@
+import { Suspense, lazy, useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import HomePage from './pages/HomePage';
-import StaffLoginPage from './pages/StaffLoginPage';
-import StaffDashboardPage from './pages/StaffDashboardPage';
-import AdminDashboardPage from './pages/AdminDashboardPage';
-import AdminSignupPage from './pages/AdminSignupPage';
 import { useAuth } from './context/AuthContext';
 import Navbar from './components/Navbar';
+import LogoLoader, { hideBootSplash } from './components/LogoLoader';
+
+const CHUNK_RELOAD_KEY = 'gp_chunk_reload';
+
+// A tab left open across a deploy asks for chunk files that no longer exist; reload once to pick up the new build.
+function lazyPage(load) {
+  return lazy(() =>
+    load().catch((error) => {
+      if (sessionStorage.getItem(CHUNK_RELOAD_KEY)) throw error;
+      sessionStorage.setItem(CHUNK_RELOAD_KEY, '1');
+      window.location.reload();
+      return new Promise(() => {});
+    })
+  );
+}
+
+const StaffLoginPage = lazyPage(() => import('./pages/StaffLoginPage'));
+const StaffDashboardPage = lazyPage(() => import('./pages/StaffDashboardPage'));
+const AdminDashboardPage = lazyPage(() => import('./pages/AdminDashboardPage'));
+const AdminSignupPage = lazyPage(() => import('./pages/AdminSignupPage'));
+
+function PageReady() {
+  useEffect(() => {
+    sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+    hideBootSplash();
+  }, []);
+  return null;
+}
 
 function roleHomePath(user) {
   return user?.role === 'Admin' ? '/admin/dashboard' : '/staff/dashboard';
@@ -37,41 +62,44 @@ export default function App() {
   return (
     <>
       <Navbar />
-      <Routes>
-        <Route path="/" element={<HomeRoute />} />
-        <Route
-          path="/staff/login"
-          element={
-            <PublicOnlyRoute>
-              <StaffLoginPage />
-            </PublicOnlyRoute>
-          }
-        />
-        <Route
-          path="/admin/signup"
-          element={
-            <PublicOnlyRoute>
-              <AdminSignupPage />
-            </PublicOnlyRoute>
-          }
-        />
-        <Route
-          path="/staff/dashboard"
-          element={
-            <ProtectedRoute roles={['Staff', 'Admin']}>
-              <StaffDashboardPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/dashboard"
-          element={
-            <ProtectedRoute roles={['Admin']} loginPath="/staff/login">
-              <AdminDashboardPage />
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
+      <Suspense fallback={<LogoLoader />}>
+        <PageReady />
+        <Routes>
+          <Route path="/" element={<HomeRoute />} />
+          <Route
+            path="/staff/login"
+            element={
+              <PublicOnlyRoute>
+                <StaffLoginPage />
+              </PublicOnlyRoute>
+            }
+          />
+          <Route
+            path="/admin/signup"
+            element={
+              <PublicOnlyRoute>
+                <AdminSignupPage />
+              </PublicOnlyRoute>
+            }
+          />
+          <Route
+            path="/staff/dashboard"
+            element={
+              <ProtectedRoute roles={['Staff', 'Admin']}>
+                <StaffDashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/dashboard"
+            element={
+              <ProtectedRoute roles={['Admin']} loginPath="/staff/login">
+                <AdminDashboardPage />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </Suspense>
     </>
   );
 }

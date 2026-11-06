@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
+import LogoMark from '../components/LogoMark';
 import '../home.css';
 
 const TZ = 'Africa/Nairobi';
@@ -96,7 +97,6 @@ const ICON_PATHS = {
   message: <path d="M20.5 12a8.5 8.5 0 0 1-12.3 7.6L3.5 20.5l1-4.4A8.5 8.5 0 1 1 20.5 12z" />,
   close: <path d="M6 6l12 12M18 6 6 18" />,
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
-  building: <path d="M4 20.5V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v15.5M15 9h4a1 1 0 0 1 1 1v10.5M2.5 20.5h19M8 8h3M8 12h3M8 16h3" />,
   desk: <path d="M3 10.5h18v3H3zM5.5 13.5v6.5M18.5 13.5v6.5M8.5 6.5h7v4h-7z" />,
   download: <path d="M12 4v11M7 10.5l5 5 5-5M5 20h14" />,
   info: (
@@ -1073,9 +1073,7 @@ export default function HomePage() {
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
           >
-            <span className="gp-brand-mark">
-              <Icon name="building" />
-            </span>
+            <LogoMark className="gp-brand-mark" />
             <span>
               <strong>Gatepass</strong>
               <small>Visitor desk</small>

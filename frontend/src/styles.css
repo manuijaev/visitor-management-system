@@ -187,7 +187,7 @@ body.auth-background::before {
   content: '';
   position: fixed;
   inset: 0;
-  background-image: url('/images/dark-abstract-wallpaper-background-smoke-design.jpg');
+  background-image: url('/images/smoke-1920.jpg');
   background-size: cover;
   background-position: center bottom;
   filter: grayscale(1) blur(2px);
@@ -213,7 +213,7 @@ body.dashboard-background::before {
   content: '';
   position: fixed;
   inset: 0;
-  background-image: url('/images/dark-abstract-wallpaper-background-smoke-design.jpg');
+  background-image: url('/images/smoke-1920.jpg');
   background-size: cover;
   background-position: center;
   filter: blur(2.2px);
@@ -397,11 +397,11 @@ body.dashboard-background::after {
 }
 
 .admin-control-hero {
-  background-image: url('/images/business-man-working-late-office.jpg');
+  background-image: url('/images/office-late-1920.jpg');
 }
 
 .staff-portal-hero {
-  background-image: url('/images/portrait-professional-business-people-working-together.jpg');
+  background-image: url('/images/team-portrait-1600.jpg');
   background-position: center 30%;
 }
 

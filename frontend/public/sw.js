@@ -1,5 +1,5 @@
-const CACHE_NAME = 'visitor-pwa-v2';
-const ASSETS = ['/', '/index.html', '/manifest.json'];
+const CACHE_NAME = 'visitor-pwa-v3';
+const ASSETS = ['/index.html', '/manifest.json'];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -7,23 +7,29 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(clients.claim());
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then(() => clients.claim())
+  );
 });
 
 self.addEventListener('fetch', (event) => {
-  // Do not intercept non-GET requests (POST/PATCH/PUT/DELETE).
-  if (event.request.method !== 'GET') return;
+  // Pages are network-first: a cached index.html points at bundles that the next deploy deletes.
+  // Everything else goes straight to the network and relies on normal HTTP caching.
+  if (event.request.method !== 'GET' || event.request.mode !== 'navigate') return;
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).catch(() => {
-        if (event.request.mode === 'navigate') {
-          return caches.match('/index.html');
+    fetch(event.request)
+      .then((response) => {
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', copy));
         }
-        return new Response('', { status: 504, statusText: 'Offline' });
-      });
-    })
+        return response;
+      })
+      .catch(() => caches.match('/index.html'))
   );
 });
 

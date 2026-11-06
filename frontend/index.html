@@ -2,29 +2,128 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0f4c81" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#f9f7f4" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
     <link
-      rel="preload"
-      href="/images/dark-abstract-wallpaper-background-smoke-design.jpg"
-      as="image"
-      fetchpriority="high"
-    />
-    <link
-      rel="preload"
-      href="/images/close-up-group-tourists-meet-dawn-volcano-batur-bali-indonesia.jpg"
-      as="image"
-      fetchpriority="high"
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
     />
     <link rel="manifest" href="/manifest.json" />
-    <title>Visitor Management System</title>
+    <title>Gatepass · Visitor Management System</title>
+    <!-- Logo and boot splash styles are inlined so they work before the JS/CSS bundle arrives.
+         LogoMark.jsx and LogoLoader.jsx reuse these classes. -->
+    <style>
+      .vms-logo { display: block; width: 100%; height: 100%; overflow: visible; }
+      .vms-logo-tile { fill: #1a1714; }
+      .vms-logo-arch,
+      .vms-logo-sill { fill: none; stroke-linecap: round; stroke-width: 3.4; }
+      .vms-logo-arch { stroke: #e8b96a; }
+      .vms-logo-sill { stroke: #c9922a; }
+      .vms-logo-dot { fill: #e8b96a; }
+      .vms-logo.is-animated .vms-logo-arch {
+        stroke-dasharray: 1 1;
+        animation: vmsArch 2.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+      }
+      .vms-logo.is-animated .vms-logo-sill,
+      .vms-logo.is-animated .vms-logo-dot { transform-box: fill-box; transform-origin: center; }
+      .vms-logo.is-animated .vms-logo-sill { animation: vmsSill 2.6s cubic-bezier(0.65, 0, 0.35, 1) infinite; }
+      .vms-logo.is-animated .vms-logo-dot { animation: vmsDot 2.6s cubic-bezier(0.34, 1.56, 0.64, 1) infinite; }
+      @keyframes vmsArch {
+        0% { stroke-dashoffset: 1; }
+        38%, 74% { stroke-dashoffset: 0; }
+        100% { stroke-dashoffset: -1; }
+      }
+      @keyframes vmsSill {
+        0%, 8% { transform: scaleX(0); }
+        34%, 78% { transform: scaleX(1); }
+        96%, 100% { transform: scaleX(0); }
+      }
+      @keyframes vmsDot {
+        0%, 30% { opacity: 0; transform: translateY(12px) scale(0.6); }
+        48% { opacity: 1; transform: translateY(0) scale(1.25); }
+        58%, 76% { opacity: 1; transform: translateY(0) scale(1); }
+        92%, 100% { opacity: 0; transform: translateY(0) scale(0.4); }
+      }
+
+      .boot {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: grid;
+        place-items: center;
+        background: radial-gradient(circle at 50% 40%, #fdf3e3 0%, #f9f7f4 46%);
+        color: #1a1714;
+        transition: opacity 0.35s ease, visibility 0.35s ease;
+      }
+      .boot.is-done { opacity: 0; visibility: hidden; }
+      /* Fade in after a beat so fast loads never flash the splash. */
+      .boot-inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        opacity: 0;
+        animation: bootIn 0.45s ease 0.18s forwards;
+      }
+      .boot-mark { width: 84px; height: 84px; filter: drop-shadow(0 20px 32px rgba(26, 23, 20, 0.28)); }
+      .boot-word {
+        margin-top: 22px;
+        font: 600 30px/1 'Cormorant Garamond', Georgia, serif;
+        letter-spacing: 0.01em;
+      }
+      .boot-sub {
+        margin-top: 8px;
+        font: 600 10.5px/1 'Outfit', system-ui, sans-serif;
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+        color: #a39d96;
+      }
+      .boot-bar {
+        position: relative;
+        width: 120px;
+        height: 3px;
+        margin-top: 24px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: #e8e2d9;
+      }
+      .boot-bar::after {
+        content: '';
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 40%;
+        border-radius: inherit;
+        background: #c9922a;
+        animation: bootBar 1.3s ease-in-out infinite;
+      }
+      @keyframes bootIn { to { opacity: 1; } }
+      @keyframes bootBar {
+        from { transform: translateX(-100%); }
+        to { transform: translateX(250%); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .vms-logo.is-animated *,
+        .boot-bar::after { animation: none !important; }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <div id="boot" class="boot" role="status" aria-label="Loading Gatepass">
+      <div class="boot-inner">
+        <svg class="vms-logo is-animated boot-mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+          <rect class="vms-logo-tile" width="64" height="64" rx="18" />
+          <path class="vms-logo-arch" d="M21 45V29a11 11 0 0 1 22 0v16" pathLength="1" />
+          <path class="vms-logo-sill" d="M15 45h34" />
+          <circle class="vms-logo-dot" cx="32" cy="36" r="3.6" />
+        </svg>
+        <span class="boot-word">Gatepass</span>
+        <span class="boot-sub">Visitor desk</span>
+        <span class="boot-bar"></span>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
