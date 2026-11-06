@@ -6,14 +6,24 @@ import requests
 
 logger = logging.getLogger(__name__)
 
+AT_USERNAME = os.getenv("AT_USERNAME")
+AT_API_KEY = os.getenv("AT_API_KEY")
+AT_SENDER_ID = os.getenv("AT_SENDER_ID")
+
 UMS_API_KEY = os.getenv("UMS_API_KEY")
 UMS_APP_ID = os.getenv("UMS_APP_ID")
 UMS_URL = "https://comms.umeskiasoftwares.com/api/v1/sms/send"
 SENDER_ID = os.getenv("UMS_SENDER_ID", "UMS_SMS")
 SMS_MAX_LENGTH = 160
 
-print(f"SMS SERVICE INIT — UMS_API_KEY present: {bool(UMS_API_KEY)}")
-print(f"SMS SERVICE INIT — UMS_APP_ID: {UMS_APP_ID}")
+if AT_USERNAME and AT_API_KEY:
+    SMS_PROVIDER = "africastalking"
+elif UMS_API_KEY and UMS_APP_ID:
+    SMS_PROVIDER = "ums"
+else:
+    SMS_PROVIDER = None
+
+print(f"SMS SERVICE INIT — provider: {SMS_PROVIDER or 'none configured'}")
 
 
 def normalize_phone(number):
@@ -36,17 +46,24 @@ def _fit(message):
     return message[:SMS_MAX_LENGTH - 3].rstrip() + "..."
 
 
-def send_sms(phone_number, message):
-    """Core send function — calls UMSComms API."""
-    normalized = normalize_phone(phone_number)
-    if not normalized:
-        print("SMS ABORTED — phone number empty or invalid")
-        return False
+def _send_africastalking(normalized, message):
+    host = "api.sandbox.africastalking.com" if AT_USERNAME == "sandbox" else "api.africastalking.com"
+    data = {"username": AT_USERNAME, "to": f"+{normalized}", "message": message}
+    if AT_SENDER_ID:
+        data["from"] = AT_SENDER_ID
+    response = requests.post(
+        f"https://{host}/version1/messaging",
+        data=data,
+        headers={"apiKey": AT_API_KEY, "Accept": "application/json"},
+        timeout=10,
+    )
+    result = response.json()
+    print(f"SMS RESPONSE — {result}")
+    recipients = result.get("SMSMessageData", {}).get("Recipients", [])
+    return any(r.get("statusCode") in (100, 101, 102) for r in recipients)
 
-    if not UMS_API_KEY or not UMS_APP_ID:
-        print("SMS ABORTED — UMSComms credentials not configured")
-        return False
 
+def _send_ums(normalized, message):
     payload = {
         "api_key": UMS_API_KEY,
         "app_id": UMS_APP_ID,
@@ -54,20 +71,31 @@ def send_sms(phone_number, message):
         "message": message,
         "phone": normalized,
     }
+    result = requests.post(UMS_URL, json=payload, timeout=10).json()
+    print(f"SMS RESPONSE — {result}")
+    return result.get("status") == "complete"
+
+
+def send_sms(phone_number, message):
+    """Send one SMS through whichever provider is configured."""
+    normalized = normalize_phone(phone_number)
+    if not normalized:
+        print("SMS ABORTED — phone number empty or invalid")
+        return False
+
+    if not SMS_PROVIDER:
+        print("SMS ABORTED — no SMS provider configured (set AT_USERNAME/AT_API_KEY or UMS_API_KEY/UMS_APP_ID)")
+        return False
 
     try:
-        print(f"SMS SENDING — to: {normalized}")
-        response = requests.post(UMS_URL, json=payload, timeout=10)
-        result = response.json()
-        print(f"SMS RESPONSE — {result}")
-
-        if result.get("status") == "complete":
+        print(f"SMS SENDING — via {SMS_PROVIDER} to: {normalized}")
+        sender = _send_africastalking if SMS_PROVIDER == "africastalking" else _send_ums
+        sent = sender(normalized, message)
+        if sent:
             logger.info("SMS sent successfully to %s", normalized)
-            return True
         else:
-            logger.error("SMS failed: %s", result)
-            return False
-
+            logger.error("SMS not accepted by %s for %s", SMS_PROVIDER, normalized)
+        return sent
     except Exception as e:
         logger.error("SMS exception: %s", str(e))
         return False

@@ -85,6 +85,35 @@ class AppointmentSmsTests(TestCase):
         self.assertLessEqual(len(text), 160)
 
 
+class AfricasTalkingTests(TestCase):
+    @mock.patch.multiple('notifications.sms_service', SMS_PROVIDER='africastalking',
+                         AT_USERNAME='gatepass', AT_API_KEY='key123', AT_SENDER_ID=None)
+    @mock.patch('notifications.sms_service.requests.post')
+    def test_sends_in_africastalking_format(self, post):
+        from notifications.sms_service import send_sms
+        post.return_value.json.return_value = {
+            'SMSMessageData': {'Recipients': [{'statusCode': 101, 'status': 'Success'}]}
+        }
+
+        self.assertTrue(send_sms('0705 171 018', 'Hello'))
+
+        url = post.call_args.args[0]
+        self.assertEqual(url, 'https://api.africastalking.com/version1/messaging')
+        self.assertEqual(post.call_args.kwargs['data'], {'username': 'gatepass', 'to': '+254705171018', 'message': 'Hello'})
+        self.assertEqual(post.call_args.kwargs['headers']['apiKey'], 'key123')
+
+    @mock.patch.multiple('notifications.sms_service', SMS_PROVIDER='africastalking',
+                         AT_USERNAME='gatepass', AT_API_KEY='key123', AT_SENDER_ID=None)
+    @mock.patch('notifications.sms_service.requests.post')
+    def test_reports_rejected_number(self, post):
+        from notifications.sms_service import send_sms
+        post.return_value.json.return_value = {
+            'SMSMessageData': {'Recipients': [{'statusCode': 405, 'status': 'InsufficientBalance'}]}
+        }
+
+        self.assertFalse(send_sms('0705171018', 'Hello'))
+
+
 class NormalizePhoneTests(TestCase):
     def test_kenyan_formats(self):
         for raw in ['0712345678', '+254712345678', '254 712 345 678', '712345678', '0712-345-678']:
