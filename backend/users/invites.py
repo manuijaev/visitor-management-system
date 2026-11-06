@@ -8,33 +8,19 @@ from django.core.mail import get_connection, send_mail
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 
-from notifications.emailjs_service import send_emailjs
+from notifications.email_templates import frontend_base_url, staff_invite_email
+from notifications.emailjs_service import REQUEST_TEMPLATE_ID, send_emailjs
 
 from .models import User
 
 logger = logging.getLogger(__name__)
 
-INVITE_TEMPLATE_ID = os.getenv('EMAILJS_INVITE_TEMPLATE_ID')
+# Invites share the staff template (subject + html_body) unless a dedicated one is configured.
+INVITE_TEMPLATE_ID = os.getenv('EMAILJS_INVITE_TEMPLATE_ID') or REQUEST_TEMPLATE_ID
 
 
 def invite_expiry_hours():
     return int(settings.PASSWORD_RESET_TIMEOUT // 3600)
-
-
-def _frontend_base_url(request):
-    configured = os.getenv('FRONTEND_URL', '').strip()
-    if configured:
-        return configured.rstrip('/')
-
-    origin = (request.headers.get('Origin') or '').strip() if request else ''
-    if origin and (settings.DEBUG or origin in settings.CORS_ALLOWED_ORIGINS):
-        return origin.rstrip('/')
-
-    railway_frontend = os.getenv('RAILWAY_SERVICE_FRONTEND_URL', '').strip()
-    if railway_frontend:
-        return f'https://{railway_frontend}'
-
-    return 'http://localhost:5173'
 
 
 def build_invite_url(user, request):
@@ -42,7 +28,7 @@ def build_invite_url(user, request):
         'uid': urlsafe_base64_encode(force_bytes(user.pk)),
         'token': default_token_generator.make_token(user),
     })
-    return f'{_frontend_base_url(request)}/staff/login?{params}'
+    return f'{frontend_base_url(request)}/staff/login?{params}'
 
 
 def resolve_invite(uid, token):
@@ -57,7 +43,7 @@ def resolve_invite(uid, token):
     return user
 
 
-def _send_via_smtp(user, invite_url, invited_by, placement):
+def _send_via_smtp(user, email, invite_url, invited_by, placement):
     if not (settings.EMAIL_HOST_USER and settings.EMAIL_HOST_PASSWORD):
         return False
     body = (
@@ -69,12 +55,13 @@ def _send_via_smtp(user, invite_url, invited_by, placement):
     )
     try:
         send_mail(
-            'Set up your Gatepass account',
+            email['subject'],
             body,
             settings.DEFAULT_FROM_EMAIL,
             [user.email],
             fail_silently=False,
             connection=get_connection(timeout=settings.EMAIL_TIMEOUT),
+            html_message=email['html_body'],
         )
         return True
     except Exception as exc:
@@ -89,19 +76,27 @@ def send_staff_invite(user, request, invited_by=None):
     division_name = user.division.name if user.division else ''
     placement = f' in {division_name}, {department_name}' if department_name and division_name else ''
 
+    email = staff_invite_email(
+        full_name=user.full_name,
+        invited_by=invited_by_name,
+        invite_url=invite_url,
+        role=user.role,
+        expires_in_hours=invite_expiry_hours(),
+        department_name=department_name,
+        division_name=division_name,
+    )
+
     channel = None
     if INVITE_TEMPLATE_ID and send_emailjs(INVITE_TEMPLATE_ID, {
+        **email,
         'to_email': user.email,
         'to_name': user.full_name,
+        'from_name': 'Gatepass',
+        'reply_to': getattr(invited_by, 'email', '') or settings.DEFAULT_FROM_EMAIL,
         'invite_url': invite_url,
-        'invited_by': invited_by_name,
-        'role': user.role,
-        'department_name': department_name,
-        'division_name': division_name,
-        'expires_in_hours': invite_expiry_hours(),
     }):
         channel = 'emailjs'
-    elif _send_via_smtp(user, invite_url, invited_by_name, placement):
+    elif _send_via_smtp(user, email, invite_url, invited_by_name, placement):
         channel = 'smtp'
 
     return {

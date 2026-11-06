@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from django.utils import timezone
 
 from notifications.services import send_fcm_push_notification
+from notifications.email_templates import visit_request_email, visit_response_email
 from notifications.emailjs_service import (
     REQUEST_TEMPLATE_ID,
     RESPONSE_TEMPLATE_ID,
@@ -44,6 +45,34 @@ def _get_visit_message(appointment):
     return f"{appointment.visitor_name} has a scheduled visit on {formatted}."
 
 
+def _visit_request_params(appointment):
+    staff = appointment.staff_member
+    staff_name = staff.full_name or staff.first_name or "Staff"
+    params = {
+        "to_email": staff.email,
+        "to_name": staff_name,
+        "from_name": appointment.visitor_name,
+        "reply_to": appointment.visitor_email,
+        "visitor_name": appointment.visitor_name,
+        "visitor_email": appointment.visitor_email,
+        "department_name": appointment.department.name if appointment.department else "",
+        "division_name": appointment.division.name if appointment.division else "",
+        "appointment_date": _format_local_time(appointment.appointment_date),
+        "message": appointment.message or "",
+        "staff_name": staff_name,
+    }
+    params.update(visit_request_email(
+        staff_name=staff_name,
+        visitor_name=params["visitor_name"],
+        visitor_email=params["visitor_email"],
+        appointment_date=params["appointment_date"],
+        department_name=params["department_name"],
+        division_name=params["division_name"],
+        message=params["message"],
+    ))
+    return params
+
+
 def _notify_new_appointment(appointment):
     logger.info(f'Starting notification for appointment_id={appointment.id}, staff_member={appointment.staff_member}')
     body = _get_visit_message(appointment)
@@ -51,21 +80,7 @@ def _notify_new_appointment(appointment):
     try:
         staff_email = appointment.staff_member.email
         logger.info(f'Sending email to staff: {staff_email}')
-        formatted_date = _format_local_time(appointment.appointment_date)
-        send_emailjs(
-            REQUEST_TEMPLATE_ID,
-            {
-                "to_email": staff_email,
-                "to_name": appointment.staff_member.full_name or appointment.staff_member.first_name or "Staff",
-                "visitor_name": appointment.visitor_name,
-                "visitor_email": appointment.visitor_email,
-                "department_name": appointment.department.name if appointment.department else "",
-                "division_name": appointment.division.name if appointment.division else "",
-                "appointment_date": formatted_date,
-                "message": appointment.message or "",
-                "staff_name": appointment.staff_member.full_name or appointment.staff_member.first_name or "Staff",
-            },
-        )
+        send_emailjs(REQUEST_TEMPLATE_ID, _visit_request_params(appointment))
         logger.info(f'EmailJS request email queued for staff {staff_email}')
     except Exception as e:
         logger.exception('Failed to send appointment request email for appointment_id=%s: %s', appointment.id, str(e))
@@ -129,15 +144,27 @@ def _notify_appointment_response(appointment, staff_name=None):
     resolved_staff_name = staff_name or appointment.staff_member.full_name or "Staff"
 
     try:
+        staff_email = appointment.staff_member.email
         send_emailjs(
             RESPONSE_TEMPLATE_ID,
             {
+                "to_email": appointment.visitor_email,
+                "from_name": resolved_staff_name,
+                "reply_to": staff_email,
+                "staff_email": staff_email,
                 "visitor_name": appointment.visitor_name,
                 "visitor_email": appointment.visitor_email,
                 "status": appointment.status,
                 "response_note": appointment.response_note or "",
                 "appointment_date": formatted_date,
                 "staff_name": resolved_staff_name,
+                **visit_response_email(
+                    visitor_name=appointment.visitor_name,
+                    staff_name=resolved_staff_name,
+                    status=appointment.status,
+                    appointment_date=formatted_date,
+                    response_note=appointment.response_note or "",
+                ),
             },
         )
         logger.info("Response email sent for appointment_id=%s", appointment.id)
@@ -187,23 +214,8 @@ class AppointmentCreateView(generics.CreateAPIView):
         self._push_result = {'sent': False, 'reason': 'unknown'}
         
         # Send email immediately (synchronously)
-        formatted_date = _format_local_time(appointment.appointment_date)
         try:
-            staff_email = appointment.staff_member.email
-            success = send_emailjs(
-                REQUEST_TEMPLATE_ID,
-                {
-                    "to_email": staff_email,
-                    "to_name": appointment.staff_member.full_name or appointment.staff_member.first_name or "Staff",
-                    "visitor_name": appointment.visitor_name,
-                    "visitor_email": appointment.visitor_email,
-                    "department_name": appointment.department.name if appointment.department else "",
-                    "division_name": appointment.division.name if appointment.division else "",
-                    "appointment_date": formatted_date,
-                    "message": appointment.message or "",
-                    "staff_name": appointment.staff_member.full_name or appointment.staff_member.first_name or "Staff",
-                },
-            )
+            success = send_emailjs(REQUEST_TEMPLATE_ID, _visit_request_params(appointment))
             self._email_result = {'sent': success, 'reason': 'sent' if success else 'failed'}
         except Exception as e:
             logger.exception('Failed to send appointment email: %s', str(e))

@@ -1,9 +1,11 @@
+from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
 from django.test import TestCase
 from rest_framework.test import APIClient
 
 from departments.models import Department, Division
+from notifications.email_templates import visit_request_email
 
 from .models import User
 
@@ -137,3 +139,42 @@ class StaffInviteFlowTests(TestCase):
             'department_name': 'Finance', 'division_name': 'Payroll',
         }, format='json')
         self.assertEqual(response.status_code, 403)
+
+
+class InviteEmailTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            email='admin@example.com', full_name='Ada Admin', password='AdminPass123!', role=User.Role.ADMIN
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(self.admin)
+
+    @mock.patch('users.invites.INVITE_TEMPLATE_ID', 'template_shared')
+    @mock.patch('users.invites.send_emailjs', return_value=True)
+    def test_invite_uses_shared_template_with_rendered_html(self, send):
+        response = self.client.post('/api/staff/create/', {
+            'full_name': 'Jane Doe',
+            'email': 'jane@example.com',
+            'department_name': 'Finance',
+            'division_name': 'Payroll',
+        }, format='json')
+
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertTrue(response.data['invite']['email_sent'])
+        template_id, params = send.call_args.args
+        self.assertEqual(template_id, 'template_shared')
+        self.assertEqual(params['to_email'], 'jane@example.com')
+        self.assertEqual(params['subject'], 'Set up your Gatepass account')
+        self.assertIn(response.data['invite']['invite_url'].replace('&', '&amp;'), params['html_body'])
+        self.assertIn('Finance / Payroll', params['html_body'])
+
+
+class EmailTemplateTests(TestCase):
+    def test_user_text_is_escaped(self):
+        email = visit_request_email(
+            staff_name='Jane', visitor_name='<b>Eve</b>', visitor_email='eve@example.com',
+            appointment_date='Nov 06, 2026 at 10:30 AM', message='<script>alert(1)</script>',
+        )
+        self.assertNotIn('<script>', email['html_body'])
+        self.assertNotIn('<b>Eve</b>', email['html_body'])
+        self.assertIn('&lt;b&gt;Eve&lt;/b&gt;', email['html_body'])
