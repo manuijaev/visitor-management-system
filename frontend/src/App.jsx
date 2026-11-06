@@ -4,8 +4,7 @@ import HomePage from './pages/HomePage';
 import { useAuth } from './context/AuthContext';
 import Navbar from './components/Navbar';
 import LogoLoader, { hideBootSplash } from './components/LogoLoader';
-
-const CHUNK_RELOAD_KEY = 'gp_chunk_reload';
+import ErrorBoundary, { CHUNK_RELOAD_KEY } from './components/ErrorBoundary';
 
 // A tab left open across a deploy asks for chunk files that no longer exist; reload once to pick up the new build.
 function lazyPage(load) {
@@ -59,8 +58,9 @@ function HomeRoute() {
 }
 
 export default function App() {
+  const { pathname } = useLocation();
   return (
-    <>
+    <ErrorBoundary resetKey={pathname}>
       <Navbar />
       <Suspense fallback={<LogoLoader />}>
         <PageReady />
@@ -100,6 +100,6 @@ export default function App() {
           />
         </Routes>
       </Suspense>
-    </>
+    </ErrorBoundary>
   );
 }

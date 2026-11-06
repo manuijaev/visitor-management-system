@@ -98,6 +98,22 @@
         background: #c9922a;
         animation: bootBar 1.3s ease-in-out infinite;
       }
+      .boot-stall { display: none; margin-top: 26px; text-align: center; font: 400 14px/1.5 'Outfit', system-ui, sans-serif; color: #6b645c; }
+      .boot.is-stalled .boot-stall { display: block; animation: bootIn 0.3s ease forwards; }
+      .boot-stall p { margin: 0 0 14px; }
+      .boot-stall-actions { display: flex; gap: 10px; justify-content: center; }
+      .boot-stall button {
+        min-height: 40px;
+        padding: 0 18px;
+        border: 1px solid #d9d1c5;
+        border-radius: 999px;
+        background: #fff;
+        color: #1a1714;
+        font: 600 13px/1 'Outfit', system-ui, sans-serif;
+        white-space: nowrap;
+        cursor: pointer;
+      }
+      .boot-stall button[data-boot-action='reload'] { border-color: #1a1714; background: #1a1714; color: #f9f7f4; }
       @keyframes bootIn { to { opacity: 1; } }
       @keyframes bootBar {
         from { transform: translateX(-100%); }
@@ -122,8 +138,32 @@
         <span class="boot-word">Gatepass</span>
         <span class="boot-sub">Visitor desk</span>
         <span class="boot-bar"></span>
+        <div class="boot-stall">
+          <p>This is taking longer than usual.</p>
+          <div class="boot-stall-actions">
+            <button type="button" data-boot-action="reload">Reload</button>
+            <button type="button" data-boot-action="login">Log in again</button>
+          </div>
+        </div>
       </div>
     </div>
+    <script>
+      (function () {
+        // If the app bundle never boots (failed download, stale cache), offer a way out instead of an endless splash.
+        var boot = document.getElementById('boot');
+        window.setTimeout(function () {
+          if (document.getElementById('boot') && !boot.classList.contains('is-done')) boot.classList.add('is-stalled');
+        }, 12000);
+        boot.addEventListener('click', function (event) {
+          var action = event.target.getAttribute('data-boot-action');
+          if (action === 'reload') window.location.reload();
+          if (action === 'login') {
+            ['access_token', 'refresh_token', 'user'].forEach(function (key) { localStorage.removeItem(key); });
+            window.location.replace('/staff/login');
+          }
+        });
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../services/api';
+import { clearSession, flashSessionExpired, hasUsableSession, readStoredUser } from '../services/session';
 
 const AuthContext = createContext(null);
 const AUTH_SYNC_CHANNEL = 'auth-sync-channel';
@@ -7,9 +8,32 @@ const AUTH_SYNC_CHANNEL = 'auth-sync-channel';
 export function AuthProvider({ children }) {
   const channelRef = useRef(null);
   const [user, setUser] = useState(() => {
-    const data = localStorage.getItem('user');
-    return data ? JSON.parse(data) : null;
+    if (hasUsableSession()) return readStoredUser();
+    if (readStoredUser()) flashSessionExpired();
+    clearSession();
+    return null;
   });
+
+  useEffect(() => {
+    if (!user) return undefined;
+    const check = () => {
+      if (hasUsableSession()) return;
+      clearSession();
+      flashSessionExpired();
+      setUser(null);
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') check();
+    };
+    const id = setInterval(check, 60000);
+    window.addEventListener('focus', check);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener('focus', check);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [user]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return;
@@ -35,7 +59,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const onStorage = (event) => {
       if (event.key === 'user') {
-        setUser(event.newValue ? JSON.parse(event.newValue) : null);
+        setUser(readStoredUser());
       }
       if (event.key === 'access_token' && !event.newValue) {
         setUser(null);
@@ -65,9 +89,7 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('user');
+    clearSession();
     setUser(null);
     channelRef.current?.postMessage({ type: 'auth:logout' });
   };

@@ -8,7 +8,7 @@ export function AppointmentProvider({ children }) {
 
   const loadMyAppointments = useCallback(async () => {
     const { data } = await api.get('/appointments/my/');
-    setAppointments(data);
+    setAppointments(Array.isArray(data) ? data : []);
   }, []);
 
   const createAppointment = useCallback(async (payload) => {

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { expireSession, hasUsableSession, readStoredUser } from './session';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
@@ -6,7 +7,14 @@ const api = axios.create({
   baseURL: API_BASE_URL,
 });
 
+const isAuthCall = (config) =>
+  ['/staff/login/', '/staff/token/refresh/', '/staff/invite/'].some((path) => config?.url?.includes(path));
+
 api.interceptors.request.use((config) => {
+  if (!isAuthCall(config) && readStoredUser() && !hasUsableSession()) {
+    expireSession();
+    return Promise.reject(new axios.Cancel('Session expired'));
+  }
   const token = localStorage.getItem('access_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -14,12 +22,21 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-let isRefreshing = false;
-let queuedRequests = [];
+let refreshPromise = null;
 
-function resolveQueue(newToken) {
-  queuedRequests.forEach((callback) => callback(newToken));
-  queuedRequests = [];
+function refreshAccessToken(refreshToken) {
+  if (!refreshPromise) {
+    refreshPromise = axios
+      .post(`${API_BASE_URL}/staff/token/refresh/`, { refresh: refreshToken })
+      .then(({ data }) => {
+        localStorage.setItem('access_token', data.access);
+        return data.access;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
 }
 
 api.interceptors.response.use(
@@ -27,50 +44,30 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     const status = error?.response?.status;
-    const isAuthCall = originalRequest?.url?.includes('/staff/login/') || originalRequest?.url?.includes('/staff/token/refresh/');
 
-    if (status !== 401 || !originalRequest || originalRequest._retry || isAuthCall) {
+    if (status !== 401 || !originalRequest || originalRequest._retry || isAuthCall(originalRequest)) {
       return Promise.reject(error);
     }
 
     const refreshToken = localStorage.getItem('refresh_token');
     if (!refreshToken) {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('user');
-      window.location.href = '/staff/login';
+      expireSession();
       return Promise.reject(error);
     }
 
     originalRequest._retry = true;
 
-    if (isRefreshing) {
-      return new Promise((resolve) => {
-        queuedRequests.push((newToken) => {
-          originalRequest.headers.Authorization = `Bearer ${newToken}`;
-          resolve(api(originalRequest));
-        });
-      });
-    }
-
-    isRefreshing = true;
     try {
-      const refreshResponse = await axios.post(`${API_BASE_URL}/staff/token/refresh/`, {
-        refresh: refreshToken,
-      });
-      const newAccess = refreshResponse.data.access;
-      localStorage.setItem('access_token', newAccess);
-      resolveQueue(newAccess);
+      const newAccess = await refreshAccessToken(refreshToken);
       originalRequest.headers.Authorization = `Bearer ${newAccess}`;
       return api(originalRequest);
     } catch (refreshError) {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('user');
-      window.location.href = '/staff/login';
+      // Only a rejected refresh token ends the session; a network blip or server error should not log anyone out.
+      const refreshStatus = refreshError?.response?.status;
+      if (refreshStatus === 401 || refreshStatus === 400) {
+        expireSession();
+      }
       return Promise.reject(refreshError);
-    } finally {
-      isRefreshing = false;
     }
   }
 );

@@ -28,6 +28,8 @@ const VISIT_STATUSES = ['All', 'Pending', 'Accepted', 'Declined', 'Rescheduled']
 const STATUS_TONE = { Pending: 'gold', Accepted: 'green', Approved: 'green', Declined: 'red', Rejected: 'red', Rescheduled: 'purple' };
 const OVERDUE_MS = 30 * 60 * 1000;
 
+const asList = (data) => (Array.isArray(data) ? data : []);
+
 function Pill({ tone = 'muted', children }) {
   return <span className={`ad-pill ad-pill-${tone}`}>{children}</span>;
 }
@@ -178,10 +180,10 @@ export default function AdminDashboardPage() {
         api.get('/staff/?include_inactive=1'),
         api.get('/appointments/my/'),
       ]);
-      setDepartments(depRes.data);
-      setDivisions(divRes.data);
-      setStaff(staffRes.data);
-      setAppointments(apptRes.data);
+      setDepartments(asList(depRes.data));
+      setDivisions(asList(divRes.data));
+      setStaff(asList(staffRes.data));
+      setAppointments(asList(apptRes.data));
       setLoaded(true);
     } catch (error) {
       if (!handleAuthError(error)) notify('Could not refresh data.', 'error');
