@@ -57,6 +57,39 @@ class AppointmentSmsTests(TestCase):
         self.assertIn('visitor_phone', response.data)
         send_sms.assert_not_called()
 
+    def test_walk_in_can_book_without_email(self, send_sms, email):
+        response = self.client.post(
+            '/api/appointments/create/',
+            self._payload(visitor_email='', appointment_date=timezone.now().isoformat()),
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data['sms'], {'staff': True, 'visitor': True})
+        staff_text = next(c.args[1] for c in send_sms.call_args_list if c.args[0] == '0711000111')
+        self.assertIn('RIGHT NOW', staff_text)
+        params = email.call_args.args[1]
+        self.assertIn('0722 333 444', params['html_body'])
+        self.assertNotIn('mailto:', params['html_body'])
+
+    def test_response_skips_email_when_visitor_gave_none(self, send_sms, email):
+        appointment = Appointment.objects.create(
+            visitor_name='Amina Hassan', visitor_email='', visitor_phone='0722333444',
+            department=self.department, division=self.division, staff_member=self.staff,
+            appointment_date=timezone.now() + timedelta(hours=3),
+        )
+        self.client.force_authenticate(self.staff)
+
+        response = self.client.patch(
+            f'/api/appointments/update/{appointment.id}/',
+            {'status': 'Accepted', 'response_note': 'Come up to floor 3'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        email.assert_not_called()
+        self.assertIn('ACCEPTED', send_sms.call_args.args[1])
+
     def test_rejects_invalid_phone(self, send_sms, _email):
         response = self.client.post('/api/appointments/create/', self._payload(visitor_phone='12ab'), format='json')
 

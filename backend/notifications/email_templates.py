@@ -132,15 +132,17 @@ def _layout(*, preheader, eyebrow, title, intro, body='', footer):
 
 
 def visit_request_email(*, staff_name, visitor_name, visitor_email, appointment_date,
-                        department_name='', division_name='', message=''):
+                        department_name='', division_name='', message='', visitor_phone=''):
     placement = ' / '.join(filter(None, [department_name, division_name]))
-    body = _details([
-        ('Visitor', escape(visitor_name)),
-        ('Email', f'<a href="mailto:{escape(visitor_email)}" style="color:{GOLD_DARK};text-decoration:none;">'
-                  f'{escape(visitor_email)}</a>'),
-        ('Arrival', escape(appointment_date)),
-        ('Department', escape(placement)),
-    ])
+    rows = [('Visitor', escape(visitor_name))]
+    if visitor_phone:
+        rows.append(('Phone', f'<a href="tel:{escape(visitor_phone)}" style="color:{GOLD_DARK};text-decoration:none;">'
+                              f'{escape(visitor_phone)}</a>'))
+    if visitor_email:
+        rows.append(('Email', f'<a href="mailto:{escape(visitor_email)}" style="color:{GOLD_DARK};text-decoration:none;">'
+                              f'{escape(visitor_email)}</a>'))
+    rows += [('Arrival', escape(appointment_date)), ('Department', escape(placement))]
+    body = _details(rows)
     if message:
         body += _note('Purpose of visit', message)
     body += _button('Respond in dashboard', f'{frontend_base_url()}/staff/login')
