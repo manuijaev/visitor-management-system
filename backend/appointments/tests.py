@@ -86,7 +86,7 @@ class AppointmentSmsTests(TestCase):
 
 
 class AfricasTalkingTests(TestCase):
-    @mock.patch.multiple('notifications.sms_service', SMS_PROVIDER='africastalking',
+    @mock.patch.multiple('notifications.sms_service', SMS_PROVIDERS=['africastalking'],
                          AT_USERNAME='gatepass', AT_API_KEY='key123', AT_SENDER_ID=None)
     @mock.patch('notifications.sms_service.requests.post')
     def test_sends_in_africastalking_format(self, post):
@@ -102,7 +102,7 @@ class AfricasTalkingTests(TestCase):
         self.assertEqual(post.call_args.kwargs['data'], {'username': 'gatepass', 'to': '+254705171018', 'message': 'Hello'})
         self.assertEqual(post.call_args.kwargs['headers']['apiKey'], 'key123')
 
-    @mock.patch.multiple('notifications.sms_service', SMS_PROVIDER='africastalking',
+    @mock.patch.multiple('notifications.sms_service', SMS_PROVIDERS=['africastalking'],
                          AT_USERNAME='gatepass', AT_API_KEY='key123', AT_SENDER_ID=None)
     @mock.patch('notifications.sms_service.requests.post')
     def test_reports_rejected_number(self, post):
@@ -111,6 +111,56 @@ class AfricasTalkingTests(TestCase):
             'SMSMessageData': {'Recipients': [{'statusCode': 405, 'status': 'InsufficientBalance'}]}
         }
 
+        self.assertFalse(send_sms('0705171018', 'Hello'))
+
+
+class SmsProviderChainTests(TestCase):
+    @mock.patch.multiple('notifications.sms_service', SMS_PROVIDERS=['talksasa'],
+                         TALKSASA_API_TOKEN='tok', TALKSASA_SENDER_ID='TALKSASA')
+    @mock.patch('notifications.sms_service.requests.post')
+    def test_talksasa_format(self, post):
+        from notifications.sms_service import send_sms
+        post.return_value.ok = True
+        post.return_value.json.return_value = {'status': 'success', 'data': {}}
+
+        self.assertTrue(send_sms('0705171018', 'Hello'))
+
+        self.assertEqual(post.call_args.args[0], 'https://bulksms.talksasa.com/api/v3/sms/send')
+        self.assertEqual(post.call_args.kwargs['json'], {
+            'recipient': '254705171018', 'sender_id': 'TALKSASA', 'type': 'plain', 'message': 'Hello',
+        })
+        self.assertEqual(post.call_args.kwargs['headers']['Authorization'], 'Bearer tok')
+
+    @mock.patch.multiple('notifications.sms_service', SMS_PROVIDERS=['textbee'],
+                         TEXTBEE_API_KEY='tb-key', TEXTBEE_DEVICE_ID='dev1')
+    @mock.patch('notifications.sms_service.requests.post')
+    def test_textbee_format(self, post):
+        from notifications.sms_service import send_sms
+        post.return_value.ok = True
+
+        self.assertTrue(send_sms('0705171018', 'Hello'))
+
+        self.assertEqual(post.call_args.args[0], 'https://api.textbee.dev/api/v1/gateway/devices/dev1/send-sms')
+        self.assertEqual(post.call_args.kwargs['json'], {'recipients': ['+254705171018'], 'message': 'Hello'})
+        self.assertEqual(post.call_args.kwargs['headers'], {'x-api-key': 'tb-key'})
+
+    @mock.patch.multiple('notifications.sms_service', SMS_PROVIDERS=['talksasa', 'textbee'],
+                         TALKSASA_API_TOKEN='tok', TEXTBEE_API_KEY='tb-key', TEXTBEE_DEVICE_ID=None)
+    @mock.patch('notifications.sms_service.requests.post')
+    def test_falls_back_to_next_provider(self, post):
+        from notifications.sms_service import send_sms
+        talksasa_reply = mock.Mock(ok=False, status_code=402)
+        talksasa_reply.json.return_value = {'status': 'error', 'message': 'Insufficient balance'}
+        post.side_effect = [talksasa_reply, mock.Mock(ok=True, status_code=200, text='{}')]
+
+        self.assertTrue(send_sms('0705171018', 'Hello'))
+
+        self.assertEqual(post.call_count, 2)
+        self.assertEqual(post.call_args.args[0], 'https://api.textbee.dev/api/v1/gateway/send-sms')
+
+    @mock.patch.multiple('notifications.sms_service', SMS_PROVIDERS=[])
+    def test_no_provider_configured(self):
+        from notifications.sms_service import send_sms
         self.assertFalse(send_sms('0705171018', 'Hello'))
 
 

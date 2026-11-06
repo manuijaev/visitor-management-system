@@ -6,6 +6,14 @@ import requests
 
 logger = logging.getLogger(__name__)
 
+TALKSASA_API_TOKEN = os.getenv("TALKSASA_API_TOKEN")
+TALKSASA_SENDER_ID = os.getenv("TALKSASA_SENDER_ID", "TALKSASA")
+TALKSASA_URL = "https://bulksms.talksasa.com/api/v3/sms/send"
+
+TEXTBEE_API_KEY = os.getenv("TEXTBEE_API_KEY")
+TEXTBEE_DEVICE_ID = os.getenv("TEXTBEE_DEVICE_ID")
+TEXTBEE_BASE_URL = "https://api.textbee.dev/api/v1/gateway"
+
 AT_USERNAME = os.getenv("AT_USERNAME")
 AT_API_KEY = os.getenv("AT_API_KEY")
 AT_SENDER_ID = os.getenv("AT_SENDER_ID")
@@ -16,14 +24,17 @@ UMS_URL = "https://comms.umeskiasoftwares.com/api/v1/sms/send"
 SENDER_ID = os.getenv("UMS_SENDER_ID", "UMS_SMS")
 SMS_MAX_LENGTH = 160
 
-if AT_USERNAME and AT_API_KEY:
-    SMS_PROVIDER = "africastalking"
-elif UMS_API_KEY and UMS_APP_ID:
-    SMS_PROVIDER = "ums"
-else:
-    SMS_PROVIDER = None
+# Tried in this order; a failed send falls through to the next configured provider.
+SMS_PROVIDERS = [
+    name for name, configured in (
+        ("talksasa", bool(TALKSASA_API_TOKEN)),
+        ("textbee", bool(TEXTBEE_API_KEY)),
+        ("africastalking", bool(AT_USERNAME and AT_API_KEY)),
+        ("ums", bool(UMS_API_KEY and UMS_APP_ID)),
+    ) if configured
+]
 
-print(f"SMS SERVICE INIT — provider: {SMS_PROVIDER or 'none configured'}")
+print(f"SMS SERVICE INIT — providers: {', '.join(SMS_PROVIDERS) or 'none configured'}")
 
 
 def normalize_phone(number):
@@ -44,6 +55,37 @@ def _fit(message):
     if len(message) <= SMS_MAX_LENGTH:
         return message
     return message[:SMS_MAX_LENGTH - 3].rstrip() + "..."
+
+
+def _send_talksasa(normalized, message):
+    response = requests.post(
+        TALKSASA_URL,
+        json={"recipient": normalized, "sender_id": TALKSASA_SENDER_ID, "type": "plain", "message": message},
+        headers={"Authorization": f"Bearer {TALKSASA_API_TOKEN}", "Accept": "application/json"},
+        timeout=10,
+    )
+    try:
+        result = response.json()
+    except ValueError:
+        print(f"SMS RESPONSE — HTTP {response.status_code}: {response.text[:200]}")
+        return False
+    print(f"SMS RESPONSE — {result}")
+    return response.ok and result.get("status") == "success"
+
+
+def _send_textbee(normalized, message):
+    url = (
+        f"{TEXTBEE_BASE_URL}/devices/{TEXTBEE_DEVICE_ID}/send-sms"
+        if TEXTBEE_DEVICE_ID else f"{TEXTBEE_BASE_URL}/send-sms"
+    )
+    response = requests.post(
+        url,
+        json={"recipients": [f"+{normalized}"], "message": message},
+        headers={"x-api-key": TEXTBEE_API_KEY},
+        timeout=10,
+    )
+    print(f"SMS RESPONSE — HTTP {response.status_code}: {response.text[:200]}")
+    return response.ok
 
 
 def _send_africastalking(normalized, message):
@@ -80,29 +122,36 @@ def _send_ums(normalized, message):
     return result.get("status") == "complete"
 
 
+SENDERS = {
+    "talksasa": _send_talksasa,
+    "textbee": _send_textbee,
+    "africastalking": _send_africastalking,
+    "ums": _send_ums,
+}
+
+
 def send_sms(phone_number, message):
-    """Send one SMS through whichever provider is configured."""
+    """Send one SMS, trying each configured provider in order until one accepts it."""
     normalized = normalize_phone(phone_number)
     if not normalized:
         print("SMS ABORTED — phone number empty or invalid")
         return False
 
-    if not SMS_PROVIDER:
-        print("SMS ABORTED — no SMS provider configured (set AT_USERNAME/AT_API_KEY or UMS_API_KEY/UMS_APP_ID)")
+    if not SMS_PROVIDERS:
+        print("SMS ABORTED — no SMS provider configured "
+              "(set TALKSASA_API_TOKEN, TEXTBEE_API_KEY, AT_USERNAME/AT_API_KEY or UMS_API_KEY/UMS_APP_ID)")
         return False
 
-    try:
-        print(f"SMS SENDING — via {SMS_PROVIDER} to: {normalized}")
-        sender = _send_africastalking if SMS_PROVIDER == "africastalking" else _send_ums
-        sent = sender(normalized, message)
-        if sent:
-            logger.info("SMS sent successfully to %s", normalized)
-        else:
-            logger.error("SMS not accepted by %s for %s", SMS_PROVIDER, normalized)
-        return sent
-    except Exception as e:
-        logger.error("SMS exception: %s", str(e))
-        return False
+    for provider in SMS_PROVIDERS:
+        try:
+            print(f"SMS SENDING — via {provider} to: {normalized}")
+            if SENDERS[provider](normalized, message):
+                logger.info("SMS sent via %s to %s", provider, normalized)
+                return True
+            logger.error("SMS not accepted by %s for %s", provider, normalized)
+        except Exception as e:
+            logger.error("SMS exception via %s: %s", provider, str(e))
+    return False
 
 
 def _first_name(name):
