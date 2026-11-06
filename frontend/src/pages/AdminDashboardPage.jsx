@@ -6,11 +6,11 @@ import ConfirmModal from '../components/ConfirmModal';
 
 // Notification categories config
 const NOTIF_CATEGORIES = {
-  escalation: { color: 'var(--red)', bg: '#ef444415', border: 'var(--red-dim)', icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z' },
-  staff: { color: 'var(--green)', bg: '#22c55e15', border: 'var(--green-dim)', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
-  appointments: { color: 'var(--amber)', bg: '#f59e0b15', border: 'var(--amber-dim)', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
-  security: { color: 'var(--purple)', bg: '#a78bfa15', border: 'var(--purple-dim)', icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z' },
-  report: { color: 'var(--cyan)', bg: '#22d3ee15', border: 'var(--cyan-dim)', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+  escalation: { color: 'var(--red)', bg: 'var(--red-light)', border: 'var(--red-dim)', icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z' },
+  staff: { color: 'var(--green)', bg: 'var(--green-light)', border: 'var(--green-dim)', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
+  appointments: { color: 'var(--amber)', bg: 'var(--gold-light)', border: 'var(--amber-dim)', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
+  security: { color: 'var(--purple)', bg: '#f3eff8', border: 'var(--purple-dim)', icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z' },
+  report: { color: 'var(--cyan)', bg: 'var(--teal-light)', border: 'var(--cyan-dim)', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
 };
 const EAT_TIMEZONE = 'Africa/Nairobi';
 
@@ -622,7 +622,7 @@ export default function AdminDashboardPage() {
           </div>
           <div className="topbar-brand">
             <div>
-              <div className="brand-text">GATEPASS</div>
+              <div className="brand-text">Gatepass</div>
               <div className="brand-sub">Control Center</div>
             </div>
           </div>
@@ -961,7 +961,7 @@ export default function AdminDashboardPage() {
                       <tr key={a.id}>
                         <td>
                           <div className="td-flex">
-                            <div className="avatar-sm" style={{ background: 'linear-gradient(135deg, #1d4ed8, #3b82f6)', color: '#fff' }}>{getInitials(a.visitor_name)}</div>
+                            <div className="avatar-sm" style={{ background: 'var(--gold-light)', color: 'var(--gold-dark)' }}>{getInitials(a.visitor_name)}</div>
                             <div>
                               <div className="td-name">{a.visitor_name}</div>
                               <div className="td-sub">{a.visitor_email}</div>
@@ -1002,7 +1002,7 @@ export default function AdminDashboardPage() {
                       <tr key={s.id}>
                         <td>
                           <div className="td-flex">
-                            <div className="avatar-sm" style={{ background: s.role === 'Admin' ? 'linear-gradient(135deg, #f59e0b, #fbbf24)' : 'linear-gradient(135deg, #065f46, #10b981)', color: s.role === 'Admin' ? '#000' : '#fff' }}>
+                            <div className="avatar-sm" style={{ background: s.role === 'Admin' ? 'var(--gold)' : 'var(--ink)', color: '#fff' }}>
                               {getInitials(s.full_name)}
                             </div>
                             <div>
@@ -1063,7 +1063,7 @@ export default function AdminDashboardPage() {
                     <tr key={s.id}>
                       <td>
                         <div className="td-flex">
-                          <div className="avatar-sm" style={{ background: s.role === 'Admin' ? 'linear-gradient(135deg, #f59e0b, #fbbf24)' : 'linear-gradient(135deg, #065f46, #10b981)', color: s.role === 'Admin' ? '#000' : '#fff' }}>
+                          <div className="avatar-sm" style={{ background: s.role === 'Admin' ? 'var(--gold)' : 'var(--ink)', color: '#fff' }}>
                             {getInitials(s.full_name)}
                           </div>
                           <div>
@@ -1135,7 +1135,7 @@ export default function AdminDashboardPage() {
                     <tr key={a.id}>
                       <td data-label="Visitor">
                         <div className="td-flex">
-                          <div className="avatar-sm" style={{ background: 'linear-gradient(135deg, #1d4ed8, #3b82f6)', color: '#fff' }}>{getInitials(a.visitor_name)}</div>
+                          <div className="avatar-sm" style={{ background: 'var(--gold-light)', color: 'var(--gold-dark)' }}>{getInitials(a.visitor_name)}</div>
                           <div>
                             <div className="td-name">{a.visitor_name}</div>
                             <div className="td-sub">{a.visitor_email}</div>
@@ -1201,7 +1201,7 @@ export default function AdminDashboardPage() {
               </div>
               <div className="panel-body">
                 {departments.map((d) => (
-                  <div key={d.id} className="dept-card" style={{ '--dept-color': '#f59e0b', marginBottom: '8px' }}>
+                  <div key={d.id} className="dept-card" style={{ '--dept-color': 'var(--gold)', marginBottom: '8px' }}>
                     {editingDeptId === d.id ? (
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <input className="field-input" value={editingDeptName} onChange={(e) => setEditingDeptName(e.target.value)} style={{ flex: 1 }} />
@@ -1270,7 +1270,7 @@ export default function AdminDashboardPage() {
               </div>
               <div className="panel-body">
                 {divisions.map((d) => (
-                  <div key={d.id} className="dept-card" style={{ '--dept-color': '#22d3ee', marginBottom: '8px' }}>
+                  <div key={d.id} className="dept-card" style={{ '--dept-color': 'var(--teal)', marginBottom: '8px' }}>
                     {editingDivId === d.id ? (
                       <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
                         <input className="field-input" value={editingDivName} onChange={(e) => setEditingDivName(e.target.value)} placeholder="Division name" />
@@ -1353,7 +1353,7 @@ export default function AdminDashboardPage() {
             {/* Summary strip */}
             <div className="summary-strip">
               <div className="summary-card">
-                <div className="summary-icon" style={{ background: '#ef444415', border: '1px solid var(--red-dim)' }}>
+                <div className="summary-icon" style={{ background: 'var(--red-light)', border: '1px solid var(--red-dim)' }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--red)" strokeWidth="2">
                     <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                   </svg>
@@ -1364,7 +1364,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
               <div className="summary-card">
-                <div className="summary-icon" style={{ background: '#f59e0b15', border: '1px solid var(--amber-dim)' }}>
+                <div className="summary-icon" style={{ background: 'var(--gold-light)', border: '1px solid var(--amber-dim)' }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="2">
                     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                     <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
@@ -1376,7 +1376,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
               <div className="summary-card">
-                <div className="summary-icon" style={{ background: '#22d3ee15', border: '1px solid var(--cyan-dim)' }}>
+                <div className="summary-icon" style={{ background: 'var(--teal-light)', border: '1px solid var(--cyan-dim)' }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" strokeWidth="2">
                     <line x1="18" y1="20" x2="18" y2="10"></line>
                     <line x1="12" y1="20" x2="12" y2="4"></line>
@@ -1389,7 +1389,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
               <div className="summary-card">
-                <div className="summary-icon" style={{ background: '#22c55e15', border: '1px solid var(--green-dim)' }}>
+                <div className="summary-icon" style={{ background: 'var(--green-light)', border: '1px solid var(--green-dim)' }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="2">
                     <polyline points="20 6 9 17 4 12"></polyline>
                   </svg>
@@ -1505,7 +1505,7 @@ export default function AdminDashboardPage() {
                               <button className="notif-btn primary" style={{ '--notif-color': cat.color, color: '#fff' }} onClick={() => setActiveNav('appointments')}>Reassign</button>
                             )}
                             {notif.category === 'staff' && notif.staff.length > 0 && (
-                              <button className="notif-btn primary" style={{ '--notif-color': cat.color, color: '#000' }} onClick={() => setActiveNav('staff')}>View profile</button>
+                              <button className="notif-btn primary" style={{ '--notif-color': cat.color, color: '#fff' }} onClick={() => setActiveNav('staff')}>View profile</button>
                             )}
                             <button className="notif-btn dismiss" onClick={() => dismissNotification(notif.id)}>Dismiss</button>
                           </div>
@@ -1639,7 +1639,7 @@ export default function AdminDashboardPage() {
                     />
                     <button 
                       className="btn btn-ghost" 
-                      style={{ padding: '8px', minWidth: '36px' }} 
+                      style={{ width: '44px', height: '44px', flex: '0 0 44px', padding: 0, justifyContent: 'center' }} 
                       onClick={() => setStaffForm(f => ({ ...f, password: generatePassword() }))}
                       title="Generate new password"
                     >
@@ -1731,7 +1731,7 @@ export default function AdminDashboardPage() {
                   />
                   <button 
                     className="btn btn-ghost" 
-                    style={{ padding: '8px', minWidth: '36px' }} 
+                    style={{ width: '44px', height: '44px', flex: '0 0 44px', padding: 0, justifyContent: 'center' }} 
                     onClick={() => setStaffForm(f => ({ ...f, password: generatePassword() }))}
                     title="Generate new password"
                   >

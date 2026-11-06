@@ -887,7 +887,7 @@ export default function StaffDashboardPage() {
                   </div>
                 </div>
                 <div className="sd-stat-card">
-                  <div className="sd-stat-icon" style={{ background: 'var(--teal-light)', color: 'var(--teal-dark)' }}>
+                  <div className="sd-stat-icon" style={{ background: 'var(--surface2)', color: 'var(--ink)' }}>
                     {ICONS.calendar}
                   </div>
                   <div className="sd-stat-info">
@@ -896,7 +896,7 @@ export default function StaffDashboardPage() {
                   </div>
                 </div>
                 <div className="sd-stat-card">
-                  <div className="sd-stat-icon" style={{ background: '#e6f4f2', color: 'var(--teal)' }}>
+                  <div className="sd-stat-icon" style={{ background: 'var(--gold-light)', color: 'var(--gold-dark)' }}>
                     {ICONS.activity}
                   </div>
                   <div className="sd-stat-info">

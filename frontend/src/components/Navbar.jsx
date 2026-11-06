@@ -11,7 +11,7 @@ export default function Navbar() {
     <nav className={`top-nav ${mobileOpen ? 'is-open' : ''}`}>
       <div className="top-nav-inner">
         <NavLink to="/" className="brand">
-          Visitor Desk
+          Gatepass
         </NavLink>
         <button
           className="nav-hamburger"

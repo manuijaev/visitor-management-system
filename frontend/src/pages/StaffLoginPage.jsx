@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
-import api from '../services/api';
+import PasswordInput from '../components/PasswordInput';
 
 export default function StaffLoginPage() {
   const navigate = useNavigate();
@@ -91,10 +91,11 @@ export default function StaffLoginPage() {
           </section>
           <section className="auth-panel">
             <div className="hero">
+              <div className="auth-eyebrow">Gatepass</div>
               <h1>Staff Access</h1>
             </div>
             <p className="page-subtitle">Sign in to manage visitor requests.</p>
-            <form className="card staff-login-card" onSubmit={submitLogin}>
+            <form className="card" onSubmit={submitLogin}>
               <div className="form-grid-single">
                 <div className="field-group">
                   <label className="field-label" htmlFor="staff_email">Email</label>
@@ -111,10 +112,9 @@ export default function StaffLoginPage() {
                 </div>
                 <div className="field-group">
                   <label className="field-label" htmlFor="staff_password">Password</label>
-                  <input
+                  <PasswordInput
                     id="staff_password"
                     name="password"
-                    type="password"
                     placeholder="Enter your password"
                     value={form.password}
                     onChange={onChange}

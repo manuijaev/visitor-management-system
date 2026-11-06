@@ -1742,7 +1742,7 @@ export default function HomePage() {
               {!showSuccess ? (
                 <>
                   <div className="form-panel-header">
-                    <div className="form-panel-title" style={{ color: '#ffffff' }}>Confirm visit request</div>
+                    <div className="form-panel-title">Confirm visit request</div>
                     <div className="form-panel-sub">Answer a few steps so reception can notify your host.</div>
                   </div>
                   {prefillSelection && (
@@ -1958,7 +1958,7 @@ export default function HomePage() {
                       </svg>
                     </div>
                   </div>
-                  <div className="success-title" style={{ color: '#ffffff' }}>Visit request submitted!</div>
+                  <div className="success-title">Visit request submitted!</div>
                   <div className="success-desc">
                     Your visit request has been sent to <strong>{getStaffNameFromId(formData.staff_member)}</strong>
                   </div>
