@@ -20,8 +20,8 @@ async function getVapidKey() {
   
   // First try to get from backend
   try {
-    const baseUrl = import.meta.env.VITE_API_URL || '';
-    const response = await fetch(`${baseUrl}/api/v1/vapid-public-key/`);
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+    const response = await fetch(`${baseUrl}/vapid-public-key/`);
     if (response.ok) {
       const data = await response.json();
       if (data.vapid_public_key) {
