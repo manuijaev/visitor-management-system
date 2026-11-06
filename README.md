@@ -399,7 +399,7 @@ Automated CI pipelines should run both backend and frontend suites along with fo
 
 ## Operational Considerations
 
-- **Deployment**: Serve frontend build via CDN or static hosting and proxy API requests to the Django REST API. Use Gunicorn/Uvicorn behind Nginx for backend.
+- **Deployment**: Hosted on Railway as three services in one project: `frontend` (root `/frontend`, Vite static build), `backend` (root `/backend`, Gunicorn, runs migrations pre-deploy), and `Postgres`. Build/start commands and environment variables are configured on the Railway services, not in the repo.
 - **Database**: Back PostgreSQL with daily backups and connection pooling.
 - **Caching**: Use Redis to cache department/division lookup tables and reduce DB load.
 - **Monitoring**: Integrate Sentry (or equivalent) for backend error tracking and React error boundaries for the frontend.
