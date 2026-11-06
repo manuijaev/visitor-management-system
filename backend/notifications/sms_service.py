@@ -57,7 +57,11 @@ def _send_africastalking(normalized, message):
         headers={"apiKey": AT_API_KEY, "Accept": "application/json"},
         timeout=10,
     )
-    result = response.json()
+    try:
+        result = response.json()
+    except ValueError:
+        print(f"SMS RESPONSE — HTTP {response.status_code}: {response.text[:200]}")
+        return False
     print(f"SMS RESPONSE — {result}")
     recipients = result.get("SMSMessageData", {}).get("Recipients", [])
     return any(r.get("statusCode") in (100, 101, 102) for r in recipients)
