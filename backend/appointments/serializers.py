@@ -86,11 +86,31 @@ class AppointmentUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Appointment
-        fields = ['status', 'response_note', 'appointment_date', 'staff_member']
+        fields = ['status', 'response_note', 'appointment_date']
 
 
 class AppointmentReassignSerializer(serializers.ModelSerializer):
     """Serializer for admin to reassign appointments to different staff."""
+
+    def validate_staff_member(self, staff):
+        if self.instance and staff.id == self.instance.staff_member_id:
+            raise serializers.ValidationError('This visit is already with that staff member.')
+        if not staff.is_active:
+            raise serializers.ValidationError('That staff member is deactivated.')
+        if not staff.department_id or not staff.division_id:
+            raise serializers.ValidationError('That staff member has no department or division yet.')
+        return staff
+
+    def update(self, instance, validated_data):
+        staff = validated_data['staff_member']
+        instance.staff_member = staff
+        instance.department_id = staff.department_id
+        instance.division_id = staff.division_id
+        instance.status = Appointment.Status.PENDING
+        instance.response_note = ''
+        instance.save(update_fields=['staff_member', 'department', 'division', 'status', 'response_note'])
+        return instance
+
     class Meta:
         model = Appointment
         fields = ['staff_member']
