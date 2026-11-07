@@ -46,6 +46,21 @@ class User(AbstractBaseUser, PermissionsMixin):
         return f'{self.full_name} ({self.email})'
 
 
+class StaffUnavailableDay(models.Model):
+    """A whole day a staff member cannot take visits, e.g. leave or a school trip."""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='unavailable_days')
+    date = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['date']
+        constraints = [models.UniqueConstraint(fields=['user', 'date'], name='unique_staff_unavailable_day')]
+
+    def __str__(self):
+        return f'{self.user_id} off on {self.date}'
+
+
 class UserDeviceToken(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='device_tokens')
     token = models.TextField(unique=True)

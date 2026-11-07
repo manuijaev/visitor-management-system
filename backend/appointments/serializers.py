@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import serializers
 
 from notifications.sms_service import normalize_phone
@@ -26,6 +27,10 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'staff_member': 'Selected staff does not belong to this department.'})
         if staff and division and staff.division_id != division.id:
             raise serializers.ValidationError({'staff_member': 'Selected staff does not belong to this division.'})
+        visit_time = attrs.get('appointment_date')
+        if staff and visit_time and staff.unavailable_days.filter(date=timezone.localtime(visit_time).date()).exists():
+            name = (staff.full_name or 'This staff member').split()[0]
+            raise serializers.ValidationError({'appointment_date': f'{name} is not available on that day. Please pick another day.'})
         return attrs
 
     class Meta:

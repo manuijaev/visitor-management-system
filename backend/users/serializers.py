@@ -1,5 +1,6 @@
 from django.contrib.auth.password_validation import validate_password as run_password_validators
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -7,7 +8,7 @@ import secrets
 
 from departments.models import Department, Division
 
-from .models import User
+from .models import StaffUnavailableDay, User
 
 
 def build_auth_payload(user):
@@ -38,13 +39,29 @@ class StaffListSerializer(serializers.ModelSerializer):
     department_name = serializers.CharField(source='department.name', read_only=True)
     division_name = serializers.CharField(source='division.name', read_only=True)
     invite_pending = serializers.SerializerMethodField()
+    unavailable_dates = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'full_name', 'email', 'phone', 'department', 'department_name', 'division', 'division_name', 'role', 'is_active', 'is_available', 'availability_reason', 'invite_pending']
+        fields = ['id', 'full_name', 'email', 'phone', 'department', 'department_name', 'division', 'division_name', 'role', 'is_active', 'is_available', 'availability_reason', 'invite_pending', 'unavailable_dates']
 
     def get_invite_pending(self, obj):
         return not obj.has_usable_password()
+
+    def get_unavailable_dates(self, obj) -> list[str]:
+        today = timezone.localdate()
+        return [day.date.isoformat() for day in obj.unavailable_days.all() if day.date >= today]
+
+
+class StaffUnavailableDaySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StaffUnavailableDay
+        fields = ['date']
+
+    def validate_date(self, value):
+        if value < timezone.localdate():
+            raise serializers.ValidationError('Pick today or a future date.')
+        return value
 
 
 

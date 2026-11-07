@@ -1,3 +1,5 @@
+import datetime
+
 from rest_framework import generics, permissions, status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
@@ -5,9 +7,10 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 
 from .models import User
-from .models import UserDeviceToken
+from .models import StaffUnavailableDay, UserDeviceToken
 from .invites import resolve_invite, send_staff_invite
 from .permissions import IsAdminRole
 from .serializers import (
@@ -16,6 +19,7 @@ from .serializers import (
     FCMTokenUpdateSerializer,
     StaffListSerializer,
     StaffAvailabilitySerializer,
+    StaffUnavailableDaySerializer,
     StaffLoginSerializer,
     StaffManageSerializer,
     StaffRegisterSerializer,
@@ -32,7 +36,7 @@ class StaffByDepartmentListView(generics.ListAPIView):
         department_id = self.request.query_params.get('department_id')
         division_id = self.request.query_params.get('division_id')
         include_inactive = self.request.query_params.get('include_inactive') == '1'
-        qs = User.objects.filter(role=User.Role.STAFF)
+        qs = User.objects.filter(role=User.Role.STAFF).prefetch_related('unavailable_days')
         if not include_inactive or not self.request.user.is_authenticated or getattr(self.request.user, 'role', '') != User.Role.ADMIN:
             qs = qs.filter(is_active=True)
         if department_id:
@@ -227,6 +231,35 @@ class StaffAvailabilityUpdateView(generics.UpdateAPIView):
             'user': staff_data,
         })
 
+
+
+class MyUnavailableDaysView(generics.ListCreateAPIView):
+    """The signed-in staff member's upcoming days off."""
+
+    serializer_class = StaffUnavailableDaySerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None
+
+    def get_queryset(self):
+        return StaffUnavailableDay.objects.filter(user=self.request.user, date__gte=timezone.localdate())
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        day, created = StaffUnavailableDay.objects.get_or_create(user=request.user, date=serializer.validated_data['date'])
+        return Response(self.get_serializer(day).data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+class MyUnavailableDayDeleteView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, date):
+        try:
+            day = datetime.date.fromisoformat(date)
+        except ValueError:
+            return Response({'date': 'Use the YYYY-MM-DD format.'}, status=status.HTTP_400_BAD_REQUEST)
+        StaffUnavailableDay.objects.filter(user=request.user, date=day).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class VapidPublicKeyView(generics.RetrieveAPIView):
