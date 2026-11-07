@@ -132,7 +132,7 @@ def _layout(*, preheader, eyebrow, title, intro, body='', footer):
 
 
 def visit_request_email(*, staff_name, visitor_name, visitor_email, appointment_date,
-                        department_name='', division_name='', message='', visitor_phone=''):
+                        department_name='', division_name='', message='', visitor_phone='', student=''):
     placement = ' / '.join(filter(None, [department_name, division_name]))
     rows = [('Visitor', escape(visitor_name))]
     if visitor_phone:
@@ -141,6 +141,8 @@ def visit_request_email(*, staff_name, visitor_name, visitor_email, appointment_
     if visitor_email:
         rows.append(('Email', f'<a href="mailto:{escape(visitor_email)}" style="color:{GOLD_DARK};text-decoration:none;">'
                               f'{escape(visitor_email)}</a>'))
+    if student:
+        rows.append(('Student', escape(student)))
     rows += [('Arrival', escape(appointment_date)), ('Department', escape(placement))]
     body = _details(rows)
     if message:

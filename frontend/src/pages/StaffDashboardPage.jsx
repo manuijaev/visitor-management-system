@@ -7,6 +7,9 @@ import ConfirmModal from '../components/ConfirmModal';
 import { sendVisitorResponseEmail } from '../services/emailjs';
 import api from '../services/api';
 
+const studentLabel = (visit) =>
+  [visit?.student_name?.trim(), visit?.student_class?.trim() && `(${visit.student_class.trim()})`].filter(Boolean).join(' ');
+
 const ICONS = {
   dashboard: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -365,6 +368,7 @@ export default function StaffDashboardPage() {
       return (
         a.visitor_name?.toLowerCase().includes(query) ||
         a.visitor_email?.toLowerCase().includes(query) ||
+        studentLabel(a).toLowerCase().includes(query) ||
         a.service?.name?.toLowerCase().includes(query)
       );
     }
@@ -577,13 +581,14 @@ export default function StaffDashboardPage() {
       return;
     }
     
-    const headers = ['ID', 'Visitor Name', 'Visitor Email', 'Date/Time Sent', 'Date/Time', 'Status', 'Visitor Message', 'Staff Response'];
+    const headers = ['ID', 'Visitor Name', 'Visitor Email', 'Student', 'Date/Time Sent', 'Date/Time', 'Status', 'Visitor Message', 'Staff Response'];
     const csvContent = [
       headers.join(','),
       ...data.map(apt => [
         apt.id,
         `"${apt.visitor_name}"`,
         `"${apt.visitor_email}"`,
+        `"${studentLabel(apt)}"`,
         `"${apt.appointment_date ? new Date(apt.appointment_date).toLocaleString('en-GB') : ''}"`,
         apt.date && apt.time ? `"${apt.date} ${apt.time}"` : '""',
         apt.status,
@@ -1031,6 +1036,12 @@ export default function StaffDashboardPage() {
                                 {ICONS.clock}
                                 <span>{formatTime(apt.appointment_date)}</span>
                               </div>
+                              {studentLabel(apt) && (
+                                <div className="sd-appt-detail">
+                                  {ICONS.user}
+                                  <span>Student: {studentLabel(apt)}</span>
+                                </div>
+                              )}
                               {apt.service?.name && (
                                 <div className="sd-appt-detail">
                                   {ICONS.activity}
@@ -1110,7 +1121,7 @@ export default function StaffDashboardPage() {
                               <span className={`sd-list-simple-status sd-list-simple-status-${statusKey}`}>{apt.status}</span>
                             </div>
                             <div className="sd-appointments-list-meta">
-                              <span>{apt.department_name || 'General'}</span>
+                              <span>{studentLabel(apt) ? `Student: ${studentLabel(apt)}` : apt.department_name || 'General'}</span>
                               <span>{apt.appointment_date ? new Date(apt.appointment_date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }) : ''}</span>
                             </div>
                           </button>
@@ -1223,6 +1234,12 @@ export default function StaffDashboardPage() {
                   <span>Time</span>
                   <strong>{formatTime(previewItem.appointment_date)}</strong>
                 </div>
+                {studentLabel(previewItem) && (
+                  <div className="sd-modal-detail">
+                    <span>Student</span>
+                    <strong>{studentLabel(previewItem)}</strong>
+                  </div>
+                )}
                 <div className="sd-modal-detail">
                   <span>Status</span>
                   <span className={`sd-badge sd-badge-${previewItem.status?.toLowerCase()}`}>{previewItem.status}</span>

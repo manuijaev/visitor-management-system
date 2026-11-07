@@ -125,6 +125,9 @@ function greeting() {
   return 'Good evening';
 }
 
+const studentLabel = (visit) =>
+  [visit?.student_name?.trim(), visit?.student_class?.trim() && `(${visit.student_class.trim()})`].filter(Boolean).join(' ');
+
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
   const { logout, user } = useAuth();
@@ -326,7 +329,7 @@ export default function AdminDashboardPage() {
     if (visitorStatus !== 'All' && a.status !== visitorStatus) return false;
     if (!visitorSearch) return true;
     const q = visitorSearch.toLowerCase();
-    return [a.visitor_name, a.visitor_email, a.staff_name, a.department_name].some((v) => v?.toLowerCase().includes(q));
+    return [a.visitor_name, a.visitor_email, studentLabel(a), a.staff_name, a.department_name].some((v) => v?.toLowerCase().includes(q));
   });
 
   const pageTitle = { overview: 'Overview', visitors: 'Visitors', team: 'Team', notifications: 'Notifications' }[view];
@@ -337,7 +340,7 @@ export default function AdminDashboardPage() {
         <Avatar name={a.visitor_name} />
         <div className="ad-row-text">
           <strong>{a.visitor_name}</strong>
-          <span>{compact ? `with ${a.staff_name || 'Unassigned'}` : a.visitor_email || a.visitor_phone}</span>
+          <span>{compact ? `with ${a.staff_name || 'Unassigned'}` : [a.visitor_email || a.visitor_phone, studentLabel(a) && `re ${studentLabel(a)}`].filter(Boolean).join(' · ')}</span>
         </div>
       </div>
       {!compact && (

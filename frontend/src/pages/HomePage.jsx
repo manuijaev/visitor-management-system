@@ -411,7 +411,7 @@ function ReviewRow({ icon, label, value, sub, onEdit }) {
   );
 }
 
-const emptyVisitor = { name: '', phone: '', email: '', purpose: '', message: '' };
+const emptyVisitor = { name: '', phone: '', email: '', studentName: '', studentClass: '', purpose: '', message: '' };
 
 export default function HomePage() {
   const [receptionMode, setReceptionMode] = useState(() => localStorage.getItem(RECEPTION_KEY) === '1');
@@ -594,6 +594,9 @@ export default function HomePage() {
     showToast(next ? 'Reception mode on: checking in walk-in visitors' : 'Reception mode off');
   };
 
+  const student = [visitor.studentName.trim(), visitor.studentClass.trim() && `(${visitor.studentClass.trim()})`]
+    .filter(Boolean)
+    .join(' ');
   const note = [visitor.purpose && `Purpose: ${visitor.purpose}`, visitor.message.trim()].filter(Boolean).join(' · ');
 
   const submit = async () => {
@@ -607,6 +610,8 @@ export default function HomePage() {
         visitor_name: visitor.name.trim(),
         visitor_phone: visitor.phone.trim(),
         visitor_email: visitor.email.trim(),
+        student_name: visitor.studentName.trim(),
+        student_class: visitor.studentClass.trim(),
         department: host.departmentId,
         division: host.divisionId,
         staff_member: host.id,
@@ -924,6 +929,26 @@ export default function HomePage() {
           onBlur={() => touch('email')}
         />
       </Field>
+      <Field label="Student name" optional hint="If the visit is about a student.">
+        <input
+          className="gp-input"
+          autoComplete="off"
+          maxLength={120}
+          placeholder="e.g. Brian Otieno"
+          value={visitor.studentName}
+          onChange={(event) => updateVisitor('studentName', event.target.value)}
+        />
+      </Field>
+      <Field label="Class / grade" optional>
+        <input
+          className="gp-input"
+          autoComplete="off"
+          maxLength={40}
+          placeholder="e.g. Grade 5 East"
+          value={visitor.studentClass}
+          onChange={(event) => updateVisitor('studentClass', event.target.value)}
+        />
+      </Field>
       <div className="gp-field gp-field--full">
         <span className="gp-label">
           Purpose <small>optional</small>
@@ -967,6 +992,7 @@ export default function HomePage() {
           sub={[visitor.phone.trim(), visitor.email.trim()].filter(Boolean).join(' · ')}
           onEdit={() => goToStep(2)}
         />
+        {student && <ReviewRow icon="user" label="Student" value={student} onEdit={() => goToStep(2)} />}
         {note && <ReviewRow icon="message" label="Note" value={note} onEdit={() => goToStep(2)} />}
       </div>
       <p className="gp-fineprint">

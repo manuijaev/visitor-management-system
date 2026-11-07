@@ -90,6 +90,46 @@ class AppointmentSmsTests(TestCase):
         email.assert_not_called()
         self.assertIn('ACCEPTED', send_sms.call_args.args[1])
 
+    def test_booking_saves_student_and_tells_staff(self, send_sms, email):
+        response = self.client.post(
+            '/api/appointments/create/',
+            self._payload(student_name='Brian Otieno', student_class='Grade 5', appointment_date=timezone.now().isoformat()),
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        appointment = Appointment.objects.get(id=response.data['data']['id'])
+        self.assertEqual(appointment.student_name, 'Brian Otieno')
+        self.assertEqual(appointment.student_class, 'Grade 5')
+        staff_text = next(c.args[1] for c in send_sms.call_args_list if c.args[0] == '0711000111')
+        self.assertIn('Brian Otieno (Grade 5)', staff_text)
+        self.assertLessEqual(len(staff_text), 160)
+        self.assertIn('Brian Otieno (Grade 5)', email.call_args.args[1]['html_body'])
+
+    def test_student_details_are_optional(self, send_sms, email):
+        response = self.client.post('/api/appointments/create/', self._payload(), format='json')
+
+        self.assertEqual(response.status_code, 201, response.data)
+        appointment = Appointment.objects.get(id=response.data['data']['id'])
+        self.assertEqual(appointment.student_name, '')
+        staff_text = next(c.args[1] for c in send_sms.call_args_list if c.args[0] == '0711000111')
+        self.assertNotIn('About:', staff_text)
+        self.assertNotIn('>Student</td>', email.call_args.args[1]['html_body'])
+
+    def test_staff_list_includes_student_details(self, _send_sms, _email):
+        Appointment.objects.create(
+            visitor_name='Amina Hassan', visitor_phone='0722333444', student_name='Brian Otieno', student_class='Grade 5',
+            department=self.department, division=self.division, staff_member=self.staff,
+            appointment_date=timezone.now() + timedelta(hours=3),
+        )
+        self.client.force_authenticate(self.staff)
+
+        response = self.client.get('/api/appointments/my/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]['student_name'], 'Brian Otieno')
+        self.assertEqual(response.data[0]['student_class'], 'Grade 5')
+
     def test_rejects_invalid_phone(self, send_sms, _email):
         response = self.client.post('/api/appointments/create/', self._payload(visitor_phone='12ab'), format='json')
 

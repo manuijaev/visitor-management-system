@@ -24,7 +24,22 @@ def _format_local_time(dt):
     return timezone.localtime(dt).strftime("%b %d, %Y at %I:%M %p")
 
 
+def _student_label(appointment):
+    """Return "Name (Class)" for the student the visit is about, or an empty string."""
+    name = (appointment.student_name or '').strip()
+    student_class = (appointment.student_class or '').strip()
+    if name and student_class:
+        return f"{name} ({student_class})"
+    return name or student_class
+
+
 def _get_visit_message(appointment):
+    student = _student_label(appointment)
+    about = f" About: {student}." if student else ""
+    return _visit_message_base(appointment) + about
+
+
+def _visit_message_base(appointment):
     now = timezone.now()
     diff = appointment.appointment_date - now
     minutes = diff.total_seconds() / 60
@@ -70,6 +85,7 @@ def _visit_request_params(appointment):
         department_name=params["department_name"],
         division_name=params["division_name"],
         message=params["message"],
+        student=_student_label(appointment),
     ))
     return params
 
