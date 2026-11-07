@@ -1,5 +1,20 @@
 export const EAT_TIMEZONE = 'Africa/Nairobi';
 
+/**
+ * The calendar day (YYYY-MM-DD) of a date or timestamp in school time (East Africa Time).
+ * Use this instead of toISOString(), which gives the UTC day and is wrong from midnight to 3 AM.
+ */
+export function eatDateKey(value = new Date()) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: EAT_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
 export function formatApiError(err, fallback = 'Something went wrong. Please try again.') {
   const data = err?.response?.data;
   if (!data) return fallback;
