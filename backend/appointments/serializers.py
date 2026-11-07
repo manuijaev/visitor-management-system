@@ -6,6 +6,13 @@ from .models import Appointment
 
 
 class AppointmentCreateSerializer(serializers.ModelSerializer):
+    is_scheduled = serializers.BooleanField(
+        write_only=True,
+        required=False,
+        default=False,
+        help_text='True for a planned time slot. Walk-ins and "on my way" visits are never blocked by other bookings.',
+    )
+
     def validate_visitor_phone(self, value):
         if not value or not value.strip():
             raise serializers.ValidationError('A phone number is required so we can text you updates.')
@@ -26,12 +33,21 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'staff_member': 'Selected staff does not belong to this department.'})
         if staff and division and staff.division_id != division.id:
             raise serializers.ValidationError({'staff_member': 'Selected staff does not belong to this division.'})
+
+        is_scheduled = attrs.pop('is_scheduled', False)
+        visit_time = attrs.get('appointment_date')
+        if is_scheduled and staff and visit_time and Appointment.active_for_staff_near(staff, visit_time).exists():
+            name = (staff.full_name or 'This staff member').split()[0]
+            raise serializers.ValidationError(
+                {'appointment_date': f'{name} already has a visit at that time. Please pick another slot.'}
+            )
         return attrs
 
     class Meta:
         model = Appointment
         fields = [
             'id',
+            'is_scheduled',
             'visitor_name',
             'visitor_email',
             'visitor_phone',

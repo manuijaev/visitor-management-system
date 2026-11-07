@@ -202,7 +202,15 @@ const toStaff = (member) => ({
   divisionName: member.division_name || '',
   available: member.is_available !== false,
   reason: (member.availability_reason || '').trim(),
+  bookedTimes: (Array.isArray(member.booked_times) ? member.booked_times : []).map((value) => new Date(value).getTime()),
 });
+
+/** True when the host already has a visit overlapping a 30-minute visit starting at `slotValue`. */
+const isSlotTaken = (host, slotValue) => {
+  if (!host || !slotValue) return false;
+  const start = new Date(slotValue).getTime();
+  return host.bookedTimes.some((booked) => Math.abs(booked - start) < SLOT_MINUTES * 60 * 1000);
+};
 
 const firstName = (name) => (name || '').trim().split(/\s+/)[0] || '';
 const initials = (name) =>
@@ -475,6 +483,13 @@ export default function HomePage() {
 
   useEffect(() => () => clearTimeout(toastTimer.current), []);
 
+  const refreshStaff = useCallback(() => {
+    api
+      .get('/staff/')
+      .then(({ data }) => setStaff((data || []).map(toStaff)))
+      .catch(() => {});
+  }, []);
+
   const showToast = useCallback((message) => {
     setToast(message);
     clearTimeout(toastTimer.current);
@@ -486,7 +501,7 @@ export default function HomePage() {
   const officeOpen = isOfficeOpen(now);
   const host = staff.find((member) => member.id === hostId) || null;
   const hostFirst = host ? firstName(host.name) : '';
-  const slotStillOpen = slot && slots.some((item) => item.value === slot && item.available);
+  const slotStillOpen = slot && slots.some((item) => item.value === slot && item.available && !isSlotTaken(host, item.value));
 
   useEffect(() => {
     if (dayKey && !days.some((day) => day.key === dayKey)) {
@@ -500,7 +515,8 @@ export default function HomePage() {
   const emailOk = !visitor.email.trim() || EMAIL_RE.test(visitor.email.trim());
   const whenOk = mode === 'now' || mode === 'onway' || (mode === 'later' && Boolean(slotStillOpen));
   const blockFor = (member, visitMode = mode) =>
-    hostBlockReason(member, visitMode, visitMode === 'later' ? dayKey : null, unavailableByDate);
+    hostBlockReason(member, visitMode, visitMode === 'later' ? dayKey : null, unavailableByDate) ||
+    (visitMode === 'later' && isSlotTaken(member, slot) ? 'Already booked at that time' : null);
   const hostOk = Boolean(host) && !blockFor(host);
   const detailsOk = nameOk && phoneOk && emailOk;
   const stepDone = [whenOk, hostOk, detailsOk, false];
@@ -611,6 +627,7 @@ export default function HomePage() {
         division: host.divisionId,
         staff_member: host.id,
         appointment_date: arrival.toISOString(),
+        is_scheduled: mode === 'later',
         message: note,
       });
       const id = data?.data?.id;
@@ -623,8 +640,10 @@ export default function HomePage() {
         visitor: { ...visitor },
       });
       scrollFlowIntoView();
+      refreshStaff();
     } catch (error) {
       setSubmitError(describeError(error));
+      refreshStaff();
     } finally {
       setSubmitting(false);
     }
@@ -795,7 +814,8 @@ export default function HomePage() {
                         <button
                           key={item.value}
                           type="button"
-                          disabled={!item.available}
+                          disabled={!item.available || isSlotTaken(host, item.value)}
+                          title={isSlotTaken(host, item.value) ? `${hostFirst} is already booked at this time` : undefined}
                           aria-pressed={slot === item.value}
                           className={`gp-slot ${slot === item.value ? 'is-on' : ''}`}
                           onClick={() => setSlot(item.value)}
