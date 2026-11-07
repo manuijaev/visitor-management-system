@@ -16,7 +16,7 @@ const UNAVAILABLE_KEY = 'staff_unavailable_by_date';
 const RECEPTION_RESET_SECONDS = 20;
 const SLIDE_SECONDS = 6;
 
-const STEPS = ['When', 'Host', 'Details', 'Review'];
+const STEPS = ['When', 'Teacher', 'Details', 'Review'];
 
 const VISIT_MODES = [
   { id: 'now', icon: 'pin', title: "I'm here now", sub: 'Waiting at reception' },
@@ -25,27 +25,27 @@ const VISIT_MODES = [
 ];
 
 const ETA_CHOICES = [10, 15, 30, 45, 60];
-const PURPOSES = ['Meeting', 'Interview', 'Delivery', 'Consultation', 'Personal'];
+const PURPOSES = ['Parent–teacher meeting', 'Admissions enquiry', 'Fees / bursar', 'Student pickup', 'Counselling', 'Other'];
 
 const SLIDES = [
   {
     key: 'team',
     eyebrow: 'Walk-ins',
-    title: 'At reception? Your host knows in seconds.',
+    title: 'At the gate? The teacher knows in seconds.',
     text: 'Choose who you are here to see and we alert them by SMS, email and push.',
     alt: 'Colleagues standing together in an office lobby',
   },
   {
     key: 'meet',
     eyebrow: 'Plan ahead',
-    title: 'Visiting later this week?',
-    text: 'Pick a day and a time slot. We text you once your host confirms, no internet needed.',
+    title: 'Meeting a teacher later this week?',
+    text: 'Pick a day and a time slot. We text you once the teacher confirms, no internet needed.',
     alt: 'Group of people greeting the sunrise together',
   },
   {
     key: 'host',
-    eyebrow: 'Hosts',
-    title: 'Hosts respond from anywhere.',
+    eyebrow: 'Staff',
+    title: 'Teachers respond from anywhere.',
     text: 'Accept, reschedule or decline in one tap, and you hear back straight away.',
     alt: 'Professional working late on a laptop with a cup of coffee',
   },
@@ -53,8 +53,8 @@ const SLIDES = [
 
 const HOW_STEPS = [
   { icon: 'clock', title: 'Choose when', text: "Here now, on your way, or a slot later this week. It's one tap." },
-  { icon: 'search', title: 'Pick your host', text: 'Search by name or browse departments. Availability is shown live.' },
-  { icon: 'message', title: 'Get a text back', text: 'Your host is alerted instantly and you get an SMS as soon as they reply.' },
+  { icon: 'search', title: 'Pick a teacher or staff member', text: 'Search by name or browse departments. Availability is shown live.' },
+  { icon: 'message', title: 'Get a text back', text: 'They are alerted instantly and you get an SMS as soon as they reply.' },
 ];
 
 const ICON_PATHS = {
@@ -326,9 +326,9 @@ function HeroCarousel() {
       <div className="gp-showcase-shade" aria-hidden="true" />
 
       <div className="gp-showcase-top">
-        <p className="gp-overline">Visitor management desk</p>
+        <p className="gp-overline">School visitor desk</p>
         <h1>
-          Let your host know <em>you&apos;re here.</em>
+          Let the school know <em>you&apos;re here.</em>
         </h1>
       </div>
 
@@ -732,7 +732,7 @@ export default function HomePage() {
       {!officeOpen && mode && mode !== 'later' && (
         <p className="gp-note gp-note--warn">
           <Icon name="clock" />
-          <span>The office is closed right now (open weekdays 8 AM to 5 PM). Your host may reply when they are back.</span>
+          <span>The school office is closed right now (open weekdays 8 AM to 5 PM). Staff may reply when they are back.</span>
         </p>
       )}
 
@@ -830,11 +830,11 @@ export default function HomePage() {
           placeholder="Search name or department"
           value={hostQuery}
           onChange={(event) => setHostQuery(event.target.value)}
-          aria-label="Search for your host"
+          aria-label="Search for a teacher or staff member"
         />
       </div>
       {departments.length > 1 && departmentChips(hostDept, setHostDept)}
-      <div className="gp-hosts" role="radiogroup" aria-label="Hosts">
+      <div className="gp-hosts" role="radiogroup" aria-label="Teachers and staff">
         {loading &&
           [0, 1, 2].map((key) => <div key={key} className="gp-skeleton" aria-hidden="true" />)}
         {!loading &&
@@ -867,7 +867,7 @@ export default function HomePage() {
         {!loading && hostList.length === 0 && (
           <div className="gp-empty">
             {staff.length === 0
-              ? 'No hosts are listed yet. Please ask at the reception desk.'
+              ? 'No staff are listed yet. Please ask at the reception desk.'
               : `No one matches "${hostQuery}". Try another name or department.`}
           </div>
         )}
@@ -942,7 +942,7 @@ export default function HomePage() {
           ))}
         </div>
       </div>
-      <Field full label={`Note for ${hostFirst || 'your host'}`} optional>
+      <Field full label={`Note for ${hostFirst || 'the teacher'}`} optional>
         <textarea
           className="gp-input"
           rows={3}
@@ -959,7 +959,7 @@ export default function HomePage() {
     <>
       <div className="gp-review">
         <ReviewRow icon="clock" label="When" value={whenLabel()} onEdit={() => goToStep(0)} />
-        <ReviewRow icon="user" label="Host" value={host?.name} sub={host && placement(host)} onEdit={() => goToStep(1)} />
+        <ReviewRow icon="user" label="Seeing" value={host?.name} sub={host && placement(host)} onEdit={() => goToStep(1)} />
         <ReviewRow
           icon="pin"
           label="Visitor"
@@ -1017,7 +1017,7 @@ export default function HomePage() {
               <dd>{visit.visitor.name.trim()}</dd>
             </div>
             <div>
-              <dt>Host</dt>
+              <dt>Seeing</dt>
               <dd>{visit.host.name}</dd>
             </div>
             <div>
@@ -1170,7 +1170,7 @@ export default function HomePage() {
                     <h2 id="gp-flow-title">{titles[step]}</h2>
                   </div>
                   <span className={`gp-office ${officeOpen ? '' : 'is-closed'}`}>
-                    {officeOpen ? 'Office open' : 'Office closed'}
+                    {officeOpen ? 'School open' : 'School closed'}
                   </span>
                 </header>
 
@@ -1245,9 +1245,9 @@ export default function HomePage() {
           <div className="gp-section-head">
             <p className="gp-overline gp-overline--dark">How it works</p>
             <h2>
-              Three taps to <em>your host.</em>
+              Three taps to <em>the right teacher.</em>
             </h2>
-            <p>Built for walk-ins at the desk and visits planned days ahead, on any phone, tablet or laptop.</p>
+            <p>Built for parents at the gate and meetings planned days ahead, on any phone, tablet or laptop.</p>
           </div>
           <div className="gp-how">
             {HOW_STEPS.map((item, i) => (
@@ -1267,7 +1267,7 @@ export default function HomePage() {
           <div className="gp-section-head">
             <p className="gp-overline gp-overline--dark">Directory</p>
             <h2>
-              Find the right <em>person.</em>
+              Find the right <em>teacher.</em>
             </h2>
             <p>Browse by department, see who is available, and start a check-in with one tap.</p>
           </div>
