@@ -117,6 +117,88 @@ class AppointmentSmsTests(TestCase):
         self.assertIn('See you at reception', text)
         self.assertLessEqual(len(text), 160)
 
+    def _pending_visit(self):
+        return Appointment.objects.create(
+            visitor_name='Amina Hassan', visitor_email='amina@example.com', visitor_phone='0722333444',
+            department=self.department, division=self.division, staff_member=self.staff,
+            appointment_date=timezone.now() + timedelta(hours=3),
+        )
+
+    def test_reschedule_saves_new_time_and_texts_it(self, send_sms, email):
+        appointment = self._pending_visit()
+        new_time = (timezone.now() + timedelta(days=2)).replace(hour=11, minute=30, second=0, microsecond=0)
+        self.client.force_authenticate(self.staff)
+
+        response = self.client.patch(
+            f'/api/appointments/update/{appointment.id}/',
+            {'status': 'Rescheduled', 'response_note': 'I have a staff meeting', 'appointment_date': new_time.isoformat()},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, 'Rescheduled')
+        self.assertEqual(appointment.appointment_date, new_time)
+        new_time_text = timezone.localtime(new_time).strftime('%b %d, %Y at %I:%M %p')
+        text = send_sms.call_args.args[1]
+        self.assertIn(f'RESCHEDULED your visit to {new_time_text}', text)
+        self.assertLessEqual(len(text), 160)
+        html = email.call_args.args[1]['html_body']
+        self.assertIn('New time', html)
+        self.assertIn(new_time_text, html)
+
+    def test_reschedule_requires_new_time(self, send_sms, _email):
+        appointment = self._pending_visit()
+        self.client.force_authenticate(self.staff)
+
+        response = self.client.patch(
+            f'/api/appointments/update/{appointment.id}/',
+            {'status': 'Rescheduled', 'response_note': 'Busy then'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('appointment_date', response.data)
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, 'Pending')
+        send_sms.assert_not_called()
+
+    def test_reschedule_rejects_past_time(self, send_sms, _email):
+        appointment = self._pending_visit()
+        self.client.force_authenticate(self.staff)
+
+        response = self.client.patch(
+            f'/api/appointments/update/{appointment.id}/',
+            {
+                'status': 'Rescheduled',
+                'response_note': 'Busy then',
+                'appointment_date': (timezone.now() - timedelta(hours=1)).isoformat(),
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('appointment_date', response.data)
+        send_sms.assert_not_called()
+
+    def test_reschedule_rejects_same_time(self, send_sms, _email):
+        appointment = self._pending_visit()
+        self.client.force_authenticate(self.staff)
+
+        response = self.client.patch(
+            f'/api/appointments/update/{appointment.id}/',
+            {
+                'status': 'Rescheduled',
+                'response_note': 'Busy then',
+                'appointment_date': appointment.appointment_date.isoformat(),
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('appointment_date', response.data)
+        send_sms.assert_not_called()
+
 
 class AfricasTalkingTests(TestCase):
     @mock.patch.multiple('notifications.sms_service', SMS_PROVIDERS=['africastalking'],

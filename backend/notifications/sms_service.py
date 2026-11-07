@@ -184,7 +184,8 @@ def send_visitor_sms(phone_number, visitor_name, staff_name, status, response_no
         if note:
             message += f' Reason: "{note}"'
     elif status == "Rescheduled":
-        message = f"Hi {first}, {staff_name} RESCHEDULED your visit{when}."
+        new_time = f" to {visit_time}" if visit_time else ""
+        message = f"Hi {first}, {staff_name} RESCHEDULED your visit{new_time}."
         if note:
             message += f' Note: "{note}"'
     else:

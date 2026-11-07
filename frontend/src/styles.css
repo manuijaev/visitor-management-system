@@ -9698,6 +9698,31 @@ tr:hover .row-actions {
   border-color: var(--teal);
 }
 
+.sd-reschedule-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sd-reschedule-field input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.sd-reschedule-field input:focus {
+  outline: none;
+  border-color: var(--teal);
+}
+
 .sd-response-actions {
   display: flex;
   gap: 8px;

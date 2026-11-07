@@ -7,6 +7,25 @@ import ConfirmModal from '../components/ConfirmModal';
 import { sendVisitorResponseEmail } from '../services/emailjs';
 import api from '../services/api';
 
+const pad2 = (value) => String(value).padStart(2, '0');
+const toLocalInputValue = (date) =>
+  `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+
+/** Returns an error message for a proposed reschedule time, or '' when it is usable. */
+function rescheduleTimeError(value, appointment) {
+  if (!value) return 'Pick a new date and time.';
+  const proposed = new Date(value);
+  if (Number.isNaN(proposed.getTime())) return 'Pick a new date and time.';
+  if (proposed.getTime() <= Date.now()) return 'The new time must be in the future.';
+  if (appointment && proposed.getTime() === new Date(appointment.appointment_date).getTime()) {
+    return 'Pick a time different from the original one.';
+  }
+  return '';
+}
+
+const formatRescheduleTime = (value) =>
+  new Date(value).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
 const ICONS = {
   dashboard: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -168,6 +187,7 @@ export default function StaffDashboardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [responseNote, setResponseNote] = useState({});
   const [responseAreaOpen, setResponseAreaOpen] = useState({});
+  const [rescheduleTo, setRescheduleTo] = useState({});
   const [responseAction, setResponseAction] = useState({});
   const [pendingStatusUpdate, setPendingStatusUpdate] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
@@ -415,10 +435,12 @@ export default function StaffDashboardPage() {
     const appointment = appointments.find((item) => item.id === appointmentId);
   const fallbackName = appointment?.visitor_name || 'Visitor';
   const note = (responseNote[appointmentId] || '').trim() || `${fallbackName} status set to ${status}.`;
+    const newTime = status === 'Rescheduled' ? new Date(rescheduleTo[appointmentId]).toISOString() : null;
 
     await updateAppointment(appointmentId, {
       status,
       response_note: note,
+      ...(newTime ? { appointment_date: newTime } : {}),
     });
 
     if (appointment && !appointment.visitor_email) {
@@ -430,7 +452,7 @@ export default function StaffDashboardPage() {
         visitor_email: appointment.visitor_email,
         status,
         response_note: note,
-        appointment_date: appointment.appointment_date,
+        appointment_date: newTime || appointment.appointment_date,
         staff_name: appointment.staff_name || 'Staff',
         staff_email: appointment.staff_email || '',
       });
@@ -449,14 +471,24 @@ export default function StaffDashboardPage() {
   };
 
   const requestStatusUpdate = (appointmentId, visitorName, status) => {
-    setPendingStatusUpdate({ appointmentId, visitorName, status });
+    const newTime = status === 'Rescheduled' ? rescheduleTo[appointmentId] : null;
+    if (status === 'Rescheduled') {
+      const appointment = appointments.find((item) => item.id === appointmentId);
+      const problem = rescheduleTimeError(newTime, appointment);
+      if (problem) {
+        setError(problem);
+        return false;
+      }
+    }
+    setError('');
+    setPendingStatusUpdate({ appointmentId, visitorName, status, newTime });
+    return true;
   };
 
   const handlePreviewResponse = (status) => {
     if (!previewItem) return;
     setResponseAction((prev) => ({ ...prev, [previewItem.id]: status }));
-    closePreview();
-    requestStatusUpdate(previewItem.id, previewItem.visitor_name, status);
+    if (requestStatusUpdate(previewItem.id, previewItem.visitor_name, status)) closePreview();
   };
 
   const confirmStatusUpdate = async () => {
@@ -474,6 +506,7 @@ export default function StaffDashboardPage() {
     } catch (err) {
       const message =
         err?.response?.data?.response_note?.[0] ||
+        err?.response?.data?.appointment_date?.[0] ||
         err?.response?.data?.detail ||
         'Unable to update appointment or send email.';
       setError(message);
@@ -1058,6 +1091,17 @@ export default function StaffDashboardPage() {
 
                           {responseAreaOpen[apt.id] && (
                             <div className="sd-response-area">
+                              {responseAction[apt.id] === 'Rescheduled' && (
+                                <label className="sd-reschedule-field">
+                                  <span>New date &amp; time</span>
+                                  <input
+                                    type="datetime-local"
+                                    min={toLocalInputValue(new Date())}
+                                    value={rescheduleTo[apt.id] || ''}
+                                    onChange={(e) => setRescheduleTo((prev) => ({ ...prev, [apt.id]: e.target.value }))}
+                                  />
+                                </label>
+                              )}
                               <textarea 
                                 placeholder="Add a response note (optional)..."
                                 value={responseNote[apt.id] || ''}
@@ -1067,6 +1111,7 @@ export default function StaffDashboardPage() {
                               <div className="sd-response-actions">
                                 <button 
                                   className="sd-btn sd-btn-accept"
+                                  disabled={responseAction[apt.id] === 'Rescheduled' && Boolean(rescheduleTimeError(rescheduleTo[apt.id], apt))}
                                   onClick={() => {
                                     requestStatusUpdate(apt.id, apt.visitor_name, responseAction[apt.id] || 'Accepted');
                                   }}
@@ -1243,6 +1288,19 @@ export default function StaffDashboardPage() {
                 </div>
               )}
 
+              {previewItem.status === 'Pending' && (
+                <div className="sd-modal-section">
+                  <h5>New date &amp; time (to reschedule)</h5>
+                  <input
+                    type="datetime-local"
+                    className="sd-modal-response-input"
+                    min={toLocalInputValue(new Date())}
+                    value={rescheduleTo[previewItem.id] || ''}
+                    onChange={(e) => setRescheduleTo((prev) => ({ ...prev, [previewItem.id]: e.target.value }))}
+                  />
+                </div>
+              )}
+
               <div className="sd-modal-section">
                 <h5>Response note (optional)</h5>
                 <textarea
@@ -1259,7 +1317,14 @@ export default function StaffDashboardPage() {
               {previewItem.status === 'Pending' && (
                 <>
                   <button className="sd-btn sd-btn-accept" onClick={() => handlePreviewResponse('Accepted')}>Accept</button>
-                  <button className="sd-btn sd-btn-reschedule" onClick={() => handlePreviewResponse('Rescheduled')}>Reschedule</button>
+                  <button
+                    className="sd-btn sd-btn-reschedule"
+                    disabled={Boolean(rescheduleTimeError(rescheduleTo[previewItem.id], previewItem))}
+                    title={rescheduleTimeError(rescheduleTo[previewItem.id], previewItem) || undefined}
+                    onClick={() => handlePreviewResponse('Rescheduled')}
+                  >
+                    Reschedule
+                  </button>
                   <button className="sd-btn sd-btn-decline" onClick={() => handlePreviewResponse('Declined')}>Decline</button>
                 </>
               )}
@@ -1274,7 +1339,9 @@ export default function StaffDashboardPage() {
         title={`Confirm ${pendingStatusUpdate?.status || ''}`}
         message={
           pendingStatusUpdate
-            ? `Update ${pendingStatusUpdate.visitorName}'s visit request to "${pendingStatusUpdate.status}"?`
+            ? pendingStatusUpdate.newTime
+              ? `Move ${pendingStatusUpdate.visitorName}'s visit to ${formatRescheduleTime(pendingStatusUpdate.newTime)}? They will be notified by SMS.`
+              : `Update ${pendingStatusUpdate.visitorName}'s visit request to "${pendingStatusUpdate.status}"?`
             : ''
         }
         confirmText="Yes, Update"

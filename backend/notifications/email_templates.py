@@ -164,7 +164,7 @@ def visit_response_email(*, visitor_name, staff_name, status, appointment_date, 
     body = _details([
         ('Status', _pill(status)),
         ('Host', escape(staff_name)),
-        ('Arrival', escape(appointment_date)),
+        ('New time' if status == 'Rescheduled' else 'Arrival', escape(appointment_date)),
     ])
     if response_note:
         body += _note(f'Message from {staff_name}', response_note)
