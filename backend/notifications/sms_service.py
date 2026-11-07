@@ -167,6 +167,12 @@ def send_visitor_received_sms(phone_number, visitor_name, staff_name, visit_time
     return send_sms(phone_number, _fit(message))
 
 
+def send_staff_arrival_sms(phone_number, staff_name, visitor_name):
+    """Tell the host their visitor has been signed in at the gate."""
+    message = f"Hi {_first_name(staff_name)}, {visitor_name} has arrived and been signed in at the gate. - Gatepass"
+    return send_sms(phone_number, _fit(message))
+
+
 def send_visitor_sms(phone_number, visitor_name, staff_name, status, response_note, visit_time=""):
     """Send response notification to visitor."""
     print(f"SMS ATTEMPT — phone: {phone_number}, visitor: {visitor_name}, status: {status}")

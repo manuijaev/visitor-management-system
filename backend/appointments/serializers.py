@@ -72,6 +72,8 @@ class AppointmentListSerializer(serializers.ModelSerializer):
             'message',
             'status',
             'response_note',
+            'checked_in_at',
+            'checked_out_at',
             'created_at',
         ]
 

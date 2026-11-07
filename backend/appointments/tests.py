@@ -205,3 +205,104 @@ class NormalizePhoneTests(TestCase):
     def test_invalid(self):
         for raw in ['', None, '12ab', '1234']:
             self.assertIsNone(normalize_phone(raw), raw)
+
+
+@mock.patch('appointments.views.send_fcm_push_notification', return_value={'sent': True})
+@mock.patch('notifications.sms_service.send_sms', return_value=True)
+class GateSignInOutTests(TestCase):
+    def setUp(self):
+        self.department = Department.objects.create(name='Academics')
+        self.division = Division.objects.create(name='Grade 5', department=self.department)
+        self.admin = User.objects.create_user(
+            email='admin@example.com', full_name='Ada Admin', password='AdminPass123!', role=User.Role.ADMIN
+        )
+        self.jane = User.objects.create_user(
+            email='jane@example.com', full_name='Jane Wanjiru', password='StaffPass123!',
+            department=self.department, division=self.division, phone='0711000111', fcm_token='jane-device',
+        )
+        self.peter = User.objects.create_user(
+            email='peter@example.com', full_name='Peter Otieno', password='StaffPass123!',
+            department=self.department, division=self.division,
+        )
+        self.visit = Appointment.objects.create(
+            visitor_name='Amina Hassan', visitor_phone='0722333444', department=self.department,
+            division=self.division, staff_member=self.jane, status='Accepted',
+            appointment_date=timezone.now() + timedelta(minutes=10),
+        )
+        self.client = APIClient()
+
+    def _post(self, action, user=None):
+        self.client.force_authenticate(user or self.admin)
+        return self.client.post(f'/api/appointments/{self.visit.id}/{action}/')
+
+    def test_sign_in_records_time_and_alerts_host(self, send_sms, push):
+        response = self._post('check-in')
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertIsNotNone(response.data['checked_in_at'])
+        self.visit.refresh_from_db()
+        self.assertIsNotNone(self.visit.checked_in_at)
+        phone, text = send_sms.call_args.args
+        self.assertEqual(phone, '0711000111')
+        self.assertIn('Amina Hassan has arrived', text)
+        self.assertLessEqual(len(text), 160)
+        self.assertEqual(push.call_args.kwargs['fcm_token'], 'jane-device')
+
+    def test_sign_out_records_time(self, _sms, _push):
+        self._post('check-in')
+
+        response = self._post('check-out')
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.visit.refresh_from_db()
+        self.assertIsNotNone(self.visit.checked_out_at)
+        self.assertGreaterEqual(self.visit.checked_out_at, self.visit.checked_in_at)
+
+    def test_cannot_sign_in_twice(self, send_sms, _push):
+        self._post('check-in')
+        send_sms.reset_mock()
+
+        response = self._post('check-in')
+
+        self.assertEqual(response.status_code, 400)
+        send_sms.assert_not_called()
+
+    def test_cannot_sign_out_before_sign_in_or_twice(self, _sms, _push):
+        self.assertEqual(self._post('check-out').status_code, 400)
+        self._post('check-in')
+        self._post('check-out')
+
+        self.assertEqual(self._post('check-out').status_code, 400)
+
+    def test_cannot_sign_in_a_declined_visit(self, send_sms, _push):
+        Appointment.objects.filter(id=self.visit.id).update(status='Declined')
+
+        response = self._post('check-in')
+
+        self.assertEqual(response.status_code, 400)
+        send_sms.assert_not_called()
+
+    def test_host_can_sign_in_their_own_visitor(self, _sms, _push):
+        response = self._post('check-in', user=self.jane)
+
+        self.assertEqual(response.status_code, 200, response.data)
+
+    def test_other_staff_cannot_sign_in_someone_elses_visitor(self, _sms, _push):
+        response = self._post('check-in', user=self.peter)
+
+        self.assertEqual(response.status_code, 404)
+        self.visit.refresh_from_db()
+        self.assertIsNone(self.visit.checked_in_at)
+
+    def test_requires_login(self, _sms, _push):
+        response = self.client.post(f'/api/appointments/{self.visit.id}/check-in/')
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_visit_list_includes_gate_times(self, _sms, _push):
+        self._post('check-in')
+
+        response = self.client.get('/api/appointments/my/')
+
+        self.assertIsNotNone(response.data[0]['checked_in_at'])
+        self.assertIsNone(response.data[0]['checked_out_at'])
