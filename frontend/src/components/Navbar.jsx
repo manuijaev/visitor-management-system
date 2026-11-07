@@ -6,7 +6,7 @@ export default function Navbar() {
   const { user } = useAuth();
   const { pathname } = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
-  if (user || pathname === '/') return null;
+  if (user || pathname === '/' || pathname === '/visit') return null;
 
   return (
     <nav className={`top-nav ${mobileOpen ? 'is-open' : ''}`}>

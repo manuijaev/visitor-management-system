@@ -24,8 +24,8 @@ const NAV_ITEMS = [
   { id: 'notifications', label: 'Notifications', icon: 'bell' },
 ];
 
-const VISIT_STATUSES = ['All', 'Pending', 'Accepted', 'Declined', 'Rescheduled'];
-const STATUS_TONE = { Pending: 'gold', Accepted: 'green', Approved: 'green', Declined: 'red', Rejected: 'red', Rescheduled: 'purple' };
+const VISIT_STATUSES = ['All', 'Pending', 'Accepted', 'Declined', 'Rescheduled', 'Cancelled'];
+const STATUS_TONE = { Pending: 'gold', Accepted: 'green', Approved: 'green', Declined: 'red', Rejected: 'red', Rescheduled: 'purple', Cancelled: 'muted' };
 const OVERDUE_MS = 30 * 60 * 1000;
 
 const asList = (data) => (Array.isArray(data) ? data : []);

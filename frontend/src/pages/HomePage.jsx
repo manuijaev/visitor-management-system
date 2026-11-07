@@ -1055,6 +1055,12 @@ export default function HomePage() {
             {receptionMode ? 'Next visitor' : 'Done'}
           </button>
         </div>
+        {!receptionMode && (
+          <p className="gp-pass-auto">
+            Keep your reference. You can{' '}
+            <Link to={`/visit?ref=${visit.reference}`}>check or cancel this visit</Link> any time.
+          </p>
+        )}
         {receptionMode && <p className="gp-pass-auto">Starting a new check-in in {countdown}s</p>}
       </div>
     );
@@ -1089,6 +1095,7 @@ export default function HomePage() {
             <button type="button" onClick={() => scrollToId('directory')}>
               Directory
             </button>
+            <Link to="/visit">Check my visit</Link>
           </nav>
           <div className="gp-nav-actions">
             <button
@@ -1126,6 +1133,7 @@ export default function HomePage() {
             <button type="button" onClick={() => scrollToId('directory')}>
               Directory
             </button>
+            <Link to="/visit">Check my visit</Link>
             <button
               type="button"
               role="switch"

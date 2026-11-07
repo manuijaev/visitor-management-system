@@ -127,6 +127,9 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.AllowAny',
     ),
+    'DEFAULT_THROTTLE_RATES': {
+        'visit-lookup': '20/hour',
+    },
 }
 
 SIMPLE_JWT = {
