@@ -13185,3 +13185,101 @@ button.sd-avatar:focus-visible {
     font-size: 12.5px;
   }
 }
+
+/* ---------- Admin: Add staff in the sidebar ---------- */
+.ad-sidebar .ad-sidebar-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 12px;
+  background: var(--gold);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.ad-sidebar .ad-sidebar-cta:hover {
+  background: var(--gold-dark);
+}
+
+/* ---------- Admin: Gate uses the same stat cards and tabbed list as the rest ---------- */
+.ad-stats.ad-stats-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ad-stat.ad-stat-button {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ad-stat.ad-stat-button:hover {
+  border-color: rgba(201, 146, 42, 0.5);
+}
+
+.ad-gate-list {
+  margin-top: 8px;
+}
+
+/* ---------- Admin: Settings ---------- */
+.ad-settings {
+  display: grid;
+  gap: 16px;
+  max-width: 720px;
+}
+
+.ad-settings .sd-account-head {
+  padding-top: 0;
+}
+
+.ad-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+@media (max-width: 768px) {
+  .ad-segmented-fill.ad-segmented-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .ad-stats.ad-stats-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .ad-stats-3 .ad-stat {
+    padding: 12px;
+  }
+
+  .ad-stats-3 .ad-stat small {
+    display: none;
+  }
+}
+
+.ad-settings .ad-card {
+  padding-bottom: 20px;
+}
+
+.ad-settings .ad-card > :not(.ad-card-head) {
+  margin-left: 22px;
+  margin-right: 22px;
+}
+
+.ad-settings .sd-account-head {
+  padding-top: 10px;
+}
+
+.ad-settings .sd-account-list > div:last-child {
+  border-bottom: none;
+}

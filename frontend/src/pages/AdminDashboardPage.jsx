@@ -27,6 +27,7 @@ const NAV_ITEMS = [
   { id: 'visitors', label: 'Visitors', icon: 'visitors' },
   { id: 'gate', label: 'Gate', icon: 'shield' },
   { id: 'team', label: 'Team', icon: 'team' },
+  { id: 'settings', label: 'Settings', icon: 'settings' },
 ];
 
 /** The views on the phone tab bar; the rest stay under More. */
@@ -357,7 +358,7 @@ export default function AdminDashboardPage() {
     return [a.visitor_name, a.visitor_email, studentLabel(a), a.staff_name, a.department_name].some((v) => v?.toLowerCase().includes(q));
   }));
 
-  const pageTitle = { overview: 'Overview', visitors: 'Visitors', gate: 'Gate', team: 'Team', notifications: 'Notifications' }[view];
+  const pageTitle = { overview: 'Overview', visitors: 'Visitors', gate: 'Gate', team: 'Team', notifications: 'Notifications', settings: 'Settings' }[view];
 
   const renderVisitRow = (a, compact = false) => (
     <div key={a.id} className={`ad-row ${compact ? 'ad-row-compact' : ''}`}>
@@ -497,6 +498,11 @@ export default function AdminDashboardPage() {
             ))}
           </nav>
 
+          <button type="button" className="ad-sidebar-cta" onClick={() => { setNavOpen(false); openWizard(); }}>
+            <Icon name="userPlus" size={16} />
+            Add staff member
+          </button>
+
         </aside>
         <div className="ad-backdrop" onClick={() => setNavOpen(false)} />
 
@@ -510,10 +516,6 @@ export default function AdminDashboardPage() {
               <button type="button" className="ad-icon-btn ad-bell" onClick={() => goTo('notifications')} aria-label={`Notifications, ${unreadCount} unread`}>
                 <Icon name="bell" size={17} />
                 {unreadCount > 0 && <span className="ad-bell-dot">{unreadCount > 9 ? '9+' : unreadCount}</span>}
-              </button>
-              <button type="button" className="ad-btn ad-btn-primary ad-topbar-cta" onClick={() => openWizard()}>
-                <Icon name="plus" size={15} />
-                <span>Add staff</span>
               </button>
               <div className="sd-profile" ref={profileRef}>
                 <button
@@ -536,6 +538,9 @@ export default function AdminDashboardPage() {
                         {user?.email && <small>{user.email}</small>}
                       </span>
                     </div>
+                    <button type="button" role="menuitem" className="sd-profile-item" onClick={() => { setProfileOpen(false); goTo('settings'); }}>
+                      Settings
+                    </button>
                     <button type="button" role="menuitem" className="sd-profile-item is-danger" onClick={handleLogout}>
                       Log out
                     </button>
@@ -716,6 +721,81 @@ export default function AdminDashboardPage() {
                     onAddStaff={(deptId) => openWizard(deptId)}
                   />
                 )}
+              </>
+            )}
+
+            {view === 'settings' && (
+              <>
+                <div className="ad-page-head">
+                  <div>
+                    <h1>Settings</h1>
+                    <p>Your account and the school&apos;s setup.</p>
+                  </div>
+                </div>
+                <div className="ad-settings">
+                  <section className="ad-card">
+                    <header className="ad-card-head">
+                      <h2>Your account</h2>
+                    </header>
+                    <div className="sd-account-head">
+                      <span className="sd-profile-avatar sd-account-avatar">{getInitials(user?.full_name || 'Admin')}</span>
+                      <div>
+                        <strong>{user?.full_name || 'Administrator'}</strong>
+                        <span>{user?.email}</span>
+                      </div>
+                    </div>
+                    <dl className="sd-account-list">
+                      <div>
+                        <dt>Role</dt>
+                        <dd>Administrator</dd>
+                      </div>
+                    </dl>
+                  </section>
+
+                  <section className="ad-card">
+                    <header className="ad-card-head">
+                      <h2>School setup</h2>
+                    </header>
+                    <dl className="sd-account-list">
+                      <div>
+                        <dt>Departments</dt>
+                        <dd>{departments.length} departments · {divisions.length} divisions</dd>
+                      </div>
+                      <div>
+                        <dt>Staff</dt>
+                        <dd>{stats.active} active{stats.invited ? ` · ${stats.invited} invited` : ''}</dd>
+                      </div>
+                    </dl>
+                    <div className="ad-settings-actions">
+                      <button type="button" className="ad-btn ad-btn-ghost" onClick={() => goTo('team')}>
+                        <Icon name="team" size={15} />
+                        Manage team and departments
+                      </button>
+                    </div>
+                  </section>
+
+                  <section className="ad-card">
+                    <header className="ad-card-head">
+                      <h2>Visit records</h2>
+                    </header>
+                    <dl className="sd-account-list">
+                      <div>
+                        <dt>Visit requests</dt>
+                        <dd>{appointments.length} in total</dd>
+                      </div>
+                      <div>
+                        <dt>Console refresh</dt>
+                        <dd>Every 15 seconds</dd>
+                      </div>
+                    </dl>
+                    <div className="ad-settings-actions">
+                      <button type="button" className="ad-btn ad-btn-ghost" onClick={exportVisits}>
+                        <Icon name="download" size={15} />
+                        Export all visits (CSV)
+                      </button>
+                    </div>
+                  </section>
+                </div>
               </>
             )}
 
