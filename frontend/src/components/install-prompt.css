@@ -224,3 +224,8 @@
     animation: none;
   }
 }
+
+/* Sit above the visitor app's bottom tab bar. */
+body:has(.gp-tabbar) .pwa-card {
+  bottom: calc(62px + 12px + env(safe-area-inset-bottom));
+}
