@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import serializers
 
 from notifications.sms_service import normalize_phone
@@ -86,7 +87,18 @@ class AppointmentUpdateSerializer(serializers.ModelSerializer):
         response_note = attrs.get('response_note', getattr(self.instance, 'response_note', ''))
         if status in ('Accepted', 'Rescheduled', 'Declined') and not str(response_note or '').strip():
             raise serializers.ValidationError({'response_note': 'Response note is required when updating appointment status.'})
+        if attrs.get('status') == 'Rescheduled':
+            self._validate_new_time(attrs.get('appointment_date'))
         return attrs
+
+    def _validate_new_time(self, new_time):
+        """A reschedule must move the visit to a different time in the future."""
+        if not new_time:
+            raise serializers.ValidationError({'appointment_date': 'Pick a new date and time for the visit.'})
+        if new_time <= timezone.now():
+            raise serializers.ValidationError({'appointment_date': 'The new time must be in the future.'})
+        if self.instance and new_time == self.instance.appointment_date:
+            raise serializers.ValidationError({'appointment_date': 'Pick a time different from the original one.'})
 
     class Meta:
         model = Appointment
