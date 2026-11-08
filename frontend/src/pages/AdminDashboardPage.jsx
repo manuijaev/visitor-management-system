@@ -7,6 +7,7 @@ import Icon from '../components/admin/Icon';
 import AddStaffWizard from '../components/admin/AddStaffWizard';
 import EditStaffModal from '../components/admin/EditStaffModal';
 import DepartmentsBoard from '../components/admin/DepartmentsBoard';
+import GateBoard from '../components/admin/GateBoard';
 import {
   EAT_TIMEZONE,
   eatDateKey,
@@ -21,6 +22,7 @@ import {
 const NAV_ITEMS = [
   { id: 'overview', label: 'Overview', icon: 'overview' },
   { id: 'visitors', label: 'Visitors', icon: 'visitors' },
+  { id: 'gate', label: 'Gate', icon: 'shield' },
   { id: 'team', label: 'Team', icon: 'team' },
   { id: 'notifications', label: 'Notifications', icon: 'bell' },
 ];
@@ -333,7 +335,7 @@ export default function AdminDashboardPage() {
     return [a.visitor_name, a.visitor_email, studentLabel(a), a.staff_name, a.department_name].some((v) => v?.toLowerCase().includes(q));
   });
 
-  const pageTitle = { overview: 'Overview', visitors: 'Visitors', team: 'Team', notifications: 'Notifications' }[view];
+  const pageTitle = { overview: 'Overview', visitors: 'Visitors', gate: 'Gate', team: 'Team', notifications: 'Notifications' }[view];
 
   const renderVisitRow = (a, compact = false) => (
     <div key={a.id} className={`ad-row ${compact ? 'ad-row-compact' : ''}`}>
@@ -632,6 +634,8 @@ export default function AdminDashboardPage() {
                 </section>
               </>
             )}
+
+            {view === 'gate' && <GateBoard appointments={appointments} onChanged={loadData} notify={notify} />}
 
             {view === 'team' && (
               <>

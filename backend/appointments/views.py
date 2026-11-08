@@ -14,6 +14,7 @@ from notifications.emailjs_service import (
     send_emailjs,
 )
 from notifications.sms_service import (
+    send_staff_arrival_sms,
     send_staff_sms,
     send_visitor_reassigned_sms,
     send_visitor_received_sms,
@@ -471,3 +472,73 @@ class VisitCancelView(VisitLookupView):
         appointment.save(update_fields=['status'])
         _notify_staff_of_cancellation(appointment)
         return Response(VisitStatusSerializer(appointment).data)
+
+
+def _notify_host_of_arrival(appointment):
+    """SMS and push the host that their visitor is at the gate."""
+    staff = appointment.staff_member
+    try:
+        if staff.phone:
+            send_staff_arrival_sms(staff.phone, staff.full_name or staff.email, appointment.visitor_name)
+    except Exception:
+        logger.exception('Failed to send arrival SMS for appointment_id=%s', appointment.id)
+
+    try:
+        tokens = set(UserDeviceToken.objects.filter(user=staff, is_active=True).values_list('token', flat=True))
+        if staff.fcm_token:
+            tokens.add(staff.fcm_token)
+        for token in tokens:
+            send_fcm_push_notification(
+                fcm_token=token,
+                title='Visitor arrived',
+                body=f'{appointment.visitor_name} has been signed in at the gate.',
+            )
+    except Exception:
+        logger.exception('Failed to send arrival push for appointment_id=%s', appointment.id)
+
+
+class _GateActionView(APIView):
+    """Shared lookup for sign-in/sign-out: admins can act on any visit, staff only on their own."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_appointment(self, request, id):
+        visits = Appointment.objects.select_related('staff_member', 'department', 'division')
+        if getattr(request.user, 'role', None) != 'Admin':
+            visits = visits.filter(staff_member=request.user)
+        return visits.filter(id=id).first()
+
+    def respond(self, appointment):
+        return Response(AppointmentListSerializer(appointment).data)
+
+
+class AppointmentCheckInView(_GateActionView):
+    def post(self, request, id):
+        appointment = self.get_appointment(request, id)
+        if not appointment:
+            return Response({'detail': 'Visit not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if appointment.status in Appointment.CLOSED_STATUSES:
+            return Response(
+                {'detail': f'This visit was {appointment.status.lower()}, so it cannot be signed in.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if appointment.checked_in_at:
+            return Response({'detail': 'This visitor is already signed in.'}, status=status.HTTP_400_BAD_REQUEST)
+        appointment.checked_in_at = timezone.now()
+        appointment.save(update_fields=['checked_in_at'])
+        _notify_host_of_arrival(appointment)
+        return self.respond(appointment)
+
+
+class AppointmentCheckOutView(_GateActionView):
+    def post(self, request, id):
+        appointment = self.get_appointment(request, id)
+        if not appointment:
+            return Response({'detail': 'Visit not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if not appointment.checked_in_at:
+            return Response({'detail': 'This visitor has not been signed in yet.'}, status=status.HTTP_400_BAD_REQUEST)
+        if appointment.checked_out_at:
+            return Response({'detail': 'This visitor has already signed out.'}, status=status.HTTP_400_BAD_REQUEST)
+        appointment.checked_out_at = timezone.now()
+        appointment.save(update_fields=['checked_out_at'])
+        return self.respond(appointment)
