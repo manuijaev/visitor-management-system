@@ -12650,6 +12650,49 @@ tr:hover .row-actions {
   }
 }
 
+/* Phones: buttons inside notifications and activity rows keep their own size. */
+@media (max-width: 760px) {
+  .sd-notification-header {
+    gap: 12px;
+  }
+
+  .sd-notification-count {
+    white-space: nowrap;
+  }
+
+  .sd-notification-header .sd-clear-all-btn {
+    width: auto;
+    flex: none;
+    margin-left: auto;
+  }
+
+  .sd-notification-content {
+    min-width: 0;
+  }
+
+  /* No hover on touch screens, so the clear button is always shown. */
+  .sd-notification-item .sd-notification-clear {
+    width: 32px;
+    height: 32px;
+    flex: none;
+    opacity: 1;
+  }
+
+  /* Recent activity: the status sits under the name so the name gets the full width. */
+  .sd-list .sd-list-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 12px;
+    row-gap: 6px;
+    align-items: start;
+  }
+
+  .sd-list .sd-list-item > .sd-badge {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
 /* Small phones: the screen refreshes itself and your name is under More, so drop those two. */
 @media (max-width: 400px) {
   .sd-topbar-right > .sd-icon-btn:not(.sd-notif-btn),
