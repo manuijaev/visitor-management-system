@@ -1142,9 +1142,6 @@ export default function HomePage() {
               <span className="gp-switch-track" aria-hidden="true" />
               Reception mode
             </button>
-            <Link to="/staff/login" className="gp-btn gp-btn--dark gp-btn--sm">
-              Staff login
-            </Link>
           </div>
           <button
             type="button"
@@ -1178,9 +1175,6 @@ export default function HomePage() {
               <span className="gp-switch-track" aria-hidden="true" />
               Reception mode
             </button>
-            <Link to="/staff/login" className="gp-btn gp-btn--dark" onClick={() => setNavOpen(false)}>
-              Staff login
-            </Link>
           </div>
         )}
       </header>
@@ -1367,9 +1361,6 @@ export default function HomePage() {
             <strong className="gp-footer-brand">Gatepass</strong>
             <span>Visitor management system</span>
           </div>
-          <nav aria-label="Footer">
-            <Link to="/staff/login">Staff login</Link>
-          </nav>
           <span className="gp-footer-copy">© {now.getFullYear()} Gatepass</span>
         </div>
       </footer>

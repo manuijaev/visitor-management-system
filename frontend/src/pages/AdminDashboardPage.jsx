@@ -170,7 +170,7 @@ export default function AdminDashboardPage() {
     (error) => {
       if (error?.response?.status === 401) {
         logout();
-        navigate('/staff/login');
+        navigate('/staff');
         return true;
       }
       return false;
@@ -227,7 +227,7 @@ export default function AdminDashboardPage() {
   const handleLogout = () => {
     sessionStorage.setItem('app_toast', 'Logged out successfully.');
     logout();
-    navigate('/staff/login');
+    navigate('/staff');
   };
 
   const sendInvite = async (member) => {
