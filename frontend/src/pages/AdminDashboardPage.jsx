@@ -27,6 +27,9 @@ const NAV_ITEMS = [
   { id: 'notifications', label: 'Notifications', icon: 'bell' },
 ];
 
+/** The views on the phone tab bar; the rest stay under More. */
+const TAB_ITEMS = ['overview', 'visitors', 'gate'];
+
 const VISIT_STATUSES = ['All', 'Pending', 'Accepted', 'Declined', 'Rescheduled', 'Cancelled'];
 const STATUS_TONE = { Pending: 'gold', Accepted: 'green', Approved: 'green', Declined: 'red', Rejected: 'red', Rescheduled: 'purple', Cancelled: 'muted' };
 const OVERDUE_MS = 30 * 60 * 1000;
@@ -743,6 +746,33 @@ export default function AdminDashboardPage() {
               </>
             )}
           </main>
+
+          <nav className="app-tabbar" aria-label="Main">
+            {TAB_ITEMS.map((id) => {
+              const item = NAV_ITEMS.find((navItem) => navItem.id === id);
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  className={`app-tab ${view === id ? 'is-active' : ''}`}
+                  aria-current={view === id ? 'page' : undefined}
+                  onClick={() => goTo(id)}
+                >
+                  <span className="app-tab-icon">
+                    <Icon name={item.icon} size={22} />
+                    {id === 'visitors' && stats.pending > 0 && <span className="app-tab-badge">{stats.pending}</span>}
+                  </span>
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+            <button type="button" className={`app-tab ${navOpen ? 'is-active' : ''}`} onClick={() => setNavOpen(true)}>
+              <span className="app-tab-icon">
+                <Icon name="more" size={22} />
+              </span>
+              <span>More</span>
+            </button>
+          </nav>
         </div>
 
         {toast && <div className={`toast-admin ${toast.type === 'error' ? 'toast-error' : 'toast-success'}`}>{toast.msg}</div>}
