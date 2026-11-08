@@ -1327,7 +1327,6 @@ export default function HomePage() {
           </div>
           <nav aria-label="Footer">
             <Link to="/staff/login">Staff login</Link>
-            <Link to="/admin/signup">Admin sign up</Link>
           </nav>
           <span className="gp-footer-copy">© {now.getFullYear()} Gatepass</span>
         </div>
