@@ -56,7 +56,7 @@ class StaffListSerializer(serializers.ModelSerializer):
         if upcoming is None:
             upcoming = Appointment.objects.filter(
                 staff_member=obj, appointment_date__gte=timezone.now()
-            ).exclude(status=Appointment.Status.DECLINED)
+            ).exclude(status__in=Appointment.CLOSED_STATUSES)
         return [visit.appointment_date.isoformat() for visit in upcoming]
 
     def get_unavailable_dates(self, obj) -> list[str]:

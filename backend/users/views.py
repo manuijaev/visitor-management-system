@@ -42,7 +42,7 @@ class StaffByDepartmentListView(generics.ListAPIView):
         upcoming_visits = Prefetch(
             'appointments',
             queryset=Appointment.objects.filter(appointment_date__gte=timezone.now())
-            .exclude(status=Appointment.Status.DECLINED)
+            .exclude(status__in=Appointment.CLOSED_STATUSES)
             .order_by('appointment_date'),
             to_attr='upcoming_visits',
         )

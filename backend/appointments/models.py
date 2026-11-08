@@ -13,6 +13,8 @@ class Appointment(models.Model):
         DECLINED = 'Declined', 'Declined'
         CANCELLED = 'Cancelled', 'Cancelled'
 
+    CLOSED_STATUSES = (Status.DECLINED, Status.CANCELLED)
+
     visitor_name = models.CharField(max_length=120)
     visitor_phone = models.CharField(max_length=20, blank=True, null=True)
     visitor_email = models.EmailField(blank=True)
@@ -51,4 +53,4 @@ class Appointment(models.Model):
             staff_member=staff,
             appointment_date__gt=when - VISIT_LENGTH,
             appointment_date__lt=when + VISIT_LENGTH,
-        ).exclude(status=cls.Status.DECLINED)
+        ).exclude(status__in=cls.CLOSED_STATUSES)

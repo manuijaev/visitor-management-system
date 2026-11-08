@@ -392,6 +392,13 @@ class DoubleBookingTests(TestCase):
 
         self.assertEqual(response.status_code, 201, response.data)
 
+    def test_cancelled_visit_frees_the_slot(self, _sms, _email):
+        self._existing(self.slot, status='Cancelled')
+
+        response = self._book(self.slot)
+
+        self.assertEqual(response.status_code, 201, response.data)
+
     def test_accepted_and_rescheduled_visits_hold_the_slot(self, _sms, _email):
         for status in ('Accepted', 'Rescheduled'):
             with self.subTest(status=status):
