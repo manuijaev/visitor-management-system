@@ -100,3 +100,17 @@ export function orderVisitsForReview(visits, now = Date.now()) {
     return rank(a) === 2 ? bTime - aTime : aTime - bTime;
   });
 }
+
+/** Status tabs for visit lists. Rescheduled visits count as accepted; cancelled and closed ones sit with declined. */
+export const VISIT_FILTERS = [
+  { id: 'pending', label: 'Pending', statuses: ['Pending'] },
+  { id: 'accepted', label: 'Accepted', statuses: ['Accepted', 'Rescheduled'] },
+  { id: 'declined', label: 'Declined', statuses: ['Declined', 'Cancelled', 'Expired'] },
+  { id: 'all', label: 'All', statuses: null },
+];
+
+/** Whether a visit belongs under the given status tab id. */
+export function matchesVisitFilter(visit, filterId) {
+  const statuses = VISIT_FILTERS.find((filter) => filter.id === filterId)?.statuses;
+  return !statuses || statuses.includes(visit.status);
+}

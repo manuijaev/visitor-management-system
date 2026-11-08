@@ -7,7 +7,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import DaysOffPanel from '../components/DaysOffPanel';
 import { sendVisitorResponseEmail } from '../services/emailjs';
 import api from '../services/api';
-import { eatDateKey, formatClockTime, orderVisitsForReview } from '../components/admin/utils';
+import { eatDateKey, formatClockTime, matchesVisitFilter, orderVisitsForReview, VISIT_FILTERS } from '../components/admin/utils';
 
 const studentLabel = (visit) =>
   [visit?.student_name?.trim(), visit?.student_class?.trim() && `(${visit.student_class.trim()})`].filter(Boolean).join(' ');
@@ -39,13 +39,7 @@ const TAB_TITLES = {
   settings: 'Settings',
 };
 
-/** The status tabs on the Requests screen. Rescheduled visits count as accepted; cancelled and closed ones sit with declined. */
-const REQUEST_FILTERS = [
-  { id: 'pending', label: 'Pending', statuses: ['Pending'] },
-  { id: 'accepted', label: 'Accepted', statuses: ['Accepted', 'Rescheduled'] },
-  { id: 'declined', label: 'Declined', statuses: ['Declined', 'Cancelled', 'Expired'] },
-  { id: 'all', label: 'All', statuses: null },
-];
+const REQUEST_FILTERS = VISIT_FILTERS;
 
 const ICONS = {
   dashboard: (
@@ -412,8 +406,7 @@ export default function StaffDashboardPage() {
   };
 
   const filteredAppointments = orderVisitsForReview(appointments.filter(a => {
-    const statuses = REQUEST_FILTERS.find((filter) => filter.id === requestFilter)?.statuses;
-    if (statuses && !statuses.includes(a.status)) return false;
+    if (!matchesVisitFilter(a, requestFilter)) return false;
 
     if (dateFilter === 'today' && eatDateKey(a.appointment_date) !== today) return false;
     if (searchQuery) {

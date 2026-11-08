@@ -16,7 +16,10 @@ import {
   formatVisitDate,
   getInitials,
   getRelativeTimeLabel,
+  matchesVisitFilter,
+  orderVisitsForReview,
   staffStatus,
+  VISIT_FILTERS,
 } from '../components/admin/utils';
 
 const NAV_ITEMS = [
@@ -29,7 +32,6 @@ const NAV_ITEMS = [
 /** The views on the phone tab bar; the rest stay under More. */
 const TAB_ITEMS = ['overview', 'visitors', 'gate'];
 
-const VISIT_STATUSES = ['All', 'Pending', 'Accepted', 'Declined', 'Rescheduled', 'Cancelled'];
 const STATUS_TONE = { Pending: 'gold', Accepted: 'green', Approved: 'green', Declined: 'red', Rejected: 'red', Rescheduled: 'purple', Cancelled: 'muted' };
 const OVERDUE_MS = 30 * 60 * 1000;
 
@@ -158,7 +160,25 @@ export default function AdminDashboardPage() {
   const [peopleSearch, setPeopleSearch] = useState('');
   const [peopleDept, setPeopleDept] = useState('');
   const [visitorSearch, setVisitorSearch] = useState('');
-  const [visitorStatus, setVisitorStatus] = useState('All');
+  const [visitorStatus, setVisitorStatus] = useState('all');
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef(null);
+
+  useEffect(() => {
+    if (!profileOpen) return undefined;
+    const closeOnOutsideClick = (event) => {
+      if (profileRef.current && !profileRef.current.contains(event.target)) setProfileOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setProfileOpen(false);
+    };
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [profileOpen]);
   const [notifFilter, setNotifFilter] = useState('all');
   const [readIds, setReadIds] = useState(() => new Set());
   const [dismissedIds, setDismissedIds] = useState(() => new Set());
@@ -330,12 +350,12 @@ export default function AdminDashboardPage() {
     return [s.full_name, s.email, s.department_name, s.division_name].some((v) => v?.toLowerCase().includes(q));
   });
 
-  const filteredVisits = appointments.filter((a) => {
-    if (visitorStatus !== 'All' && a.status !== visitorStatus) return false;
+  const filteredVisits = orderVisitsForReview(appointments.filter((a) => {
+    if (!matchesVisitFilter(a, visitorStatus)) return false;
     if (!visitorSearch) return true;
     const q = visitorSearch.toLowerCase();
     return [a.visitor_name, a.visitor_email, studentLabel(a), a.staff_name, a.department_name].some((v) => v?.toLowerCase().includes(q));
-  });
+  }));
 
   const pageTitle = { overview: 'Overview', visitors: 'Visitors', gate: 'Gate', team: 'Team', notifications: 'Notifications' }[view];
 
@@ -477,19 +497,6 @@ export default function AdminDashboardPage() {
             ))}
           </nav>
 
-          <div className="ad-sidebar-foot">
-            <div className="ad-me">
-              <span className="ad-avatar ad-avatar-gold">{getInitials(user?.full_name || 'Admin')}</span>
-              <div>
-                <strong>{user?.full_name || 'Administrator'}</strong>
-                <span>{user?.email}</span>
-              </div>
-            </div>
-            <button type="button" className="ad-nav-item ad-logout" onClick={handleLogout}>
-              <Icon name="logout" size={17} />
-              <span>Log out</span>
-            </button>
-          </div>
         </aside>
         <div className="ad-backdrop" onClick={() => setNavOpen(false)} />
 
@@ -508,6 +515,33 @@ export default function AdminDashboardPage() {
                 <Icon name="plus" size={15} />
                 <span>Add staff</span>
               </button>
+              <div className="sd-profile" ref={profileRef}>
+                <button
+                  type="button"
+                  className="ad-profile-btn"
+                  onClick={() => setProfileOpen((open) => !open)}
+                  aria-haspopup="menu"
+                  aria-expanded={profileOpen}
+                  aria-label={`Account: ${user?.full_name || 'Administrator'}`}
+                >
+                  {getInitials(user?.full_name || 'Admin')}
+                </button>
+                {profileOpen && (
+                  <div className="sd-profile-menu" role="menu">
+                    <div className="sd-profile-head">
+                      <span className="sd-profile-avatar">{getInitials(user?.full_name || 'Admin')}</span>
+                      <span>
+                        <strong>{user?.full_name || 'Administrator'}</strong>
+                        <small>Administrator</small>
+                        {user?.email && <small>{user.email}</small>}
+                      </span>
+                    </div>
+                    <button type="button" role="menuitem" className="sd-profile-item is-danger" onClick={handleLogout}>
+                      Log out
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </header>
 
@@ -528,7 +562,7 @@ export default function AdminDashboardPage() {
                       <strong>{stats.pending} visit {stats.pending === 1 ? 'request is' : 'requests are'} awaiting a response</strong>
                       {stats.overdue > 0 && ` · ${stats.overdue} waiting longer than 30 minutes`}
                     </p>
-                    <button type="button" className="ad-btn ad-btn-ghost" onClick={() => { setVisitorStatus('Pending'); goTo('visitors'); }}>Review</button>
+                    <button type="button" className="ad-btn ad-btn-ghost" onClick={() => { setVisitorStatus('pending'); goTo('visitors'); }}>Review</button>
                   </div>
                 )}
 
@@ -610,11 +644,11 @@ export default function AdminDashboardPage() {
                 </div>
                 <section className="ad-card">
                   <div className="ad-toolbar">
-                    <div className="ad-segmented" role="tablist">
-                      {VISIT_STATUSES.map((s) => (
-                        <button type="button" key={s} role="tab" aria-selected={visitorStatus === s} className={visitorStatus === s ? 'active' : ''} onClick={() => setVisitorStatus(s)}>
-                          {s}
-                          {s === 'Pending' && stats.pending > 0 && <span>{stats.pending}</span>}
+                    <div className="ad-segmented ad-segmented-fill" role="tablist" aria-label="Visit status">
+                      {VISIT_FILTERS.map((filter) => (
+                        <button type="button" key={filter.id} role="tab" aria-selected={visitorStatus === filter.id} className={visitorStatus === filter.id ? 'active' : ''} onClick={() => setVisitorStatus(filter.id)}>
+                          {filter.label}
+                          <span>{appointments.filter((a) => matchesVisitFilter(a, filter.id)).length}</span>
                         </button>
                       ))}
                     </div>
