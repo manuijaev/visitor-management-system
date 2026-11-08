@@ -6,6 +6,7 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 import secrets
 
+from appointments.models import Appointment
 from departments.models import Department, Division
 
 from .models import StaffUnavailableDay, User
@@ -40,13 +41,23 @@ class StaffListSerializer(serializers.ModelSerializer):
     division_name = serializers.CharField(source='division.name', read_only=True)
     invite_pending = serializers.SerializerMethodField()
     unavailable_dates = serializers.SerializerMethodField()
+    booked_times = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'full_name', 'email', 'phone', 'department', 'department_name', 'division', 'division_name', 'role', 'is_active', 'is_available', 'availability_reason', 'invite_pending', 'unavailable_dates']
+        fields = ['id', 'full_name', 'email', 'phone', 'department', 'department_name', 'division', 'division_name', 'role', 'is_active', 'is_available', 'availability_reason', 'invite_pending', 'unavailable_dates', 'booked_times']
 
     def get_invite_pending(self, obj):
         return not obj.has_usable_password()
+
+    def get_booked_times(self, obj) -> list[str]:
+        """Start times of upcoming visits that still hold a slot. Times only, no visitor details."""
+        upcoming = getattr(obj, 'upcoming_visits', None)
+        if upcoming is None:
+            upcoming = Appointment.objects.filter(
+                staff_member=obj, appointment_date__gte=timezone.now()
+            ).exclude(status=Appointment.Status.DECLINED)
+        return [visit.appointment_date.isoformat() for visit in upcoming]
 
     def get_unavailable_dates(self, obj) -> list[str]:
         today = timezone.localdate()

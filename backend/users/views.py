@@ -7,7 +7,10 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Prefetch
 from django.utils import timezone
+
+from appointments.models import Appointment
 
 from .models import User
 from .models import StaffUnavailableDay, UserDeviceToken
@@ -36,7 +39,14 @@ class StaffByDepartmentListView(generics.ListAPIView):
         department_id = self.request.query_params.get('department_id')
         division_id = self.request.query_params.get('division_id')
         include_inactive = self.request.query_params.get('include_inactive') == '1'
-        qs = User.objects.filter(role=User.Role.STAFF).prefetch_related('unavailable_days')
+        upcoming_visits = Prefetch(
+            'appointments',
+            queryset=Appointment.objects.filter(appointment_date__gte=timezone.now())
+            .exclude(status=Appointment.Status.DECLINED)
+            .order_by('appointment_date'),
+            to_attr='upcoming_visits',
+        )
+        qs = User.objects.filter(role=User.Role.STAFF).prefetch_related('unavailable_days', upcoming_visits)
         if not include_inactive or not self.request.user.is_authenticated or getattr(self.request.user, 'role', '') != User.Role.ADMIN:
             qs = qs.filter(is_active=True)
         if department_id:

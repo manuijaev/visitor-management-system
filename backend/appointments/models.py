@@ -1,4 +1,8 @@
+from datetime import timedelta
+
 from django.db import models
+
+VISIT_LENGTH = timedelta(minutes=30)
 
 
 class Appointment(models.Model):
@@ -33,3 +37,12 @@ class Appointment(models.Model):
 
     def __str__(self):
         return f'{self.visitor_name} -> {self.staff_member.full_name} ({self.status})'
+
+    @classmethod
+    def active_for_staff_near(cls, staff, when):
+        """Visits for this staff member that still hold a slot overlapping a 30-minute visit at `when`."""
+        return cls.objects.filter(
+            staff_member=staff,
+            appointment_date__gt=when - VISIT_LENGTH,
+            appointment_date__lt=when + VISIT_LENGTH,
+        ).exclude(status=cls.Status.DECLINED)

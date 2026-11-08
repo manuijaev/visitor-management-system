@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from unittest import mock
 
 from django.test import TestCase
@@ -327,3 +327,106 @@ class NormalizePhoneTests(TestCase):
     def test_invalid(self):
         for raw in ['', None, '12ab', '1234']:
             self.assertIsNone(normalize_phone(raw), raw)
+
+
+@mock.patch('appointments.views.send_emailjs', return_value=True)
+@mock.patch('notifications.sms_service.send_sms', return_value=True)
+class DoubleBookingTests(TestCase):
+    def setUp(self):
+        self.department = Department.objects.create(name='Academics')
+        self.division = Division.objects.create(name='Grade 5', department=self.department)
+        self.staff = User.objects.create_user(
+            email='jane@example.com', full_name='Jane Wanjiru', password='StaffPass123!',
+            department=self.department, division=self.division,
+        )
+        self.slot = (timezone.now() + timedelta(days=2)).replace(hour=10, minute=0, second=0, microsecond=0)
+        self.client = APIClient()
+
+    def _book(self, when, is_scheduled=True, **overrides):
+        payload = {
+            'visitor_name': 'Amina Hassan',
+            'visitor_phone': '0722 333 444',
+            'department': self.department.id,
+            'division': self.division.id,
+            'staff_member': self.staff.id,
+            'appointment_date': when.isoformat(),
+            'is_scheduled': is_scheduled,
+        }
+        payload.update(overrides)
+        return self.client.post('/api/appointments/create/', payload, format='json')
+
+    def _existing(self, when, status='Pending'):
+        return Appointment.objects.create(
+            visitor_name='Brian Otieno', visitor_phone='0711222333', department=self.department,
+            division=self.division, staff_member=self.staff, appointment_date=when, status=status,
+        )
+
+    def test_rejects_a_taken_slot(self, _sms, _email):
+        self._existing(self.slot)
+
+        response = self._book(self.slot)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Jane already has a visit at that time', response.data['appointment_date'][0])
+        self.assertEqual(Appointment.objects.count(), 1)
+
+    def test_rejects_an_overlapping_time(self, _sms, _email):
+        self._existing(self.slot)
+
+        response = self._book(self.slot + timedelta(minutes=15))
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_next_slot_is_free(self, _sms, _email):
+        self._existing(self.slot)
+
+        response = self._book(self.slot + timedelta(minutes=30))
+
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_declined_visit_frees_the_slot(self, _sms, _email):
+        self._existing(self.slot, status='Declined')
+
+        response = self._book(self.slot)
+
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_accepted_and_rescheduled_visits_hold_the_slot(self, _sms, _email):
+        for status in ('Accepted', 'Rescheduled'):
+            with self.subTest(status=status):
+                Appointment.objects.all().delete()
+                self._existing(self.slot, status=status)
+
+                self.assertEqual(self._book(self.slot).status_code, 400)
+
+    def test_other_staff_can_take_the_same_slot(self, _sms, _email):
+        other = User.objects.create_user(
+            email='otieno@example.com', full_name='Peter Otieno', password='StaffPass123!',
+            department=self.department, division=self.division,
+        )
+        self._existing(self.slot)
+
+        response = self._book(self.slot, staff_member=other.id)
+
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_walk_ins_are_never_blocked(self, _sms, _email):
+        now = timezone.now()
+        self._existing(now)
+
+        response = self._book(now, is_scheduled=False)
+
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_staff_list_shows_upcoming_booked_times_without_visitor_details(self, _sms, _email):
+        self._existing(self.slot)
+        self._existing(self.slot + timedelta(hours=1), status='Declined')
+        self._existing(timezone.now() - timedelta(days=1))
+
+        response = self.client.get('/api/staff/')
+
+        self.assertEqual(response.status_code, 200)
+        member = response.data[0]
+        self.assertEqual(len(member['booked_times']), 1)
+        self.assertEqual(datetime.fromisoformat(member['booked_times'][0]), self.slot)
+        self.assertNotIn('Brian', str(member))
