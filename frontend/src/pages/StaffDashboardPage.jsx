@@ -198,7 +198,7 @@ export default function StaffDashboardPage() {
   const { user, logout, updateUser } = useAuth();
   const { appointments, loadMyAppointments, updateAppointment, deleteAppointment, deleteAppointmentsBulk } = useAppointments();
   const { subscribeToForegroundMessages } = useNotification();
-  
+
   const [activeTab, setActiveTab] = useState('dashboard');
   const [viewMode, setViewMode] = useState('grid');
   const [searchQuery, setSearchQuery] = useState('');
@@ -246,14 +246,14 @@ export default function StaffDashboardPage() {
   // Subscribe to foreground push notifications
   useEffect(() => {
     let unsubscribe = null;
-    
+
     const setupSubscription = async () => {
       unsubscribe = await subscribeToForegroundMessages((payload) => {
         // Handle incoming push notification
         const { notification, data } = payload;
         const title = notification?.title || 'Visitor waiting';
         const body = notification?.body || 'You have a visitor waiting for you';
-        
+
         // Create notification object
         const newNotification = {
           id: Date.now(),
@@ -263,28 +263,27 @@ export default function StaffDashboardPage() {
           timestamp: new Date().toISOString(),
           data: data
         };
-        
+
         // Add to notifications list
         setNotifications(prev => [newNotification, ...prev].slice(0, 50));
-        
+
         // Show toast notification
         setToast(body);
         setTimeout(() => setToast(''), 5000);
       });
     };
-    
+
     if (subscribeToForegroundMessages) {
       setupSubscription();
     }
-    
+
     return () => {
       if (unsubscribe && typeof unsubscribe === 'function') {
         unsubscribe();
       }
     };
   }, [subscribeToForegroundMessages]);
-  
-  const longPressTimerRef = useRef(null);
+
   const notificationRef = useRef(null);
 
   const today = eatDateKey();
@@ -359,14 +358,6 @@ export default function StaffDashboardPage() {
     return currentTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) + ' EAT';
   };
 
-  const getWeekNumber = () => {
-    const now = new Date();
-    const start = new Date(now.getFullYear(), 0, 1);
-    const diff = now - start;
-    const oneWeek = 604800000;
-    return Math.ceil(diff / oneWeek);
-  };
-
   const getRelativeTimeLabel = (timestamp) => {
     if (!timestamp) return 'just now';
     const createdTime = new Date(timestamp).getTime();
@@ -395,7 +386,7 @@ export default function StaffDashboardPage() {
     if (activeTab === 'accepted' && a.status !== 'Accepted') return false;
     if (activeTab === 'declined' && a.status !== 'Declined') return false;
     if (activeTab === 'history' && ['Pending', 'Accepted'].includes(a.status)) return false;
-    
+
     if (dateFilter === 'today' && eatDateKey(a.appointment_date) !== today) return false;
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -416,8 +407,8 @@ export default function StaffDashboardPage() {
     rescheduled: appointments.filter(a => a.status === 'Rescheduled').length,
     today: appointments.filter(a => eatDateKey(a.appointment_date) === today).length,
     total: appointments.length,
-    acceptRate: appointments.length > 0 
-      ? Math.round((appointments.filter(a => a.status === 'Accepted').length / appointments.length) * 100) 
+    acceptRate: appointments.length > 0
+      ? Math.round((appointments.filter(a => a.status === 'Accepted').length / appointments.length) * 100)
       : 0,
   };
 
@@ -536,19 +527,6 @@ export default function StaffDashboardPage() {
     }
   };
 
-  const toggleSelected = (id) => {
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
-  };
-
-  const requestDeleteSelected = () => {
-    if (!selectedIds.length) return;
-    setPendingDelete({ type: 'bulk', ids: selectedIds });
-  };
-
-  const requestDeleteSingle = (id) => {
-    setPendingDelete({ type: 'single', ids: [id] });
-  };
-
   const confirmDelete = async () => {
     if (!pendingDelete) return;
     if (pendingDelete.type === 'single') {
@@ -586,16 +564,9 @@ export default function StaffDashboardPage() {
     setPreviewItem(null);
   };
 
+  /** A short pop-up message. Only visit alerts go into the notifications list. */
   const showToast = (msg) => {
     setToast(msg);
-    // Add to notifications
-    const newNotification = {
-      id: Date.now(),
-      message: msg,
-      time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
-      read: false
-    };
-    setNotifications(prev => [newNotification, ...prev].slice(0, 20));
     setTimeout(() => setToast(''), 4000);
   };
 
@@ -629,7 +600,7 @@ export default function StaffDashboardPage() {
       showToast('No visit requests to export');
       return;
     }
-    
+
     const headers = ['ID', 'Visitor Name', 'Visitor Email', 'Student', 'Date/Time Sent', 'Date/Time', 'Status', 'Visitor Message', 'Staff Response'];
     const csvContent = [
       headers.join(','),
@@ -645,65 +616,13 @@ export default function StaffDashboardPage() {
         `"${apt.response_note || ''}"`
       ].join(','))
     ].join('\n');
-    
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `visit_requests_${eatDateKey()}.csv`;
     link.click();
     showToast('Visit requests exported to CSV');
-  };
-
-  const handleExportStats = () => {
-    const statsData = [
-      { Metric: 'Total visit requests', Value: appointments.length },
-      { Metric: 'Pending', Value: appointments.filter(a => a.status === 'Pending').length },
-      { Metric: 'Accepted', Value: appointments.filter(a => a.status === 'Accepted').length },
-      { Metric: 'Declined', Value: appointments.filter(a => a.status === 'Declined').length },
-      { Metric: 'Rescheduled', Value: appointments.filter(a => a.status === 'Rescheduled').length },
-      { Metric: 'Today\'s visit requests', Value: appointments.filter(a => eatDateKey(a.appointment_date) === today).length },
-      { Metric: 'Acceptance Rate', Value: appointments.length > 0 ? Math.round((appointments.filter(a => a.status === 'Accepted').length / appointments.length) * 100) + '%' : '0%' },
-    ];
-    
-    const headers = ['Metric', 'Value'];
-    const csvContent = [
-      headers.join(','),
-      ...statsData.map(row => `${row.Metric},${row.Value}`)
-    ].join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `daily_statistics_${eatDateKey()}.csv`;
-    link.click();
-    showToast('Daily statistics exported');
-  };
-
-  const handleExportStaff = () => {
-    if (!user) {
-      showToast('No user data available');
-      return;
-    }
-    
-    const staffData = [{
-      Name: user.full_name || '',
-      Email: user.email || '',
-      Department: user.department_name || '',
-      Role: user.role || 'Staff',
-    }];
-    
-    const headers = ['Name', 'Email', 'Department', 'Role'];
-    const csvContent = [
-      headers.join(','),
-      ...staffData.map(row => `${row.Name},${row.Email},${row.Department},${row.Role}`)
-    ].join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `staff_profile_${eatDateKey()}.csv`;
-    link.click();
-    showToast('Staff profile exported');
   };
 
   const getOverdueHours = (dateStr) => {
@@ -814,9 +733,9 @@ export default function StaffDashboardPage() {
             <span className="sd-topbar-title">{TAB_TITLES[activeTab] || 'Dashboard'}</span>
             <div className="sd-search-box">
               {ICONS.search}
-              <input 
-                type="text" 
-                placeholder="Search visitor requests..." 
+              <input
+                type="text"
+                placeholder="Search visitor requests..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -875,10 +794,10 @@ export default function StaffDashboardPage() {
                           <div className="sd-notification-dot"></div>
                           <div className="sd-notification-content">
                             <p>{n.message}</p>
-                            <span>{n.time}</span>
+                            <span>{n.time || (n.timestamp ? new Date(n.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '')}</span>
                           </div>
-                          <button 
-                            className="sd-notification-clear" 
+                          <button
+                            className="sd-notification-clear"
                             onClick={(e) => {
                               e.stopPropagation();
                               setNotifications(prev => prev.filter(item => item.id !== n.id));
@@ -997,10 +916,10 @@ export default function StaffDashboardPage() {
                     ) : (
                       recentAppointments.map(apt => (
                         <div key={apt.id} className="sd-list-item" onClick={() => openPreview(apt)}>
-                          <div className="sd-list-avatar" style={{ 
-                            background: apt.status === 'Pending' ? 'var(--gold-light)' : 
+                          <div className="sd-list-avatar" style={{
+                            background: apt.status === 'Pending' ? 'var(--gold-light)' :
                                        apt.status === 'Accepted' ? 'var(--green-light)' : 'var(--red-light)',
-                            color: apt.status === 'Pending' ? 'var(--gold-dark)' : 
+                            color: apt.status === 'Pending' ? 'var(--gold-dark)' :
                                    apt.status === 'Accepted' ? 'var(--green-dark)' : 'var(--red-dark)'
                           }}>
                             {getInitials(apt.visitor_name)}
@@ -1054,11 +973,11 @@ export default function StaffDashboardPage() {
                     {filteredAppointments.map(apt => {
                       const overdueHours = apt.status === 'Pending' ? getOverdueHours(apt.appointment_date) : 0;
                       const isUrgent = overdueHours > 24;
-                      
+
                       return (
                         <div key={apt.id} className={`sd-appt-card ${isUrgent ? 'urgent' : ''}`}>
                           <div className="sd-appt-header">
-                            <div className="sd-appt-avatar" style={{ 
+                            <div className="sd-appt-avatar" style={{
                               background: isUrgent ? 'var(--red-light)' : apt.status === 'Accepted' ? 'var(--green-light)' : apt.status === 'Declined' ? 'var(--red-light)' : 'var(--gold-light)',
                               color: isUrgent ? 'var(--red-dark)' : apt.status === 'Accepted' ? 'var(--green-dark)' : apt.status === 'Declined' ? 'var(--red-dark)' : 'var(--gold-dark)'
                             }}>
@@ -1072,11 +991,11 @@ export default function StaffDashboardPage() {
                               </div>
                             </div>
                           </div>
-                          
+
                           <div className="sd-appt-body">
                             <h4 className="sd-appt-name">{apt.visitor_name}</h4>
                             <p className="sd-appt-email">{apt.visitor_email || apt.visitor_phone}</p>
-                            
+
                             <div className="sd-appt-details">
                               <div className="sd-appt-detail">
                                 {ICONS.calendar}
@@ -1099,7 +1018,7 @@ export default function StaffDashboardPage() {
                                 </div>
                               )}
                             </div>
-                            
+
                             {apt.message && (
                               <p className="sd-appt-message">"{apt.message}"</p>
                             )}
@@ -1130,14 +1049,14 @@ export default function StaffDashboardPage() {
                                   />
                                 </label>
                               )}
-                              <textarea 
+                              <textarea
                                 placeholder="Add a response note (optional)..."
                                 value={responseNote[apt.id] || ''}
                                 onChange={(e) => setResponseNote(prev => ({ ...prev, [apt.id]: e.target.value }))}
                                 rows="2"
                               />
                               <div className="sd-response-actions">
-                                <button 
+                                <button
                                   className="sd-btn sd-btn-accept"
                                   disabled={responseAction[apt.id] === 'Rescheduled' && Boolean(rescheduleTimeError(rescheduleTo[apt.id], apt))}
                                   onClick={() => {
@@ -1157,7 +1076,6 @@ export default function StaffDashboardPage() {
                 ) : (
                   <div className="sd-appointments-list-view">
                     <div className="sd-list-toolbar">
-                      <button type="button" className="sd-list-back" onClick={() => setViewMode('grid')}>Return to grid</button>
                       <span className="sd-list-count">{filteredAppointments.length} requests</span>
                     </div>
                     <div className="sd-appointments-list">
@@ -1174,17 +1092,20 @@ export default function StaffDashboardPage() {
                             onClick={() => openPreview(apt)}
                           >
                             <div className="sd-appointments-list-main">
-                              <div>
-                                <div className="sd-appointments-list-name">{apt.visitor_name}</div>
-                                <div className="sd-appointments-list-time" title={sentTitle}>
-                                  Sent {sentLabel}
-                                </div>
-                              </div>
+                              <span className="sd-appointments-list-name">{apt.visitor_name}</span>
                               <span className={`sd-list-simple-status sd-list-simple-status-${statusKey}`}>{apt.status}</span>
                             </div>
+                            {apt.appointment_date && (
+                              <div className="sd-appointments-list-when">
+                                {ICONS.calendar}
+                                <span>{formatDate(apt.appointment_date)} · {formatTime(apt.appointment_date)}</span>
+                              </div>
+                            )}
                             <div className="sd-appointments-list-meta">
-                              <span>{studentLabel(apt) ? `Student: ${studentLabel(apt)}` : apt.department_name || 'General'}</span>
-                              <span>{apt.appointment_date ? new Date(apt.appointment_date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }) : ''}</span>
+                              {studentLabel(apt) ? `Student: ${studentLabel(apt)}` : apt.department_name || 'General visit'}
+                            </div>
+                            <div className="sd-appointments-list-time" title={sentTitle}>
+                              Sent {sentLabel}
                             </div>
                           </button>
                         );
@@ -1303,17 +1224,17 @@ export default function StaffDashboardPage() {
               <button onClick={closePreview}>{ICONS.x}</button>
             </div>
             <div className="sd-modal-body">
-              <div className="sd-modal-avatar" style={{ 
-                background: previewItem.status === 'Pending' ? 'var(--gold-light)' : 
+              <div className="sd-modal-avatar" style={{
+                background: previewItem.status === 'Pending' ? 'var(--gold-light)' :
                            previewItem.status === 'Accepted' ? 'var(--green-light)' : 'var(--red-light)',
-                color: previewItem.status === 'Pending' ? 'var(--gold-dark)' : 
+                color: previewItem.status === 'Pending' ? 'var(--gold-dark)' :
                        previewItem.status === 'Accepted' ? 'var(--green-dark)' : 'var(--red-dark)'
               }}>
                 {getInitials(previewItem.visitor_name)}
               </div>
               <h4>{previewItem.visitor_name}</h4>
               <p className="sd-modal-email">{previewItem.visitor_email || previewItem.visitor_phone}</p>
-              
+
               <div className="sd-modal-details">
                 <div className="sd-modal-detail">
                   <span>Date</span>
