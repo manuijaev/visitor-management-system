@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import LogoMark from '../LogoMark';
 import Icon from './Icon';
 import '../../home.css';
@@ -49,7 +49,7 @@ export default function AppShell({ title, action, hideTabs = false, children }) 
             {TABS.map((tab) => {
               const active = tab.match(pathname);
               return (
-                <NavLink
+                <Link
                   key={tab.to}
                   to={tab.to}
                   className={`gp-tab ${active ? 'is-active' : ''}`}
@@ -57,7 +57,7 @@ export default function AppShell({ title, action, hideTabs = false, children }) 
                 >
                   <Icon name={tab.icon} />
                   <span>{tab.label}</span>
-                </NavLink>
+                </Link>
               );
             })}
           </div>
