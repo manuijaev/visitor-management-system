@@ -8,6 +8,7 @@ from .views import (
     AppointmentCheckInView,
     AppointmentCheckOutView,
     MyAppointmentsView,
+    OfficeHoursView,
     VisitCancelView,
     VisitLookupView,
 )
@@ -22,4 +23,5 @@ urlpatterns = [
     path('visits/cancel/', VisitCancelView.as_view(), name='visit-cancel'),
     path('appointments/<int:id>/check-in/', AppointmentCheckInView.as_view(), name='appointment-check-in'),
     path('appointments/<int:id>/check-out/', AppointmentCheckOutView.as_view(), name='appointment-check-out'),
+    path('office-hours/', OfficeHoursView.as_view(), name='office-hours'),
 ]

@@ -11,7 +11,15 @@ from departments.models import Department, Division
 from notifications.sms_service import normalize_phone
 from users.models import User
 
-from .models import Appointment
+from .models import Appointment, OfficeHours
+
+
+def next_weekday_at(hour, minute=0, days_ahead=2):
+    """A local (EAT) time at least `days_ahead` days out that falls on a weekday."""
+    day = timezone.localtime() + timedelta(days=days_ahead)
+    while day.weekday() >= 5:
+        day += timedelta(days=1)
+    return day.replace(hour=hour, minute=minute, second=0, microsecond=0)
 
 
 @mock.patch('appointments.views.send_emailjs', return_value=True)
@@ -341,7 +349,7 @@ class DoubleBookingTests(TestCase):
             email='jane@example.com', full_name='Jane Wanjiru', password='StaffPass123!',
             department=self.department, division=self.division,
         )
-        self.slot = (timezone.now() + timedelta(days=2)).replace(hour=10, minute=0, second=0, microsecond=0)
+        self.slot = next_weekday_at(10)
         self.client = APIClient()
 
     def _book(self, when, is_scheduled=True, **overrides):
@@ -810,3 +818,100 @@ class SeedDemoTests(TestCase):
         with self.assertRaises(CommandError):
             self._seed()
         self.assertFalse(User.objects.exists())
+
+
+@mock.patch('appointments.views.send_emailjs', return_value=True)
+@mock.patch('notifications.sms_service.send_sms', return_value=True)
+class OfficeHoursTests(TestCase):
+    def setUp(self):
+        self.department = Department.objects.create(name='Academics')
+        self.division = Division.objects.create(name='Grade 5', department=self.department)
+        self.staff = User.objects.create_user(
+            email='jane@example.com', full_name='Jane Wanjiru', password='StaffPass123!',
+            department=self.department, division=self.division,
+        )
+        self.admin = User.objects.create_user(
+            email='admin@example.com', full_name='Office Admin', password='AdminPass123!', role=User.Role.ADMIN,
+        )
+        self.client = APIClient()
+
+    def _book(self, when, is_scheduled=True):
+        return self.client.post('/api/appointments/create/', {
+            'visitor_name': 'Amina Hassan',
+            'visitor_phone': '0722 333 444',
+            'department': self.department.id,
+            'division': self.division.id,
+            'staff_member': self.staff.id,
+            'appointment_date': when.isoformat(),
+            'is_scheduled': is_scheduled,
+        }, format='json')
+
+    def test_anyone_can_read_default_hours(self, _sms, _email):
+        response = self.client.get('/api/office-hours/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['opens_at'], '08:00:00')
+        self.assertEqual(response.data['closes_at'], '17:00:00')
+        self.assertEqual(response.data['open_days'], [0, 1, 2, 3, 4])
+        self.assertEqual(response.data['summary'], 'Mon–Fri, 8:00 AM to 5:00 PM')
+
+    def test_admin_can_change_hours(self, _sms, _email):
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.patch('/api/office-hours/', {
+            'opens_at': '07:30', 'closes_at': '13:00', 'open_days': [5, 0, 1, 1],
+        }, format='json')
+
+        self.assertEqual(response.status_code, 200, response.data)
+        hours = OfficeHours.load()
+        self.assertEqual(hours.open_days, '0,1,5')
+        self.assertEqual(response.data['summary'], 'Mon, Tue, Sat, 7:30 AM to 1:00 PM')
+
+    def test_staff_and_visitors_cannot_change_hours(self, _sms, _email):
+        self.assertEqual(self.client.patch('/api/office-hours/', {'opens_at': '06:00'}, format='json').status_code, 401)
+        self.client.force_authenticate(self.staff)
+        self.assertEqual(self.client.patch('/api/office-hours/', {'opens_at': '06:00'}, format='json').status_code, 403)
+        self.assertEqual(OfficeHours.load().opens_at.hour, 8)
+
+    def test_rejects_closing_before_opening(self, _sms, _email):
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.patch('/api/office-hours/', {'opens_at': '16:00', 'closes_at': '09:00'}, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('closes_at', response.data)
+
+    def test_rejects_no_open_days_and_bad_days(self, _sms, _email):
+        self.client.force_authenticate(self.admin)
+
+        self.assertEqual(self.client.patch('/api/office-hours/', {'open_days': []}, format='json').status_code, 400)
+        self.assertEqual(self.client.patch('/api/office-hours/', {'open_days': [7]}, format='json').status_code, 400)
+
+    def test_rejects_a_planned_visit_outside_hours(self, _sms, _email):
+        response = self._book(next_weekday_at(18))
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Visiting hours are Mon–Fri, 8:00 AM to 5:00 PM', response.data['appointment_date'][0])
+        self.assertFalse(Appointment.objects.exists())
+
+    def test_rejects_a_planned_visit_on_a_closed_day(self, _sms, _email):
+        saturday = next_weekday_at(10)
+        saturday += timedelta(days=5 - saturday.weekday())
+
+        response = self._book(saturday)
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_closing_time_itself_is_not_bookable(self, _sms, _email):
+        self.assertEqual(self._book(next_weekday_at(17)).status_code, 400)
+        self.assertEqual(self._book(next_weekday_at(16, 30)).status_code, 201)
+
+    def test_follows_hours_set_by_admin(self, _sms, _email):
+        hours = OfficeHours.load()
+        hours.opens_at = hours.opens_at.replace(hour=6)
+        hours.save()
+
+        self.assertEqual(self._book(next_weekday_at(6, 30)).status_code, 201)
+
+    def test_walk_ins_are_never_blocked_by_hours(self, _sms, _email):
+        self.assertEqual(self._book(next_weekday_at(19), is_scheduled=False).status_code, 201)

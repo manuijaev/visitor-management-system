@@ -1,6 +1,7 @@
-from datetime import timedelta
+from datetime import time, timedelta
 
 from django.db import models
+from django.utils import timezone
 
 VISIT_LENGTH = timedelta(minutes=30)
 
@@ -56,3 +57,35 @@ class Appointment(models.Model):
             appointment_date__gt=when - VISIT_LENGTH,
             appointment_date__lt=when + VISIT_LENGTH,
         ).exclude(status__in=cls.CLOSED_STATUSES)
+
+
+class OfficeHours(models.Model):
+    """The school's visiting hours. A single row, edited by admins and read by the booking page."""
+
+    DEFAULT_DAYS = '0,1,2,3,4'
+
+    opens_at = models.TimeField(default=time(8, 0))
+    closes_at = models.TimeField(default=time(17, 0))
+    open_days = models.CharField(
+        max_length=20, default=DEFAULT_DAYS, help_text='Comma-separated weekdays, Monday=0 to Sunday=6.'
+    )
+
+    class Meta:
+        verbose_name_plural = 'office hours'
+
+    def __str__(self):
+        return f'{self.opens_at:%H:%M}–{self.closes_at:%H:%M} on days {self.open_days}'
+
+    @classmethod
+    def load(cls):
+        hours, _ = cls.objects.get_or_create(pk=1)
+        return hours
+
+    @property
+    def weekdays(self):
+        return sorted({int(day) for day in self.open_days.split(',') if day.strip().isdigit()})
+
+    def is_open_at(self, when):
+        """True when a visit starting at `when` falls on an open day, between opening and closing time."""
+        local = timezone.localtime(when)
+        return local.weekday() in self.weekdays and self.opens_at <= local.time() < self.closes_at
