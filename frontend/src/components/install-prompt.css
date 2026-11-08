@@ -1,0 +1,226 @@
+.pwa-card,
+.pwa-sheet {
+  font-family: 'Outfit', system-ui, sans-serif;
+  color: var(--ink, #1a1714);
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--line, #e8e2d9);
+  box-shadow: 0 18px 48px rgba(26, 23, 20, 0.18);
+}
+
+.pwa-card {
+  position: fixed;
+  left: 18px;
+  bottom: 18px;
+  z-index: 1100;
+  width: min(380px, calc(100vw - 36px));
+  padding: 18px;
+  border-radius: 18px;
+  animation: pwaRise 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.pwa-card-head {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.pwa-card-logo {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+}
+
+.pwa-card h2,
+.pwa-sheet h2 {
+  margin: 2px 0 4px;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.pwa-card p,
+.pwa-sheet p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-light, #6b6560);
+}
+
+.pwa-help {
+  margin-top: 12px !important;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--gold-light, #fdf3e3);
+  color: var(--ink-mid, #3d3832) !important;
+}
+
+.pwa-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.pwa-btn {
+  min-height: 42px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid var(--ink, #1a1714);
+  font: 500 14px/1 'Outfit', system-ui, sans-serif;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.pwa-btn:active {
+  transform: scale(0.97);
+}
+
+.pwa-btn:focus-visible {
+  outline: 2px solid var(--gold, #c9922a);
+  outline-offset: 2px;
+}
+
+.pwa-btn-primary {
+  background: var(--ink, #1a1714);
+  color: #f9f7f4;
+}
+
+.pwa-btn-ghost {
+  background: transparent;
+  color: var(--ink, #1a1714);
+  border-color: var(--line, #e8e2d9);
+}
+
+.pwa-btn-ghost:hover {
+  background: var(--bg-soft, #f3f0ec);
+}
+
+.pwa-btn-block {
+  width: 100%;
+  margin-top: 14px;
+}
+
+.pwa-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1150;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(26, 23, 20, 0.45);
+  animation: pwaFade 0.2s ease both;
+}
+
+.pwa-sheet {
+  width: min(520px, 100%);
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 10px 20px calc(20px + env(safe-area-inset-bottom));
+  border-radius: 24px 24px 0 0;
+  border-bottom: 0;
+  outline: none;
+  animation: pwaRise 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.pwa-sheet-grip {
+  width: 42px;
+  height: 5px;
+  margin: 0 auto 16px;
+  border-radius: 999px;
+  background: var(--line, #e8e2d9);
+}
+
+.pwa-steps {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.pwa-steps li {
+  display: grid;
+  grid-template-columns: 22px 40px 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--bg, #f9f7f4);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink-mid, #3d3832);
+}
+
+.pwa-step-num {
+  font: 600 13px/1 'JetBrains Mono', monospace;
+  color: var(--gold-dark, #8a6018);
+  text-align: center;
+}
+
+.pwa-step-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--line, #e8e2d9);
+  color: #0a84ff;
+}
+
+.pwa-glyph {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pwa-glyph.is-filled {
+  fill: currentColor;
+  stroke: none;
+}
+
+.pwa-step-add {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pwa-step-logo {
+  width: 30px;
+  height: 30px;
+}
+
+@keyframes pwaRise {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pwaFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (max-width: 640px) {
+  .pwa-card {
+    left: 12px;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    width: auto;
+  }
+
+  .pwa-actions .pwa-btn {
+    flex: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pwa-card,
+  .pwa-sheet,
+  .pwa-overlay {
+    animation: none;
+  }
+}
