@@ -24,7 +24,6 @@ const NAV_ITEMS = [
   { id: 'visitors', label: 'Visitors', icon: 'visitors' },
   { id: 'gate', label: 'Gate', icon: 'shield' },
   { id: 'team', label: 'Team', icon: 'team' },
-  { id: 'notifications', label: 'Notifications', icon: 'bell' },
 ];
 
 /** The views on the phone tab bar; the rest stay under More. */
@@ -474,15 +473,9 @@ export default function AdminDashboardPage() {
                 <span>{item.label}</span>
                 {item.id === 'visitors' && stats.pending > 0 && <span className="ad-nav-count">{stats.pending}</span>}
                 {item.id === 'team' && <span className="ad-nav-count muted">{staff.length}</span>}
-                {item.id === 'notifications' && unreadCount > 0 && <span className="ad-nav-count">{unreadCount}</span>}
               </button>
             ))}
           </nav>
-
-          <button type="button" className="ad-sidebar-cta" onClick={() => { setNavOpen(false); openWizard(); }}>
-            <Icon name="userPlus" size={16} />
-            Add staff member
-          </button>
 
           <div className="ad-sidebar-foot">
             <div className="ad-me">

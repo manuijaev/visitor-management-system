@@ -732,6 +732,7 @@ textarea.gp-input {
 
 .gp-hosts {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   max-height: 390px;
   margin: 14px -4px 0 0;
@@ -1411,6 +1412,34 @@ textarea.gp-input {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.gp-appbar-inner.has-back {
+  justify-content: flex-start;
+}
+
+.gp-appbar-inner.has-back .gp-appbar-action {
+  margin-left: auto;
+}
+
+.gp-back {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  margin-left: -8px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--ink);
+}
+
+.gp-back:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.gp-back .gp-icon {
+  width: 22px;
+  height: 22px;
 }
 
 .gp-appbar .gp-brand-mark {

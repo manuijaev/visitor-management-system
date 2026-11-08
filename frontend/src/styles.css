@@ -69,7 +69,8 @@ body,
   min-height: 100%;
   width: 100%;
   max-width: 100%;
-  overflow-x: hidden;
+  /* clip, not hidden: hidden turns these into scroll containers, which breaks sticky sidebars and top bars. */
+  overflow-x: clip;
   overscroll-behavior-x: none;
 }
 
@@ -119,7 +120,7 @@ body.home-background {
   font-family: 'Outfit', sans-serif;
   font-size: 15px;
   min-height: 100vh;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body.home-background::before {
@@ -10780,24 +10781,6 @@ tr:hover .row-actions {
 .ad-nav-count.muted {
   background: rgba(255, 255, 255, 0.08);
   color: var(--chrome-muted);
-}
-
-.ad-sidebar-cta {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: var(--gold);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 600;
-  transition: background 0.15s ease;
-}
-
-.ad-sidebar-cta:hover {
-  background: var(--gold-dark);
 }
 
 .ad-sidebar-foot {

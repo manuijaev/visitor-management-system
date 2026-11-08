@@ -13,8 +13,9 @@ const TABS = [
 /**
  * The visitor app frame: a slim top bar, the current screen, and a bottom tab bar.
  * `hideTabs` is used by reception mode, where the device is shared and stays on booking.
+ * `back` ({ to, label }) shows a back button in place of the logo, for screens opened from a list.
  */
-export default function AppShell({ title, action, hideTabs = false, children }) {
+export default function AppShell({ title, action, back, hideTabs = false, children }) {
   const { pathname } = useLocation();
 
   useEffect(() => {
@@ -29,7 +30,12 @@ export default function AppShell({ title, action, hideTabs = false, children }) 
   return (
     <div className={`gp-root gp-app ${hideTabs ? 'has-no-tabs' : ''}`}>
       <header className="gp-appbar">
-        <div className="gp-appbar-inner">
+        <div className={`gp-appbar-inner ${back ? 'has-back' : ''}`}>
+          {back && (
+            <Link to={back.to} className="gp-back" aria-label={back.label}>
+              <Icon name="chevronLeft" />
+            </Link>
+          )}
           <NavLink to="/" className="gp-brand" aria-label="Gatepass, book a visit">
             <LogoMark className="gp-brand-mark" />
             <span>
