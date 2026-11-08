@@ -177,8 +177,8 @@ def send_visitor_reassigned_sms(phone_number, visitor_name, staff_name, visit_ti
 
 
 def send_staff_arrival_sms(phone_number, staff_name, visitor_name):
-    """Tell the host their visitor has been signed in at the gate."""
-    message = f"Hi {_first_name(staff_name)}, {visitor_name} has arrived and been signed in at the gate. - Gatepass"
+    """Tell the host their visitor has arrived at reception."""
+    message = f"Hi {_first_name(staff_name)}, {visitor_name} has arrived at reception. - Gatepass"
     return send_sms(phone_number, _fit(message))
 
 

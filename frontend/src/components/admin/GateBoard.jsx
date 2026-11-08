@@ -21,8 +21,8 @@ const matches = (visit, query) =>
     .some((value) => value?.toLowerCase().includes(query));
 
 /**
- * The gate desk: who is expected today, who is on site right now, and who has left.
- * Signing a visitor in alerts their host by SMS and push.
+ * Arrivals: today's visitors at reception. Who is expected, who is here now, and who has left.
+ * Marking a visitor as arrived alerts their host by SMS and push.
  */
 export default function GateBoard({ appointments, onChanged, notify }) {
   const [query, setQuery] = useState('');
@@ -52,8 +52,8 @@ export default function GateBoard({ appointments, onChanged, notify }) {
       await api.post(`/appointments/${visit.id}/${action}/`);
       notify(
         action === 'check-in'
-          ? `${visit.visitor_name} signed in. ${visit.staff_name || 'Their host'} has been alerted.`
-          : `${visit.visitor_name} signed out.`
+          ? `${visit.visitor_name} has arrived. ${visit.staff_name || 'Their host'} has been told.`
+          : `${visit.visitor_name} has left.`
       );
       await onChanged();
     } catch (err) {
@@ -92,18 +92,18 @@ export default function GateBoard({ appointments, onChanged, notify }) {
       label: 'Expected',
       visits: expected,
       empty: 'No more visitors expected today.',
-      row: (visit) => renderRow(visit, { time: clockTime(visit.appointment_date), action: 'check-in', label: 'Sign in', tone: 'ad-btn-primary' }),
+      row: (visit) => renderRow(visit, { time: clockTime(visit.appointment_date), action: 'check-in', label: 'Mark arrived', tone: 'ad-btn-primary' }),
     },
     onsite: {
-      label: 'On site',
+      label: 'Here now',
       visits: onSite,
-      empty: 'Nobody is signed in right now.',
-      row: (visit) => renderRow(visit, { time: `In ${clockTime(visit.checked_in_at)}`, action: 'check-out', label: 'Sign out', tone: 'ad-btn-ghost' }),
+      empty: 'No visitors are here right now.',
+      row: (visit) => renderRow(visit, { time: `Arrived ${clockTime(visit.checked_in_at)}`, action: 'check-out', label: 'Mark left', tone: 'ad-btn-ghost' }),
     },
     left: {
       label: 'Left',
       visits: leftToday,
-      empty: 'Nobody has signed out yet today.',
+      empty: 'Nobody has left yet today.',
       row: (visit) => renderRow(visit, { time: `${clockTime(visit.checked_in_at)} – ${clockTime(visit.checked_out_at)}` }),
     },
   };
@@ -115,8 +115,8 @@ export default function GateBoard({ appointments, onChanged, notify }) {
     <>
       <div className="ad-page-head">
         <div>
-          <h1>Gate</h1>
-          <p>Today at the front desk. Sign visitors in when they arrive and out when they leave.</p>
+          <h1>Arrivals</h1>
+          <p>Today&apos;s visitors. Mark them as arrived when they reach reception (their host gets a text) and as left when they go.</p>
         </div>
       </div>
 
@@ -127,20 +127,20 @@ export default function GateBoard({ appointments, onChanged, notify }) {
           <small>{expected[0] ? `Next at ${clockTime(expected[0].appointment_date)}` : 'Nobody else due'}</small>
         </button>
         <button type="button" className="ad-stat ad-stat-button" onClick={() => setTab('onsite')}>
-          <span>On site now</span>
+          <span>Here now</span>
           <strong>{onSite.length}</strong>
-          <small>{onSite.length ? `Since ${clockTime(onSite[0].checked_in_at)}` : 'Nobody signed in'}</small>
+          <small>{onSite.length ? `Since ${clockTime(onSite[0].checked_in_at)}` : 'Nobody here yet'}</small>
         </button>
         <button type="button" className="ad-stat ad-stat-button" onClick={() => setTab('left')}>
           <span>Left today</span>
           <strong>{leftToday.length}</strong>
-          <small>Signed out</small>
+          <small>Visits finished</small>
         </button>
       </div>
 
       <section className="ad-card">
         <div className="ad-toolbar">
-          <div className="ad-segmented ad-segmented-fill ad-segmented-3" role="tablist" aria-label="Gate list">
+          <div className="ad-segmented ad-segmented-fill ad-segmented-3" role="tablist" aria-label="Arrivals list">
             {Object.entries(lists).map(([id, list]) => (
               <button
                 type="button"

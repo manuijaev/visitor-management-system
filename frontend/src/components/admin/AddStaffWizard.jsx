@@ -189,7 +189,7 @@ export default function AddStaffWizard({ open, onClose, onCreated, departments, 
               </label>
               <label className="ad-field">
                 <span>Work email</span>
-                <input type="email" value={details.email} onChange={updateDetails('email')} placeholder="jane@company.com" autoComplete="off" />
+                <input type="email" value={details.email} onChange={updateDetails('email')} placeholder="jane@school.ac.ke" autoComplete="off" />
               </label>
               <label className="ad-field">
                 <span>Phone <em>recommended</em></span>

@@ -475,7 +475,7 @@ class VisitCancelView(VisitLookupView):
 
 
 def _notify_host_of_arrival(appointment):
-    """SMS and push the host that their visitor is at the gate."""
+    """SMS and push the host that their visitor has arrived at reception."""
     staff = appointment.staff_member
     try:
         if staff.phone:
@@ -491,7 +491,7 @@ def _notify_host_of_arrival(appointment):
             send_fcm_push_notification(
                 fcm_token=token,
                 title='Visitor arrived',
-                body=f'{appointment.visitor_name} has been signed in at the gate.',
+                body=f'{appointment.visitor_name} has arrived at reception.',
             )
     except Exception:
         logger.exception('Failed to send arrival push for appointment_id=%s', appointment.id)
@@ -519,11 +519,11 @@ class AppointmentCheckInView(_GateActionView):
             return Response({'detail': 'Visit not found.'}, status=status.HTTP_404_NOT_FOUND)
         if appointment.status in Appointment.CLOSED_STATUSES:
             return Response(
-                {'detail': f'This visit was {appointment.status.lower()}, so it cannot be signed in.'},
+                {'detail': f'This visit was {appointment.status.lower()}, so it cannot be marked as arrived.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if appointment.checked_in_at:
-            return Response({'detail': 'This visitor is already signed in.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': 'This visitor is already marked as arrived.'}, status=status.HTTP_400_BAD_REQUEST)
         appointment.checked_in_at = timezone.now()
         appointment.save(update_fields=['checked_in_at'])
         _notify_host_of_arrival(appointment)
@@ -536,9 +536,9 @@ class AppointmentCheckOutView(_GateActionView):
         if not appointment:
             return Response({'detail': 'Visit not found.'}, status=status.HTTP_404_NOT_FOUND)
         if not appointment.checked_in_at:
-            return Response({'detail': 'This visitor has not been signed in yet.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': 'This visitor has not been marked as arrived yet.'}, status=status.HTTP_400_BAD_REQUEST)
         if appointment.checked_out_at:
-            return Response({'detail': 'This visitor has already signed out.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': 'This visitor has already been marked as left.'}, status=status.HTTP_400_BAD_REQUEST)
         appointment.checked_out_at = timezone.now()
         appointment.save(update_fields=['checked_out_at'])
         return self.respond(appointment)

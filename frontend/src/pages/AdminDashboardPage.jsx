@@ -26,7 +26,7 @@ import {
 const NAV_ITEMS = [
   { id: 'overview', label: 'Overview', icon: 'overview' },
   { id: 'visitors', label: 'Visitors', icon: 'visitors' },
-  { id: 'gate', label: 'Gate', icon: 'shield' },
+  { id: 'gate', label: 'Arrivals', icon: 'arrivals' },
   { id: 'team', label: 'Team', icon: 'team' },
   { id: 'departments', label: 'Departments', icon: 'building' },
 ];
@@ -365,7 +365,7 @@ export default function AdminDashboardPage() {
     return [a.visitor_name, a.visitor_email, studentLabel(a), a.staff_name, a.department_name].some((v) => v?.toLowerCase().includes(q));
   }));
 
-  const pageTitle = { overview: 'Overview', visitors: 'Visitors', gate: 'Gate', team: 'Team', departments: 'Departments', notifications: 'Notifications', settings: 'Settings' }[view];
+  const pageTitle = { overview: 'Overview', visitors: 'Visitors', gate: 'Arrivals', team: 'Team', departments: 'Departments', notifications: 'Notifications', settings: 'Settings' }[view];
 
   const renderVisitRow = (a, compact = false) => (
     <div key={a.id} className={`ad-row ${compact ? 'ad-row-compact' : ''}`}>

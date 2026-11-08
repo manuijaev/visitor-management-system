@@ -13304,3 +13304,25 @@ button.sd-avatar:focus-visible {
     display: none;
   }
 }
+
+/* ---------- Admin on phones ---------- */
+.ad-settings > * {
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  /* Text links get a finger-sized tap area without changing how they look. */
+  .ad-link-btn {
+    min-height: 40px;
+    padding: 0 4px;
+  }
+
+  .ad-segmented button {
+    min-height: 38px;
+  }
+
+  .ad-settings-actions .ad-btn {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+}
