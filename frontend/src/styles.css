@@ -12673,33 +12673,40 @@ tr:hover .row-actions {
   }
 }
 
-/* Phones: buttons inside notifications and activity rows keep their own size. */
-@media (max-width: 760px) {
-  .sd-notification-header {
-    gap: 12px;
-  }
+/* Notifications dropdown (all screen sizes): buttons keep their own size so the message gets the width. */
+.sd-notification-header {
+  gap: 12px;
+}
 
-  .sd-notification-count {
-    white-space: nowrap;
-  }
+.sd-notification-count {
+  white-space: nowrap;
+}
 
-  .sd-notification-header .sd-clear-all-btn {
-    width: auto;
-    flex: none;
-    margin-left: auto;
-  }
+.sd-notification-header .sd-clear-all-btn {
+  width: auto;
+  flex: none;
+  margin-left: auto;
+}
 
-  .sd-notification-content {
-    min-width: 0;
-  }
+.sd-notification-content {
+  min-width: 0;
+}
 
-  /* No hover on touch screens, so the clear button is always shown. */
+.sd-notification-item .sd-notification-clear {
+  width: 32px;
+  height: 32px;
+  flex: none;
+}
+
+/* No hover on touch screens, so the clear button is always shown. */
+@media (hover: none) {
   .sd-notification-item .sd-notification-clear {
-    width: 32px;
-    height: 32px;
-    flex: none;
     opacity: 1;
   }
+}
+
+/* Phones: activity rows. */
+@media (max-width: 760px) {
 
   /* Recent activity: the status sits under the name so the name gets the full width. */
   .sd-list .sd-list-item {

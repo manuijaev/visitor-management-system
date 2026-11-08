@@ -225,7 +225,9 @@ export default function StaffDashboardPage() {
   const [notifications, setNotifications] = useState(() => {
     try {
       const saved = localStorage.getItem('staff_notifications');
-      return saved ? JSON.parse(saved) : [];
+      const list = saved ? JSON.parse(saved) : [];
+      // Older versions also saved pop-up messages ("Refreshed!"); keep only visit alerts.
+      return Array.isArray(list) ? list.filter((item) => item && item.type === 'appointment') : [];
     } catch {
       return [];
     }
@@ -309,11 +311,11 @@ export default function StaffDashboardPage() {
     return () => clearInterval(intervalId);
   }, [loadMyAppointments]);
 
-// Update time every second for clock display
+// Update the clock every 15 seconds; it shows minutes only.
   useEffect(() => {
     const timerId = setInterval(() => {
       setCurrentTime(new Date());
-    }, 1000);
+    }, 15000);
     return () => clearInterval(timerId);
   }, []);
 
@@ -355,7 +357,7 @@ export default function StaffDashboardPage() {
   };
 
   const getTimeLabel = () => {
-    return currentTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) + ' EAT';
+    return currentTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }) + ' EAT';
   };
 
   const getRelativeTimeLabel = (timestamp) => {
@@ -1297,7 +1299,7 @@ export default function StaffDashboardPage() {
               )}
             </div>
             <div className="sd-modal-footer">
-              <button type="button" className="sd-btn sd-btn-view" onClick={closePreview}>Return</button>
+              <button type="button" className="sd-btn sd-btn-view" onClick={closePreview}>Close</button>
               {previewItem.status === 'Pending' && (
                 <>
                   <button className="sd-btn sd-btn-accept" onClick={() => handlePreviewResponse('Accepted')}>Accept</button>
