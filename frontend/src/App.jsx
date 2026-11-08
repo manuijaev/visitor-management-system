@@ -23,6 +23,8 @@ const StaffDashboardPage = lazyPage(() => import('./pages/StaffDashboardPage'));
 const AdminDashboardPage = lazyPage(() => import('./pages/AdminDashboardPage'));
 const AdminSignupPage = lazyPage(() => import('./pages/AdminSignupPage'));
 const VisitStatusPage = lazyPage(() => import('./pages/VisitStatusPage'));
+const MyVisitsPage = lazyPage(() => import('./pages/MyVisitsPage'));
+const HelpPage = lazyPage(() => import('./pages/HelpPage'));
 
 function PageReady() {
   useEffect(() => {
@@ -73,6 +75,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={<HomeRoute />} />
           <Route path="/visit" element={<VisitStatusPage />} />
+          <Route path="/visits" element={<MyVisitsPage />} />
+          <Route path="/help" element={<HelpPage />} />
           <Route path="/staff/login" element={<LegacyLoginRedirect />} />
           <Route
             path="/staff"
