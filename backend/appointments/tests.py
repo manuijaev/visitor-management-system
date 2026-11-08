@@ -2,7 +2,8 @@ from datetime import datetime, timedelta
 from unittest import mock
 
 from django.core.cache import cache
-from django.test import TestCase
+from django.core.management import CommandError, call_command
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -756,3 +757,56 @@ class GateSignInOutTests(TestCase):
 
         self.assertIsNotNone(response.data[0]['checked_in_at'])
         self.assertIsNone(response.data[0]['checked_out_at'])
+
+
+@override_settings(DEBUG=True)
+class SeedDemoTests(TestCase):
+    def _seed(self, *args):
+        call_command('seed_demo', *args, stdout=mock.Mock())
+
+    def test_builds_a_demo_school(self):
+        self._seed()
+
+        self.assertEqual(Department.objects.count(), 3)
+        self.assertEqual(User.objects.filter(role=User.Role.ADMIN).count(), 1)
+        self.assertGreaterEqual(User.objects.filter(role=User.Role.STAFF).count(), 10)
+        self.assertGreaterEqual(Appointment.objects.count(), 40)
+        statuses = set(Appointment.objects.values_list('status', flat=True))
+        self.assertTrue({'Pending', 'Accepted', 'Declined', 'Rescheduled', 'Cancelled'} <= statuses)
+        self.assertTrue(Appointment.objects.filter(checked_out_at__isnull=False).exists())
+        self.assertFalse(Appointment.objects.exclude(visitor_phone=None).exists())
+
+    def test_demo_accounts_can_log_in(self):
+        self._seed('--password', 'Show-time-1')
+
+        admin = User.objects.get(role=User.Role.ADMIN)
+        self.assertTrue(admin.check_password('Show-time-1'))
+
+    def test_phone_option_routes_visitor_sms_to_presenter(self):
+        self._seed('--phone', '0705171018')
+
+        self.assertEqual(set(Appointment.objects.values_list('visitor_phone', flat=True)), {'0705171018'})
+
+    def test_refuses_to_run_twice_without_reset(self):
+        self._seed()
+
+        with self.assertRaises(CommandError):
+            self._seed()
+
+    def test_reset_replaces_demo_data_and_keeps_real_data(self):
+        real_department = Department.objects.create(name='Real Department')
+        real_user = User.objects.create_user(email='head@school.ac.ke', full_name='Real Head', password='x')
+        self._seed()
+        first_count = Appointment.objects.count()
+
+        self._seed('--reset')
+
+        self.assertEqual(Appointment.objects.count(), first_count)
+        self.assertTrue(User.objects.filter(pk=real_user.pk).exists())
+        self.assertTrue(Department.objects.filter(pk=real_department.pk).exists())
+
+    @override_settings(DEBUG=False)
+    def test_refuses_on_a_live_database_without_force(self):
+        with self.assertRaises(CommandError):
+            self._seed()
+        self.assertFalse(User.objects.exists())
