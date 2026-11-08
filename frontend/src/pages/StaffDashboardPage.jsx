@@ -686,7 +686,7 @@ export default function StaffDashboardPage() {
           </button>
           <button className={`sd-nav-item ${activeTab === 'appointments' ? 'active' : ''}`} onClick={() => { setActiveTab('appointments'); setSidebarOpen(false); }}>
             {ICONS.calendar}<span>Visitor queue</span>
-            <span className="sd-nav-badge">{stats.pending}</span>
+            {stats.pending > 0 && <span className="sd-nav-badge">{stats.pending}</span>}
           </button>
           <button className={`sd-nav-item ${activeTab === 'schedule' ? 'active' : ''}`} onClick={() => { setActiveTab('schedule'); setSidebarOpen(false); }}>
             {ICONS.clock}<span>Schedule</span>
@@ -695,7 +695,7 @@ export default function StaffDashboardPage() {
           <div className="sd-nav-section">MANAGE</div>
           <button className={`sd-nav-item ${activeTab === 'pending' ? 'active' : ''}`} onClick={() => { setActiveTab('pending'); setSidebarOpen(false); }}>
             {ICONS.activity}<span>Pending</span>
-            <span className="sd-nav-badge red">{stats.pending}</span>
+            {stats.pending > 0 && <span className="sd-nav-badge red">{stats.pending}</span>}
           </button>
           <button className={`sd-nav-item ${activeTab === 'accepted' ? 'active' : ''}`} onClick={() => { setActiveTab('accepted'); setSidebarOpen(false); }}>
             {ICONS.check}<span>Accepted</span>
@@ -1199,32 +1199,28 @@ export default function StaffDashboardPage() {
                   <h3>{ICONS.settings} Settings</h3>
                 </div>
                 <div className="sd-settings-content">
-                  <div className="sd-setting-item">
-                    <div className="sd-setting-info">
-                      <h4>Profile Information</h4>
-                      <p>Update your personal information</p>
-                    </div>
-                    <div className="sd-setting-value">
-                      <span>{user?.full_name}</span>
+                  <div className="sd-account-head">
+                    <span className="sd-profile-avatar sd-account-avatar">{getInitials(user?.full_name)}</span>
+                    <div>
+                      <strong>{user?.full_name || 'Staff member'}</strong>
                       <span>{user?.email}</span>
                     </div>
                   </div>
-                  <div className="sd-setting-item">
-                    <div className="sd-setting-info">
-                      <h4>Department</h4>
-                      <p>Your assigned department</p>
+                  <dl className="sd-account-list">
+                    <div>
+                      <dt>Department</dt>
+                      <dd>{user?.department_name || 'Not assigned'}</dd>
                     </div>
-                    <div className="sd-setting-value">
-                      <span>{user?.department_name || 'Not assigned'}</span>
+                    <div>
+                      <dt>Division</dt>
+                      <dd>{user?.division_name || 'Not assigned'}</dd>
                     </div>
-                  </div>
-                  <div className="sd-setting-item">
-                    <div className="sd-setting-info">
-                      <h4>Session</h4>
-                      <p>Auto-refresh appointments every 15 seconds</p>
+                    <div>
+                      <dt>Visitor requests</dt>
+                      <dd>Refresh automatically every 15 seconds</dd>
                     </div>
-                    <button className="sd-btn sd-btn-view" onClick={handleLogout}>Sign Out</button>
-                  </div>
+                  </dl>
+                  <p className="sd-account-note">To change your name, email or department, ask the school admin.</p>
                 </div>
               </div>
             </div>
