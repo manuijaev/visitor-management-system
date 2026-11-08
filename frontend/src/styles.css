@@ -12885,7 +12885,9 @@ button.sd-avatar:focus-visible {
 
 /* ---------- Staff settings: account summary ---------- */
 .sd-settings-view .sd-panel {
+  width: 100%;
   max-width: 640px;
+  margin: 0 auto;
 }
 
 .sd-account-head {
