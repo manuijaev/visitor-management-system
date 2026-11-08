@@ -8,6 +8,8 @@ import AddStaffWizard from '../components/admin/AddStaffWizard';
 import EditStaffModal from '../components/admin/EditStaffModal';
 import DepartmentsBoard from '../components/admin/DepartmentsBoard';
 import GateBoard from '../components/admin/GateBoard';
+import NotificationsMenu from '../components/NotificationsMenu';
+import ViewToggle from '../components/ViewToggle';
 import {
   EAT_TIMEZONE,
   eatDateKey,
@@ -187,7 +189,10 @@ export default function AdminDashboardPage() {
       document.removeEventListener('keydown', closeOnEscape);
     };
   }, [profileOpen]);
-  const [notifFilter, setNotifFilter] = useState('all');
+  /** Cards suit phones; desktops start with the compact table. */
+  const [layout, setLayout] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia?.('(max-width: 768px)').matches ? 'grid' : 'list'
+  );
   const [readIds, setReadIds] = useState(() => new Set());
   const [dismissedIds, setDismissedIds] = useState(() => new Set());
 
@@ -349,7 +354,6 @@ export default function AdminDashboardPage() {
     [appointments, readIds, dismissedIds]
   );
   const unreadCount = notifications.filter((n) => n.unread).length;
-  const visibleNotifications = notifications.filter((n) => (notifFilter === 'unread' ? n.unread : notifFilter === 'urgent' ? n.urgent : true));
 
   const filteredPeople = staff.filter((s) => {
     if (peopleDept && String(s.department) !== peopleDept) return false;
@@ -365,7 +369,7 @@ export default function AdminDashboardPage() {
     return [a.visitor_name, a.visitor_email, studentLabel(a), a.staff_name, a.department_name].some((v) => v?.toLowerCase().includes(q));
   }));
 
-  const pageTitle = { overview: 'Overview', visitors: 'Visitors', gate: 'Arrivals', team: 'Team', departments: 'Departments', notifications: 'Notifications', settings: 'Settings' }[view];
+  const pageTitle = { overview: 'Overview', visitors: 'Visitors', gate: 'Arrivals', team: 'Team', departments: 'Departments', settings: 'Settings' }[view];
 
   const renderVisitRow = (a, compact = false) => (
     <div key={a.id} className={`ad-row ${compact ? 'ad-row-compact' : ''}`}>
@@ -522,10 +526,22 @@ export default function AdminDashboardPage() {
             <div className="ad-topbar-title">{pageTitle}</div>
             <div className="ad-topbar-actions">
               <span className="ad-clock">{formatTopbarDateTime(now)}</span>
-              <button type="button" className="ad-icon-btn ad-bell" onClick={() => goTo('notifications')} aria-label={`Notifications, ${unreadCount} unread`}>
-                <Icon name="bell" size={17} />
-                {unreadCount > 0 && <span className="ad-bell-dot">{unreadCount > 9 ? '9+' : unreadCount}</span>}
-              </button>
+              <NotificationsMenu
+                items={notifications.map((n) => ({
+                  id: n.id,
+                  text: n.message ? `${n.title}. ${n.message}` : n.title,
+                  time: getRelativeTimeLabel(n.timestamp),
+                  unread: n.unread,
+                  urgent: n.urgent,
+                }))}
+                onOpenItem={(item) => {
+                  setReadIds((prev) => new Set(prev).add(item.id));
+                  setVisitorStatus('all');
+                  goTo('visitors');
+                }}
+                onDismiss={(id) => setDismissedIds((prev) => new Set(prev).add(id))}
+                action={unreadCount ? { label: 'Mark all read', onClick: () => setReadIds(new Set(notifications.map((n) => n.id))) } : null}
+              />
               <button
                 type="button"
                 className="ad-icon-btn ad-refresh"
@@ -685,8 +701,9 @@ export default function AdminDashboardPage() {
                       <Icon name="search" size={15} />
                       <input value={visitorSearch} onChange={(e) => setVisitorSearch(e.target.value)} placeholder="Search visitors or staff" />
                     </label>
+                    <ViewToggle value={layout} onChange={setLayout} />
                   </div>
-                  <div className="ad-list ad-list-table ad-cols-visits">
+                  <div className={layout === 'grid' ? 'ad-list ad-cards' : 'ad-list ad-list-table ad-cols-visits'}>
                     {filteredVisits.map((a) => renderVisitRow(a))}
                     {!filteredVisits.length && <div className="ad-empty-line">No visit requests match.</div>}
                   </div>
@@ -703,6 +720,10 @@ export default function AdminDashboardPage() {
                     <h1>Team</h1>
                     <p>{staff.length} {staff.length === 1 ? 'person' : 'people'} across {departments.length} department{departments.length === 1 ? '' : 's'}</p>
                   </div>
+                  <button type="button" className="ad-btn ad-btn-primary" onClick={() => openWizard(peopleDept || null)}>
+                    <Icon name="userPlus" size={15} />
+                    Add staff member
+                  </button>
                 </div>
 
                 <section className="ad-card">
@@ -715,15 +736,12 @@ export default function AdminDashboardPage() {
                         <option value="">All departments</option>
                         {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                       </select>
+                      <ViewToggle value={layout} onChange={setLayout} />
                     </div>
-                    <div className="ad-list ad-list-table ad-cols-people">
+                    <div className={layout === 'grid' ? 'ad-list ad-cards' : 'ad-list ad-list-table ad-cols-people'}>
                       {filteredPeople.map((s) => renderPersonRow(s))}
                       {!filteredPeople.length && <div className="ad-empty-line">No one matches that search.</div>}
                     </div>
-                    <button type="button" className="ad-add-row" onClick={() => openWizard(peopleDept || null)}>
-                      <Icon name="plus" size={15} />
-                      Add staff member
-                    </button>
                   </section>
               </>
             )}
@@ -827,59 +845,6 @@ export default function AdminDashboardPage() {
               </>
             )}
 
-            {view === 'notifications' && (
-              <>
-                <div className="ad-page-head">
-                  <div>
-                    <h1>Notifications</h1>
-                    <p>{unreadCount} unread</p>
-                  </div>
-                  <button type="button" className="ad-btn ad-btn-ghost" onClick={() => setReadIds(new Set(notifications.map((n) => n.id)))} disabled={!unreadCount}>
-                    <Icon name="check" size={15} />
-                    Mark all read
-                  </button>
-                </div>
-                <section className="ad-card">
-                  <div className="ad-toolbar">
-                    <div className="ad-segmented" role="tablist">
-                      {[
-                        { id: 'all', label: 'All', count: notifications.length },
-                        { id: 'unread', label: 'Unread', count: unreadCount },
-                        { id: 'urgent', label: 'Urgent', count: notifications.filter((n) => n.urgent).length },
-                      ].map((tab) => (
-                        <button type="button" key={tab.id} role="tab" aria-selected={notifFilter === tab.id} className={notifFilter === tab.id ? 'active' : ''} onClick={() => setNotifFilter(tab.id)}>
-                          {tab.label}
-                          {tab.count > 0 && <span>{tab.count}</span>}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="ad-list">
-                    {visibleNotifications.map((n) => (
-                      <div key={n.id} className={`ad-notif ${n.unread ? 'unread' : ''}`}>
-                        <span className={`ad-notif-icon ad-pill-${n.tone}`}><Icon name={n.icon} size={15} /></span>
-                        <button
-                          type="button"
-                          className="ad-notif-body"
-                          onClick={() => {
-                            setReadIds((prev) => new Set(prev).add(n.id));
-                            goTo('visitors');
-                          }}
-                        >
-                          <strong>{n.title}</strong>
-                          {n.message && <span>{n.message}</span>}
-                          <small>{getRelativeTimeLabel(n.timestamp)}</small>
-                        </button>
-                        <button type="button" className="ad-icon-btn ad-icon-btn-sm" aria-label="Dismiss" onClick={() => setDismissedIds((prev) => new Set(prev).add(n.id))}>
-                          <Icon name="x" size={14} />
-                        </button>
-                      </div>
-                    ))}
-                    {!visibleNotifications.length && <div className="ad-empty-line">You're all caught up.</div>}
-                  </div>
-                </section>
-              </>
-            )}
           </main>
 
           <nav className="app-tabbar" aria-label="Main">

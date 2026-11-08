@@ -5,6 +5,8 @@ import { useAppointments } from '../context/AppointmentContext';
 import { useNotification } from '../context/NotificationContext';
 import ConfirmModal from '../components/ConfirmModal';
 import DaysOffPanel from '../components/DaysOffPanel';
+import NotificationsMenu from '../components/NotificationsMenu';
+import ViewToggle from '../components/ViewToggle';
 import { sendVisitorResponseEmail } from '../services/emailjs';
 import api from '../services/api';
 import { eatDateKey, formatClockTime, formatTopbarDateTime, matchesVisitFilter, orderVisitsForReview, VISIT_FILTERS } from '../components/admin/utils';
@@ -215,7 +217,6 @@ export default function StaffDashboardPage() {
   const [previewItem, setPreviewItem] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [dateFilter, setDateFilter] = useState('all');
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [isCurrentlyAvailable, setIsCurrentlyAvailable] = useState(user?.is_available ?? true);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [overdueDismissedKey, setOverdueDismissedKey] = useState('');
@@ -284,7 +285,6 @@ export default function StaffDashboardPage() {
     };
   }, [subscribeToForegroundMessages]);
 
-  const notificationRef = useRef(null);
   const profileRef = useRef(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [requestFilter, setRequestFilter] = useState('all');
@@ -342,22 +342,6 @@ export default function StaffDashboardPage() {
     return () => clearInterval(timerId);
   }, []);
 
-  // Close notification dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
-        setNotificationsOpen(false);
-      }
-    };
-
-    if (notificationsOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [notificationsOpen]);
 
   const getInitials = (name) => {
     if (!name) return '??';
@@ -737,61 +721,17 @@ export default function StaffDashboardPage() {
                 {isCurrentlyAvailable ? 'Available' : 'Away'}
               </span>
             </button>
-            <div className="sd-notification-wrapper" ref={notificationRef}>
-              <button className="sd-icon-btn" onClick={() => setNotificationsOpen(!notificationsOpen)}>
-                {ICONS.bell}
-                {notifications.filter(n => !n.read).length > 0 && (
-                  <span className="sd-notification-badge">{notifications.filter(n => !n.read).length}</span>
-                )}
-              </button>
-              {notificationsOpen && <div className="sd-notification-backdrop" onClick={() => setNotificationsOpen(false)} aria-hidden="true" />}
-              {notificationsOpen && (
-                <div className="sd-notification-dropdown">
-                  <div className="sd-notification-header">
-                    <div className="sd-notification-header-left">
-                      <h4>Notifications</h4>
-                      {notifications.length > 0 && (
-                        <span className="sd-notification-count">{notifications.filter(n => !n.read).length} unread</span>
-                      )}
-                    </div>
-                    {notifications.length > 0 && (
-                      <button onClick={() => { setNotifications([]); setNotificationsOpen(false); }} className="sd-clear-all-btn">Clear all</button>
-                    )}
-                  </div>
-                  <div className="sd-notification-list">
-                    {notifications.length === 0 ? (
-                      <div className="sd-notification-empty">
-                        <div className="sd-notification-empty-icon">{ICONS.bell}</div>
-                        <p>No notifications yet</p>
-                      </div>
-                    ) : (
-                      notifications.slice(0, 10).map(n => (
-                        <div key={n.id} className={`sd-notification-item ${!n.read ? 'unread' : ''}`} onClick={() => {
-                          setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, read: true } : item));
-                          setNotificationsOpen(false);
-                        }}>
-                          <div className="sd-notification-dot"></div>
-                          <div className="sd-notification-content">
-                            <p>{n.message}</p>
-                            <span>{n.time || formatClockTime(n.timestamp)}</span>
-                          </div>
-                          <button
-                            className="sd-notification-clear"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setNotifications(prev => prev.filter(item => item.id !== n.id));
-                            }}
-                            title="Clear this notification"
-                          >
-                            {ICONS.x}
-                          </button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+            <NotificationsMenu
+              items={notifications.map((n) => ({
+                id: n.id,
+                text: n.message,
+                time: n.time || formatClockTime(n.timestamp),
+                unread: !n.read,
+              }))}
+              onOpenItem={(item) => setNotifications((prev) => prev.map((n) => (n.id === item.id ? { ...n, read: true } : n)))}
+              onDismiss={(id) => setNotifications((prev) => prev.filter((n) => n.id !== id))}
+              action={{ label: 'Clear all', onClick: () => setNotifications([]) }}
+            />
             <button className="sd-icon-btn" onClick={() => loadMyAppointments().then(() => showToast('Refreshed!'))}>{ICONS.refresh}</button>
             <div className="sd-profile" ref={profileRef}>
               <button
@@ -1007,10 +947,7 @@ export default function StaffDashboardPage() {
                   <span>Today only</span>
                 </label>
                 <div className="sd-filter-actions">
-                  <div className="sd-view-toggle">
-                    <button className={viewMode === 'grid' ? 'active' : ''} onClick={() => setViewMode('grid')}>{ICONS.grid}</button>
-                    <button className={viewMode === 'list' ? 'active' : ''} onClick={() => setViewMode('list')}>{ICONS.list}</button>
-                  </div>
+                  <ViewToggle value={viewMode} onChange={setViewMode} />
                   <button className="sd-export-btn" onClick={handleExportCSV}>
                     {ICONS.download} Export
                   </button>

@@ -13326,3 +13326,170 @@ button.sd-avatar:focus-visible {
     justify-content: center;
   }
 }
+
+/* ---------- Admin: card view (same rows, laid out as cards) ---------- */
+.ad-toolbar {
+  flex-wrap: wrap;
+}
+
+.ad-list.ad-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  gap: 12px;
+  padding: 4px 16px 16px;
+}
+
+.ad-cards .ad-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 8px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.ad-cards .ad-row:hover {
+  border-color: rgba(201, 146, 42, 0.45);
+}
+
+.ad-cards .ad-row-main {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.ad-cards .ad-row-cell {
+  flex: 1 1 100%;
+  min-width: 0;
+  padding-left: 52px;
+}
+
+.ad-cards .ad-row-cell strong,
+.ad-cards .ad-row-cell span,
+.ad-cards .ad-row-text span {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.ad-cards .ad-pill {
+  margin-left: 0;
+}
+
+.ad-cards .ad-row-tools {
+  margin-left: auto;
+}
+
+/* Urgent notifications get a red dot. */
+.sd-notification-item.urgent .sd-notification-dot {
+  background: var(--red);
+}
+
+/* Departments: cards never ask for more room than the screen has. */
+.ad-dept-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+}
+
+@media (max-width: 768px) {
+  /* Overview banner: message on top, Review button full width underneath. */
+  .ad-banner {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    padding: 14px 16px;
+  }
+
+  .ad-banner p {
+    flex: 1 1 calc(100% - 40px);
+  }
+
+  .ad-banner .ad-btn {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+
+  /* List view on phones: one line per visit or person, details live in card view. */
+  .ad-list-table .ad-row-cell:not(.ad-row-date) {
+    display: none;
+  }
+
+  .ad-list-table .ad-row-cell.ad-row-date {
+    flex: 1 1 100%;
+    padding-left: 50px;
+  }
+
+  .ad-list-table .ad-row-text strong,
+  .ad-list-table .ad-row-text span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .ad-list-table .ad-row-tools {
+    margin-left: auto;
+  }
+
+  /* Arrivals: name gets the full width; time and button share the line below. */
+  .ad-gate-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'avatar text text'
+      'avatar time action';
+    align-items: center;
+    gap: 6px 12px;
+  }
+
+  .ad-gate-row > .ad-avatar {
+    grid-area: avatar;
+    align-self: start;
+  }
+
+  .ad-gate-row > .ad-gate-text {
+    grid-area: text;
+  }
+
+  .ad-gate-row > .ad-gate-time {
+    grid-area: time;
+  }
+
+  .ad-gate-row > .ad-btn {
+    grid-area: action;
+  }
+
+  .ad-gate-text span {
+    white-space: normal;
+  }
+
+  /* New department: name field above a full-width button. */
+  .ad-new-dept {
+    flex-wrap: wrap;
+    padding: 12px;
+  }
+
+  .ad-new-dept > svg {
+    display: none;
+  }
+
+  .ad-new-dept input {
+    flex: 1 1 100%;
+  }
+
+  .ad-new-dept .ad-btn {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+
+  .ad-toolbar .sd-view-toggle {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  /* A blurred top bar traps fixed children (the notifications backdrop) inside it, so phones get a solid bar. */
+  .ad-topbar {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--surface);
+  }
+}
