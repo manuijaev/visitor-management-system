@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
-import LogoMark from '../components/LogoMark';
+import Icon from '../components/visitor/Icon';
+import AppShell from '../components/visitor/AppShell';
+import {
+  isReceptionMode,
+  loadVisitorDetails,
+  saveVisit,
+  saveVisitorDetails,
+  setReceptionMode as storeReceptionMode,
+} from '../services/visitorDevice';
 import '../home.css';
 
 const TZ = 'Africa/Nairobi';
@@ -11,9 +19,7 @@ const CLOSE_HOUR = 17;
 const SLOT_MINUTES = 30;
 const LEAD_MINUTES = 30;
 const BOOKABLE_DAYS = 10;
-const RECEPTION_KEY = 'gp_reception_mode';
 const RECEPTION_RESET_SECONDS = 20;
-const SLIDE_SECONDS = 6;
 
 const STEPS = ['When', 'Teacher', 'Details', 'Review'];
 
@@ -25,103 +31,6 @@ const VISIT_MODES = [
 
 const ETA_CHOICES = [10, 15, 30, 45, 60];
 const PURPOSES = ['Parent–teacher meeting', 'Admissions enquiry', 'Fees / bursar', 'Student pickup', 'Counselling', 'Other'];
-
-const SLIDES = [
-  {
-    key: 'team',
-    eyebrow: 'Walk-ins',
-    title: 'At the gate? The teacher knows in seconds.',
-    text: 'Choose who you are here to see and we alert them by SMS, email and push.',
-    alt: 'Colleagues standing together in an office lobby',
-  },
-  {
-    key: 'meet',
-    eyebrow: 'Plan ahead',
-    title: 'Meeting a teacher later this week?',
-    text: 'Pick a day and a time slot. We text you once the teacher confirms, no internet needed.',
-    alt: 'Group of people greeting the sunrise together',
-  },
-  {
-    key: 'host',
-    eyebrow: 'Staff',
-    title: 'Teachers respond from anywhere.',
-    text: 'Accept, reschedule or decline in one tap, and you hear back straight away.',
-    alt: 'Professional working late on a laptop with a cup of coffee',
-  },
-];
-
-const HOW_STEPS = [
-  { icon: 'clock', title: 'Choose when', text: "Here now, on your way, or a slot later this week. It's one tap." },
-  { icon: 'search', title: 'Pick a teacher or staff member', text: 'Search by name or browse departments. Availability is shown live.' },
-  { icon: 'message', title: 'Get a text back', text: 'They are alerted instantly and you get an SMS as soon as they reply.' },
-];
-
-const ICON_PATHS = {
-  pin: (
-    <>
-      <path d="M12 21s7-6.1 7-11.5a7 7 0 1 0-14 0C5 14.9 12 21 12 21z" />
-      <circle cx="12" cy="9.5" r="2.5" />
-    </>
-  ),
-  route: <path d="M3.5 11.2 20.5 3.5l-7.7 17-1.9-7.4-7.4-1.9z" />,
-  calendar: (
-    <>
-      <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
-      <path d="M8 3v4M16 3v4M3.5 10h17" />
-    </>
-  ),
-  search: (
-    <>
-      <circle cx="11" cy="11" r="6.5" />
-      <path d="m20 20-4.2-4.2" />
-    </>
-  ),
-  check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
-  arrowRight: <path d="M5 12h14M13 6l6 6-6 6" />,
-  arrowLeft: <path d="M19 12H5M11 6l-6 6 6 6" />,
-  chevronLeft: <path d="m14.5 6-6 6 6 6" />,
-  chevronRight: <path d="m9.5 6 6 6-6 6" />,
-  user: (
-    <>
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4.5 20.5a7.5 7.5 0 0 1 15 0" />
-    </>
-  ),
-  clock: (
-    <>
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="M12 7.5V12l3 2" />
-    </>
-  ),
-  message: <path d="M20.5 12a8.5 8.5 0 0 1-12.3 7.6L3.5 20.5l1-4.4A8.5 8.5 0 1 1 20.5 12z" />,
-  close: <path d="M6 6l12 12M18 6 6 18" />,
-  menu: <path d="M4 7h16M4 12h16M4 17h16" />,
-  desk: <path d="M3 10.5h18v3H3zM5.5 13.5v6.5M18.5 13.5v6.5M8.5 6.5h7v4h-7z" />,
-  download: <path d="M12 4v11M7 10.5l5 5 5-5M5 20h14" />,
-  info: (
-    <>
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="M12 11v5M12 8h.01" />
-    </>
-  ),
-};
-
-function Icon({ name, className = '' }) {
-  return (
-    <svg
-      className={`gp-icon ${className}`}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {ICON_PATHS[name]}
-    </svg>
-  );
-}
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const isValidPhone = (value) => /^\+?\d{9,15}$/.test((value || '').replace(/[\s()-]/g, ''));
@@ -278,102 +187,6 @@ function downloadCalendarInvite(visit) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function HeroCarousel() {
-  const [index, setIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
-  const touchStart = useRef(null);
-  const count = SLIDES.length;
-  const goTo = useCallback((next) => setIndex((next + count) % count), [count]);
-  const slide = SLIDES[index];
-
-  useEffect(() => {
-    const onVisibility = () => setPaused(document.hidden);
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => document.removeEventListener('visibilitychange', onVisibility);
-  }, []);
-
-  const onTouchEnd = (event) => {
-    if (touchStart.current === null) return;
-    const delta = event.changedTouches[0].clientX - touchStart.current;
-    touchStart.current = null;
-    if (Math.abs(delta) > 40) goTo(index + (delta < 0 ? 1 : -1));
-  };
-
-  return (
-    <div
-      className={`gp-showcase ${paused ? 'is-paused' : ''}`}
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      onTouchStart={(event) => {
-        touchStart.current = event.touches[0].clientX;
-      }}
-      onTouchEnd={onTouchEnd}
-      aria-roledescription="carousel"
-      aria-label="How Gatepass works"
-    >
-      {SLIDES.map((item, i) => (
-        <figure key={item.key} className={`gp-slide gp-slide--${item.key} ${i === index ? 'is-active' : ''}`} aria-hidden={i !== index}>
-          <img
-            src={`/images/carousel/${item.key}-1600.jpg`}
-            srcSet={`/images/carousel/${item.key}-800.jpg 800w, /images/carousel/${item.key}-1600.jpg 1600w`}
-            sizes="(min-width: 1100px) 56vw, 100vw"
-            alt={item.alt}
-            loading={i === 0 ? 'eager' : 'lazy'}
-            decoding="async"
-          />
-        </figure>
-      ))}
-      <div className="gp-showcase-shade" aria-hidden="true" />
-
-      <div className="gp-showcase-top">
-        <p className="gp-overline">School visitor desk</p>
-        <h1>
-          Let the school know <em>you&apos;re here.</em>
-        </h1>
-      </div>
-
-      <div className="gp-showcase-bottom">
-        <div className="gp-caption" key={slide.key} aria-live="polite">
-          <span>{slide.eyebrow}</span>
-          <strong>{slide.title}</strong>
-          <p>{slide.text}</p>
-        </div>
-        <div className="gp-carousel-controls">
-          <button type="button" className="gp-carousel-btn" onClick={() => goTo(index - 1)} aria-label="Previous slide">
-            <Icon name="chevronLeft" />
-          </button>
-          <div className="gp-dots">
-            {SLIDES.map((item, i) => (
-              <button
-                key={item.key}
-                type="button"
-                className={`gp-dot ${i === index ? 'is-active' : ''}`}
-                onClick={() => goTo(i)}
-                aria-label={`Show slide ${i + 1}: ${item.eyebrow}`}
-                aria-current={i === index ? 'true' : undefined}
-              >
-                <span className="gp-dot-bar">
-                  {i === index && (
-                    <span
-                      key={index}
-                      className="gp-dot-fill"
-                      style={{ animationDuration: `${SLIDE_SECONDS}s` }}
-                      onAnimationEnd={() => goTo(index + 1)}
-                    />
-                  )}
-                </span>
-              </button>
-            ))}
-          </div>
-          <button type="button" className="gp-carousel-btn" onClick={() => goTo(index + 1)} aria-label="Next slide">
-            <Icon name="chevronRight" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function StatusTag({ host }) {
   return (
     <span className={`gp-status ${host.available ? '' : 'is-away'}`}>{host.available ? 'Available' : 'Away'}</span>
@@ -413,15 +226,22 @@ function ReviewRow({ icon, label, value, sub, onEdit }) {
 
 const emptyVisitor = { name: '', phone: '', email: '', studentName: '', studentClass: '', purpose: '', message: '' };
 
+/** A fresh form, prefilled with the parent's saved details unless this is a shared reception device. */
+const startingVisitor = (receptionMode) => {
+  const saved = receptionMode ? null : loadVisitorDetails();
+  return saved ? { ...emptyVisitor, name: saved.name, phone: saved.phone, email: saved.email || '' } : emptyVisitor;
+};
+
 export default function HomePage() {
-  const [receptionMode, setReceptionMode] = useState(() => localStorage.getItem(RECEPTION_KEY) === '1');
+  const [receptionMode, setReceptionMode] = useState(isReceptionMode);
+  const [returning] = useState(() => (isReceptionMode() ? null : loadVisitorDetails()));
   const [step, setStep] = useState(0);
-  const [mode, setMode] = useState(() => (localStorage.getItem(RECEPTION_KEY) === '1' ? 'now' : null));
+  const [mode, setMode] = useState(() => (isReceptionMode() ? 'now' : null));
   const [eta, setEta] = useState(15);
   const [dayKey, setDayKey] = useState(null);
   const [slot, setSlot] = useState(null);
   const [hostId, setHostId] = useState(null);
-  const [visitor, setVisitor] = useState(emptyVisitor);
+  const [visitor, setVisitor] = useState(() => startingVisitor(isReceptionMode()));
   const [touched, setTouched] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -432,18 +252,10 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [hostQuery, setHostQuery] = useState('');
   const [hostDept, setHostDept] = useState('all');
-  const [dirQuery, setDirQuery] = useState('');
-  const [dirDept, setDirDept] = useState('all');
   const [now, setNow] = useState(() => new Date());
-  const [navOpen, setNavOpen] = useState(false);
   const [toast, setToast] = useState('');
   const flowRef = useRef(null);
   const toastTimer = useRef(null);
-
-  useEffect(() => {
-    document.body.classList.add('home-background');
-    return () => document.body.classList.remove('home-background');
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -563,7 +375,7 @@ export default function HomePage() {
     setDayKey(null);
     setSlot(null);
     setHostId(null);
-    setVisitor(emptyVisitor);
+    setVisitor(startingVisitor(receptionMode));
     setTouched({});
     setSubmitError('');
     setVisit(null);
@@ -590,9 +402,8 @@ export default function HomePage() {
   const toggleReception = () => {
     const next = !receptionMode;
     setReceptionMode(next);
-    localStorage.setItem(RECEPTION_KEY, next ? '1' : '0');
+    storeReceptionMode(next);
     if (next && step === 0 && !mode) setMode('now');
-    setNavOpen(false);
     showToast(next ? 'Reception mode on: checking in walk-in visitors' : 'Reception mode off');
   };
 
@@ -622,8 +433,13 @@ export default function HomePage() {
         message: note,
       });
       const id = data?.data?.id;
+      const reference = id ? `GP-${String(id).padStart(5, '0')}` : `GP-${String(Date.now()).slice(-6)}`;
+      if (!receptionMode) {
+        saveVisitorDetails(visitor);
+        if (id) saveVisit({ reference, phone: visitor.phone.trim(), hostName: host.name, arrival: arrival.toISOString(), mode });
+      }
       setVisit({
-        reference: id ? `GP-${String(id).padStart(5, '0')}` : `GP-${String(Date.now()).slice(-6)}`,
+        reference,
         arrival: arrival.toISOString(),
         mode,
         eta,
@@ -640,20 +456,6 @@ export default function HomePage() {
     }
   };
 
-  const scrollToId = (id) => {
-    setNavOpen(false);
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
-  const visitFromDirectory = (member) => {
-    setHostId(member.id);
-    setVisit(null);
-    if (whenOk && !blockFor(member)) setStep(2);
-    else setStep(0);
-    scrollToId('check-in');
-    showToast(`${firstName(member.name)} selected. ${whenOk ? 'Add your details' : 'Now choose when'}.`);
-  };
-
   const whenLabel = () => {
     if (mode === 'now') return 'Right now · at reception';
     if (mode === 'onway') return `In about ${eta} minutes`;
@@ -665,11 +467,6 @@ export default function HomePage() {
     .filter((member) => hostDept === 'all' || String(member.departmentId) === hostDept)
     .filter((member) => matchesQuery(member, hostQuery.trim().toLowerCase()))
     .sort((a, b) => Number(Boolean(blockFor(a))) - Number(Boolean(blockFor(b))) || a.name.localeCompare(b.name));
-
-  const directory = staff
-    .filter((member) => dirDept === 'all' || String(member.departmentId) === dirDept)
-    .filter((member) => matchesQuery(member, dirQuery.trim().toLowerCase()))
-    .sort((a, b) => Number(b.available) - Number(a.available) || a.name.localeCompare(b.name));
 
   const departmentChips = (value, onChange) => (
     <div className="gp-chips gp-chips--scroll" role="tablist" aria-label="Filter by department">
@@ -1091,8 +888,8 @@ export default function HomePage() {
         </div>
         {!receptionMode && (
           <p className="gp-pass-auto">
-            Keep your reference. You can{' '}
-            <Link to={`/visit?ref=${visit.reference}`}>check or cancel this visit</Link> any time.
+            It&apos;s saved in{' '}
+            <Link to="/visits">My visits</Link>, where you can check or cancel it any time.
           </p>
         )}
         {receptionMode && <p className="gp-pass-auto">Starting a new check-in in {countdown}s</p>}
@@ -1100,95 +897,17 @@ export default function HomePage() {
     );
   };
 
+  const greeting =
+    returning && !receptionMode && step === 0 && !visit ? `Welcome back, ${firstName(returning.name)}` : null;
+
   return (
-    <div className="gp-root" id="top">
-      <header className={`gp-nav ${navOpen ? 'is-open' : ''}`}>
-        <div className="gp-nav-inner">
-          <a
-            href="#top"
-            className="gp-brand"
-            onClick={(event) => {
-              event.preventDefault();
-              setNavOpen(false);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-          >
-            <LogoMark className="gp-brand-mark" />
-            <span>
-              <strong>Gatepass</strong>
-              <small>Visitor desk</small>
-            </span>
-          </a>
-          <nav className="gp-nav-links" aria-label="Sections">
-            <button type="button" onClick={() => scrollToId('check-in')}>
-              Check in
-            </button>
-            <button type="button" onClick={() => scrollToId('how')}>
-              How it works
-            </button>
-            <button type="button" onClick={() => scrollToId('directory')}>
-              Directory
-            </button>
-            <Link to="/visit">Check my visit</Link>
-          </nav>
-          <div className="gp-nav-actions">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={receptionMode}
-              className={`gp-switch ${receptionMode ? 'is-on' : ''}`}
-              onClick={toggleReception}
-            >
-              <span className="gp-switch-track" aria-hidden="true" />
-              Reception mode
-            </button>
-            <Link to="/staff/login" className="gp-btn gp-btn--dark gp-btn--sm">
-              Staff login
-            </Link>
-          </div>
-          <button
-            type="button"
-            className="gp-nav-toggle"
-            aria-label={navOpen ? 'Close menu' : 'Open menu'}
-            aria-expanded={navOpen}
-            onClick={() => setNavOpen((open) => !open)}
-          >
-            <Icon name={navOpen ? 'close' : 'menu'} />
-          </button>
-        </div>
-        {navOpen && (
-          <div className="gp-nav-panel">
-            <button type="button" onClick={() => scrollToId('check-in')}>
-              Check in
-            </button>
-            <button type="button" onClick={() => scrollToId('how')}>
-              How it works
-            </button>
-            <button type="button" onClick={() => scrollToId('directory')}>
-              Directory
-            </button>
-            <Link to="/visit">Check my visit</Link>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={receptionMode}
-              className={`gp-switch ${receptionMode ? 'is-on' : ''}`}
-              onClick={toggleReception}
-            >
-              <span className="gp-switch-track" aria-hidden="true" />
-              Reception mode
-            </button>
-            <Link to="/staff/login" className="gp-btn gp-btn--dark" onClick={() => setNavOpen(false)}>
-              Staff login
-            </Link>
-          </div>
-        )}
-      </header>
-
-      <main>
-        <section className="gp-hero">
-          <HeroCarousel />
-
+    <AppShell
+      title={receptionMode ? 'Reception desk' : 'Book a visit'}
+      hideTabs={receptionMode}
+      action={
+        <span className={`gp-office ${officeOpen ? '' : 'is-closed'}`}>{officeOpen ? 'School open' : 'School closed'}</span>
+      }
+    >
           <section className="gp-flow" id="check-in" ref={flowRef} aria-labelledby="gp-flow-title">
             {receptionMode && (
               <div className="gp-flow-reception">
@@ -1206,14 +925,12 @@ export default function HomePage() {
               <>
                 <header className="gp-flow-head">
                   <div>
+                    {greeting && <p className="gp-greeting">{greeting}</p>}
                     <p className="gp-eyebrow">
                       Step {step + 1} of {STEPS.length}
                     </p>
                     <h2 id="gp-flow-title">{titles[step]}</h2>
                   </div>
-                  <span className={`gp-office ${officeOpen ? '' : 'is-closed'}`}>
-                    {officeOpen ? 'School open' : 'School closed'}
-                  </span>
                 </header>
 
                 <ol className="gp-stepper">
@@ -1281,104 +998,12 @@ export default function HomePage() {
               </>
             )}
           </section>
-        </section>
-
-        <section className="gp-section" id="how">
-          <div className="gp-section-head">
-            <p className="gp-overline gp-overline--dark">How it works</p>
-            <h2>
-              Three taps to <em>the right teacher.</em>
-            </h2>
-            <p>Built for parents at the gate and meetings planned days ahead, on any phone, tablet or laptop.</p>
-          </div>
-          <div className="gp-how">
-            {HOW_STEPS.map((item, i) => (
-              <article className="gp-how-card" key={item.title}>
-                <span className="gp-how-num">{String(i + 1).padStart(2, '0')}</span>
-                <span className="gp-how-icon">
-                  <Icon name={item.icon} />
-                </span>
-                <h3>{item.title}</h3>
-                <p>{item.text}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="gp-section gp-section--tinted" id="directory">
-          <div className="gp-section-head">
-            <p className="gp-overline gp-overline--dark">Directory</p>
-            <h2>
-              Find the right <em>teacher.</em>
-            </h2>
-            <p>Browse by department, see who is available, and start a check-in with one tap.</p>
-          </div>
-          <div className="gp-dir-tools">
-            <div className="gp-search">
-              <Icon name="search" />
-              <input
-                className="gp-input"
-                type="search"
-                placeholder="Search staff by name, department or division"
-                value={dirQuery}
-                onChange={(event) => setDirQuery(event.target.value)}
-                aria-label="Search the staff directory"
-              />
-            </div>
-            {departments.length > 1 && departmentChips(dirDept, setDirDept)}
-          </div>
-          <div className="gp-dir-grid">
-            {loading && [0, 1, 2].map((key) => <div key={key} className="gp-skeleton gp-skeleton--card" aria-hidden="true" />)}
-            {!loading &&
-              directory.map((member) => (
-                <article className="gp-person" key={member.id}>
-                  <div className="gp-person-head">
-                    <span className={`gp-avatar gp-tone-${member.id % 5}`}>{initials(member.name)}</span>
-                    <div className="gp-host-text">
-                      <strong>{member.name}</strong>
-                      <small>{placement(member) || 'Staff'}</small>
-                    </div>
-                    <StatusTag host={member} />
-                  </div>
-                  {!member.available && member.reason && <p className="gp-person-reason">{member.reason}</p>}
-                  <button
-                    type="button"
-                    className="gp-btn gp-btn--ghost gp-btn--sm"
-                    onClick={() => visitFromDirectory(member)}
-                    disabled={!member.departmentId || !member.divisionId}
-                  >
-                    Visit {firstName(member.name)}
-                    <Icon name="arrowRight" />
-                  </button>
-                </article>
-              ))}
-            {!loading && directory.length === 0 && (
-              <div className="gp-empty gp-empty--wide">
-                {staff.length === 0 ? 'The staff directory is empty for now.' : 'No one matches that search.'}
-              </div>
-            )}
-          </div>
-        </section>
-      </main>
-
-      <footer className="gp-footer">
-        <div className="gp-footer-inner">
-          <div>
-            <strong className="gp-footer-brand">Gatepass</strong>
-            <span>Visitor management system</span>
-          </div>
-          <nav aria-label="Footer">
-            <Link to="/staff/login">Staff login</Link>
-          </nav>
-          <span className="gp-footer-copy">© {now.getFullYear()} Gatepass</span>
-        </div>
-      </footer>
 
       {toast && (
         <div className="gp-toast" role="status" aria-live="polite">
           {toast}
         </div>
       )}
-    </div>
+    </AppShell>
   );
 }

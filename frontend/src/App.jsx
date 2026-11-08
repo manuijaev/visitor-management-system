@@ -2,7 +2,6 @@ import { Suspense, lazy, useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import { useAuth } from './context/AuthContext';
-import Navbar from './components/Navbar';
 import LogoLoader, { hideBootSplash } from './components/LogoLoader';
 import ErrorBoundary, { CHUNK_RELOAD_KEY } from './components/ErrorBoundary';
 import InstallPrompt from './components/InstallPrompt';
@@ -24,6 +23,8 @@ const StaffDashboardPage = lazyPage(() => import('./pages/StaffDashboardPage'));
 const AdminDashboardPage = lazyPage(() => import('./pages/AdminDashboardPage'));
 const AdminSignupPage = lazyPage(() => import('./pages/AdminSignupPage'));
 const VisitStatusPage = lazyPage(() => import('./pages/VisitStatusPage'));
+const MyVisitsPage = lazyPage(() => import('./pages/MyVisitsPage'));
+const HelpPage = lazyPage(() => import('./pages/HelpPage'));
 
 function PageReady() {
   useEffect(() => {
@@ -37,7 +38,7 @@ function roleHomePath(user) {
   return user?.role === 'Admin' ? '/admin/dashboard' : '/staff/dashboard';
 }
 
-function ProtectedRoute({ children, roles, loginPath = '/staff/login' }) {
+function ProtectedRoute({ children, roles, loginPath = '/staff' }) {
   const { user } = useAuth();
   if (!user) return <Navigate to={loginPath} replace />;
   if (roles && !roles.includes(user.role)) return <Navigate to={roleHomePath(user)} replace />;
@@ -53,6 +54,12 @@ function PublicOnlyRoute({ children }) {
   return children;
 }
 
+/** Old invite emails and bookmarks point at /staff/login; keep them working. */
+function LegacyLoginRedirect() {
+  const { search } = useLocation();
+  return <Navigate to={`/staff${search}`} replace />;
+}
+
 function HomeRoute() {
   const { user } = useAuth();
   if (user) return <Navigate to={roleHomePath(user)} replace />;
@@ -63,14 +70,16 @@ export default function App() {
   const { pathname } = useLocation();
   return (
     <ErrorBoundary resetKey={pathname}>
-      <Navbar />
       <Suspense fallback={<LogoLoader />}>
         <PageReady />
         <Routes>
           <Route path="/" element={<HomeRoute />} />
           <Route path="/visit" element={<VisitStatusPage />} />
+          <Route path="/visits" element={<MyVisitsPage />} />
+          <Route path="/help" element={<HelpPage />} />
+          <Route path="/staff/login" element={<LegacyLoginRedirect />} />
           <Route
-            path="/staff/login"
+            path="/staff"
             element={
               <PublicOnlyRoute>
                 <StaffLoginPage />
@@ -96,7 +105,7 @@ export default function App() {
           <Route
             path="/admin/dashboard"
             element={
-              <ProtectedRoute roles={['Admin']} loginPath="/staff/login">
+              <ProtectedRoute roles={['Admin']}>
                 <AdminDashboardPage />
               </ProtectedRoute>
             }

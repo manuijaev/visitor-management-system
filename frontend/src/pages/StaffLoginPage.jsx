@@ -133,7 +133,7 @@ export default function StaffLoginPage() {
 
   const leaveInvite = () => {
     setError('');
-    navigate('/staff/login', { replace: true });
+    navigate('/staff', { replace: true });
   };
 
   const renderInvitePanel = () => {

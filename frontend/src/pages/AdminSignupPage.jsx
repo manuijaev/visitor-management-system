@@ -118,7 +118,7 @@ export default function AdminSignupPage() {
               <p className="page-subtitle">Admin registration is disabled because an admin account already exists.</p>
               <div className="auth-mini-links">
                 <span>Already have admin credentials?</span>
-                <Link to="/staff/login" className="auth-text-link">
+                <Link to="/staff" className="auth-text-link">
                   Go to Staff Login
                 </Link>
               </div>
@@ -208,7 +208,7 @@ export default function AdminSignupPage() {
             </form>
             <div className="auth-mini-links">
               <span>Already have admin credentials?</span>
-              <Link to="/staff/login" className="auth-text-link">
+              <Link to="/staff" className="auth-text-link">
                 Go to Staff Login
               </Link>
             </div>

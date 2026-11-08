@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
-import LogoMark from '../components/LogoMark';
+import AppShell from '../components/visitor/AppShell';
 import ConfirmModal from '../components/ConfirmModal';
-import '../home.css';
 
 const TZ = 'Africa/Nairobi';
 
@@ -35,22 +34,18 @@ const errorMessage = (error) => {
 export default function VisitStatusPage() {
   const [params] = useSearchParams();
   const [reference, setReference] = useState(params.get('ref') || '');
-  const [phone, setPhone] = useState('');
+  const { state } = useLocation();
+  const [phone, setPhone] = useState(state?.phone || '');
   const [visit, setVisit] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
-  useEffect(() => {
-    document.body.classList.add('home-background');
-    return () => document.body.classList.remove('home-background');
-  }, []);
-
   const credentials = { reference: reference.trim(), phone: phone.trim() };
 
   const lookUp = async (event) => {
-    event.preventDefault();
+    event?.preventDefault();
     if (!credentials.reference || !credentials.phone || loading) return;
     setLoading(true);
     setError('');
@@ -64,6 +59,11 @@ export default function VisitStatusPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (state?.phone && params.get('ref')) lookUp();
+    // Runs once, when opened from My visits with the saved phone number.
+  }, []);
 
   const cancelVisit = async () => {
     setCancelling(true);
@@ -83,21 +83,8 @@ export default function VisitStatusPage() {
   const host = visit?.staff_name || 'Your host';
 
   return (
-    <div className="gp-root gp-lookup-page">
-      <header className="gp-lookup-head">
-        <Link to="/" className="gp-brand">
-          <LogoMark className="gp-brand-mark" />
-          <span>
-            <strong>Gatepass</strong>
-            <small>Visitor desk</small>
-          </span>
-        </Link>
-        <Link to="/" className="gp-btn gp-btn--ghost gp-btn--sm">
-          New visit
-        </Link>
-      </header>
-
-      <main className="gp-flow gp-lookup">
+    <AppShell title="Check a visit">
+      <section className="gp-flow gp-lookup">
         {!visit ? (
           <form className="gp-lookup-body" onSubmit={lookUp}>
             <p className="gp-eyebrow">Check your visit</p>
@@ -201,7 +188,7 @@ export default function VisitStatusPage() {
             </div>
           </div>
         )}
-      </main>
+      </section>
 
       <ConfirmModal
         isOpen={confirmingCancel}
@@ -215,6 +202,6 @@ export default function VisitStatusPage() {
         onConfirm={cancelVisit}
         onCancel={() => !cancelling && setConfirmingCancel(false)}
       />
-    </div>
+    </AppShell>
   );
 }
