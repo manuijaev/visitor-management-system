@@ -12,6 +12,11 @@ const STATUS_COPY = {
   Rescheduled: { tone: 'wait', title: 'New time proposed', text: (host) => `${host} moved your visit to the time below.` },
   Declined: { tone: 'stop', title: 'Visit declined', text: (host) => `${host} can't make this visit.` },
   Cancelled: { tone: 'stop', title: 'Visit cancelled', text: () => 'This visit has been cancelled.' },
+  Expired: {
+    tone: 'stop',
+    title: 'Request closed',
+    text: (host) => `${host} couldn't reply in time, so this request was closed. Please book a new visit.`,
+  },
 };
 
 const formatWhen = (value) =>

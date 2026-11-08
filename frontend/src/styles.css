@@ -12624,3 +12624,9 @@ tr:hover .row-actions {
     bottom: calc(62px + 12px + env(safe-area-inset-bottom));
   }
 }
+
+.sd-badge-expired,
+.sd-list-simple-status-expired {
+  background: var(--surface2);
+  color: var(--muted);
+}
