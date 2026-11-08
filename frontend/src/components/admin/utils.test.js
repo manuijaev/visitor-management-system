@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { eatDateKey, formatApiError, getInitials } from './utils';
+import { eatDateKey, formatApiError, getInitials, orderVisitsForReview } from './utils';
 
 describe('eatDateKey', () => {
   it('uses the school day in Nairobi, not UTC', () => {
@@ -33,5 +33,36 @@ describe('getInitials', () => {
   it('uses up to two initials', () => {
     expect(getInitials('Mary Wanjiru Kamau')).toBe('MW');
     expect(getInitials('')).toBe('?');
+  });
+});
+
+describe('orderVisitsForReview', () => {
+  const now = new Date('2026-11-10T09:00:00Z').getTime();
+  const visit = (id, status, when) => ({ id, status, appointment_date: when });
+
+  it('puts pending first, then upcoming soonest first, then past newest first', () => {
+    const visits = [
+      visit('old', 'Accepted', '2026-11-01T09:00:00Z'),
+      visit('later', 'Accepted', '2026-11-20T09:00:00Z'),
+      visit('pending-late', 'Pending', '2026-11-15T09:00:00Z'),
+      visit('recent', 'Declined', '2026-11-08T09:00:00Z'),
+      visit('soon', 'Rescheduled', '2026-11-11T09:00:00Z'),
+      visit('pending-overdue', 'Pending', '2026-11-09T09:00:00Z'),
+    ];
+
+    expect(orderVisitsForReview(visits, now).map((v) => v.id)).toEqual([
+      'pending-overdue',
+      'pending-late',
+      'soon',
+      'later',
+      'recent',
+      'old',
+    ]);
+  });
+
+  it('does not change the list it was given', () => {
+    const visits = [visit('a', 'Accepted', '2026-11-20T09:00:00Z'), visit('b', 'Pending', '2026-11-21T09:00:00Z')];
+    orderVisitsForReview(visits, now);
+    expect(visits[0].id).toBe('a');
   });
 });

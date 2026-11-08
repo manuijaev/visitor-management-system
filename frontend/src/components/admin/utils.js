@@ -73,3 +73,21 @@ export function formatVisitDate(value) {
     minute: '2-digit',
   });
 }
+
+/**
+ * Orders visits for a staff member's review: pending requests first (soonest visit first),
+ * then upcoming visits soonest first, then past ones newest first.
+ */
+export function orderVisitsForReview(visits, now = Date.now()) {
+  const rank = (visit) => {
+    if (visit.status === 'Pending') return 0;
+    return new Date(visit.appointment_date).getTime() >= now ? 1 : 2;
+  };
+  return [...visits].sort((a, b) => {
+    const byRank = rank(a) - rank(b);
+    if (byRank !== 0) return byRank;
+    const aTime = new Date(a.appointment_date).getTime();
+    const bTime = new Date(b.appointment_date).getTime();
+    return rank(a) === 2 ? bTime - aTime : aTime - bTime;
+  });
+}

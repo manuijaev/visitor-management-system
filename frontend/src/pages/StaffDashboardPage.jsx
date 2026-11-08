@@ -7,7 +7,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import DaysOffPanel from '../components/DaysOffPanel';
 import { sendVisitorResponseEmail } from '../services/emailjs';
 import api from '../services/api';
-import { eatDateKey } from '../components/admin/utils';
+import { eatDateKey, orderVisitsForReview } from '../components/admin/utils';
 
 const studentLabel = (visit) =>
   [visit?.student_name?.trim(), visit?.student_class?.trim() && `(${visit.student_class.trim()})`].filter(Boolean).join(' ');
@@ -389,14 +389,14 @@ export default function StaffDashboardPage() {
     return `${diffSeconds} second${diffSeconds === 1 ? '' : 's'} ago`;
   };
 
-  const filteredAppointments = appointments.filter(a => {
+  const filteredAppointments = orderVisitsForReview(appointments.filter(a => {
     // Filter by status for specific tabs
     if (activeTab === 'pending' && a.status !== 'Pending') return false;
     if (activeTab === 'accepted' && a.status !== 'Accepted') return false;
     if (activeTab === 'declined' && a.status !== 'Declined') return false;
     if (activeTab === 'history' && ['Pending', 'Accepted'].includes(a.status)) return false;
     
-    if (dateFilter === 'today' && !eatDateKey(a.appointment_date) === today) return false;
+    if (dateFilter === 'today' && eatDateKey(a.appointment_date) !== today) return false;
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
@@ -407,7 +407,7 @@ export default function StaffDashboardPage() {
       );
     }
     return true;
-  });
+  }));
 
   const stats = {
     pending: appointments.filter(a => a.status === 'Pending').length,
@@ -899,7 +899,7 @@ export default function StaffDashboardPage() {
           </div>
         </header>
 
-        {showOverdueAnnouncement && (
+        {showOverdueAnnouncement && activeTab === 'dashboard' && (
           <div
             className="sd-overdue-announcement"
             role="button"
