@@ -11,6 +11,8 @@ class Appointment(models.Model):
     visitor_name = models.CharField(max_length=120)
     visitor_phone = models.CharField(max_length=20, blank=True, null=True)
     visitor_email = models.EmailField(blank=True)
+    student_name = models.CharField(max_length=120, blank=True)
+    student_class = models.CharField(max_length=40, blank=True)
     department = models.ForeignKey('departments.Department', on_delete=models.CASCADE, related_name='appointments')
     division = models.ForeignKey(
         'departments.Division',
