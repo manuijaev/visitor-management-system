@@ -28,7 +28,7 @@ def build_invite_url(user, request):
         'uid': urlsafe_base64_encode(force_bytes(user.pk)),
         'token': default_token_generator.make_token(user),
     })
-    return f'{frontend_base_url(request)}/staff/login?{params}'
+    return f'{frontend_base_url(request)}/staff?{params}'
 
 
 def resolve_invite(uid, token):

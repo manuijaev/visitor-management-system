@@ -21,6 +21,7 @@ class StaffInviteFlowTests(TestCase):
         self.client.force_authenticate(self.admin)
 
     def _invite_params(self, response):
+        self.assertEqual(urlparse(response.data['invite']['invite_url']).path, '/staff')
         query = parse_qs(urlparse(response.data['invite']['invite_url']).query)
         return query['uid'][0], query['token'][0]
 

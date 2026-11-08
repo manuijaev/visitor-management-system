@@ -1,4 +1,4 @@
-export const LOGIN_PATH = '/staff/login';
+export const LOGIN_PATH = '/staff';
 export const SESSION_EXPIRED_MESSAGE = 'Your session expired. Please log in again.';
 
 const EXPIRY_SKEW_SECONDS = 30;

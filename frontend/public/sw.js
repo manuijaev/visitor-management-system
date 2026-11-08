@@ -1,5 +1,5 @@
-const CACHE_NAME = 'visitor-pwa-v3';
-const ASSETS = ['/index.html', '/manifest.json'];
+const CACHE_NAME = 'visitor-pwa-v4';
+const ASSETS = ['/index.html', '/manifest.json', '/staff-manifest.json'];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Gatepass · Visitor Management System",
+  "name": "Gatepass · School Visits",
   "short_name": "Gatepass",
-  "description": "Book visits, get notified when visitors arrive, and manage requests from one place.",
+  "description": "Book a visit to the school, get SMS updates and check or cancel your visit.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

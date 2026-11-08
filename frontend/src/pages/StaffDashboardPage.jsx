@@ -552,7 +552,7 @@ export default function StaffDashboardPage() {
   const handleLogout = () => {
     sessionStorage.setItem('app_toast', `Goodbye, ${user?.full_name || 'Staff'}! You have been logged out successfully.`);
     logout();
-    navigate('/staff/login');
+    navigate('/staff');
   };
 
   const openResponseArea = (id, action = 'Accepted') => {

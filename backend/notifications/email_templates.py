@@ -147,7 +147,7 @@ def visit_request_email(*, staff_name, visitor_name, visitor_email, appointment_
     body = _details(rows)
     if message:
         body += _note('Purpose of visit', message)
-    body += _button('Respond in dashboard', f'{frontend_base_url()}/staff/login')
+    body += _button('Respond in dashboard', f'{frontend_base_url()}/staff')
     return {
         'subject': f'Visitor alert: {visitor_name} is here to see you',
         'html_body': _layout(

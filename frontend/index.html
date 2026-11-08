@@ -17,6 +17,13 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Gatepass" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <script>
+      // Staff and admins install their own app (/staff); visitors install the booking app (/).
+      if (/^\/(staff|admin)(\/|$)/.test(location.pathname)) {
+        document.querySelector('link[rel="manifest"]').href = '/staff-manifest.json';
+        document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute('content', 'Gatepass Staff');
+      }
+    </script>
     <title>Gatepass · Visitor Management System</title>
     <!-- Logo and boot splash styles are inlined so they work before the JS/CSS bundle arrives.
          LogoMark.jsx and LogoLoader.jsx reuse these classes. -->
