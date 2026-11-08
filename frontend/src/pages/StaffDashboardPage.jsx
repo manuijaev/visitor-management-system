@@ -31,6 +31,18 @@ function rescheduleTimeError(value, appointment) {
 const formatRescheduleTime = (value) =>
   new Date(value).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
+/** Screen names shown in the phone top bar. */
+const TAB_TITLES = {
+  dashboard: 'Home',
+  appointments: 'Requests',
+  schedule: 'Schedule',
+  pending: 'Pending',
+  accepted: 'Accepted',
+  declined: 'Declined',
+  history: 'History',
+  settings: 'Settings',
+};
+
 const ICONS = {
   dashboard: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -797,6 +809,7 @@ export default function StaffDashboardPage() {
             <button className="sd-menu-btn" onClick={() => setSidebarOpen(!sidebarOpen)}>
               {ICONS.menu}
             </button>
+            <span className="sd-topbar-title">{TAB_TITLES[activeTab] || 'Dashboard'}</span>
             <div className="sd-search-box">
               {ICONS.search}
               <input 
@@ -1252,6 +1265,32 @@ export default function StaffDashboardPage() {
           )}
         </div>
       </main>
+
+      <nav className="app-tabbar" aria-label="Main">
+        {[
+          { id: 'dashboard', label: 'Home', icon: ICONS.dashboard },
+          { id: 'appointments', label: 'Requests', icon: ICONS.calendar, badge: stats.pending },
+          { id: 'schedule', label: 'Schedule', icon: ICONS.clock },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={`app-tab ${activeTab === tab.id ? 'is-active' : ''}`}
+            aria-current={activeTab === tab.id ? 'page' : undefined}
+            onClick={() => { setActiveTab(tab.id); setSidebarOpen(false); }}
+          >
+            <span className="app-tab-icon">
+              {tab.icon}
+              {tab.badge > 0 && <span className="app-tab-badge">{tab.badge}</span>}
+            </span>
+            <span>{tab.label}</span>
+          </button>
+        ))}
+        <button type="button" className={`app-tab ${sidebarOpen ? 'is-active' : ''}`} onClick={() => setSidebarOpen(true)}>
+          <span className="app-tab-icon">{ICONS.menu}</span>
+          <span>More</span>
+        </button>
+      </nav>
 
       {/* Preview Modal */}
       {previewItem && (
