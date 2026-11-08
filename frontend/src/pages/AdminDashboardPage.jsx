@@ -363,7 +363,7 @@ export default function AdminDashboardPage() {
             aria-label={`Reassign ${a.visitor_name}`}
             onClick={() => {
               setReassign(a);
-              setReassignTo(String(a.staff_member || ''));
+              setReassignTo('');
             }}
           >
             <Icon name="swap" size={14} />
@@ -775,12 +775,15 @@ export default function AdminDashboardPage() {
                 <button type="button" className="ad-icon-btn" onClick={() => setReassign(null)} aria-label="Close"><Icon name="x" size={18} /></button>
               </header>
               <div className="ad-modal-body ad-form">
-                <p className="ad-lead">Currently with {reassign.staff_name || 'nobody'}. Choose who should handle it instead.</p>
+                <p className="ad-lead">
+                  Currently with {reassign.staff_name || 'nobody'}. Choose who should handle it instead. They&apos;ll get an
+                  alert, the visit goes back to pending, and {reassign.visitor_name} gets an SMS with the new name.
+                </p>
                 <label className="ad-field">
                   <span>Staff member</span>
                   <select value={reassignTo} onChange={(e) => setReassignTo(e.target.value)}>
                     <option value="">Choose staff</option>
-                    {staff.filter((s) => s.is_active).map((s) => (
+                    {staff.filter((s) => s.is_active && s.department && s.division && s.id !== reassign.staff_member).map((s) => (
                       <option key={s.id} value={s.id}>{s.full_name} · {s.department_name || 'No department'}</option>
                     ))}
                   </select>

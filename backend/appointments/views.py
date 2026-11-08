@@ -11,7 +11,12 @@ from notifications.emailjs_service import (
     RESPONSE_TEMPLATE_ID,
     send_emailjs,
 )
-from notifications.sms_service import send_staff_sms, send_visitor_received_sms, send_visitor_sms
+from notifications.sms_service import (
+    send_staff_sms,
+    send_visitor_reassigned_sms,
+    send_visitor_received_sms,
+    send_visitor_sms,
+)
 from users.models import UserDeviceToken
 
 from .models import Appointment
@@ -212,6 +217,34 @@ def _send_response_email(appointment, resolved_staff_name, formatted_date):
     logger.info("Response email sent for appointment_id=%s", appointment.id)
 
 
+def _notify_reassignment(appointment):
+    """Alert the newly assigned staff member (email, push, SMS) and tell the visitor who they will now see."""
+    _notify_new_appointment(appointment)
+
+    staff = appointment.staff_member
+    staff_name = staff.full_name or staff.email
+    try:
+        if staff.phone:
+            send_staff_sms(
+                phone_number=staff.phone,
+                staff_name=staff_name,
+                message=f"a visit was reassigned to you. {_get_visit_message(appointment)}",
+            )
+    except Exception:
+        logger.exception('Failed to send reassignment SMS to staff for appointment_id=%s', appointment.id)
+
+    try:
+        if appointment.visitor_phone:
+            send_visitor_reassigned_sms(
+                phone_number=appointment.visitor_phone,
+                visitor_name=appointment.visitor_name,
+                staff_name=staff.full_name or 'a new host',
+                visit_time=_format_local_time(appointment.appointment_date),
+            )
+    except Exception:
+        logger.exception('Failed to send reassignment SMS to visitor for appointment_id=%s', appointment.id)
+
+
 class AppointmentCreateView(generics.CreateAPIView):
     queryset = Appointment.objects.all()
     serializer_class = AppointmentCreateSerializer
@@ -370,7 +403,7 @@ class AppointmentReassignView(generics.UpdateAPIView):
         response = super().update(request, *args, **kwargs)
         appointment.refresh_from_db()
         new_staff = appointment.staff_member
-        # TODO: Notify new staff member of reassignment
+        _notify_reassignment(appointment)
         return Response({
             'message': f'Appointment reassigned from {old_staff.full_name} to {new_staff.full_name}',
             'data': response.data

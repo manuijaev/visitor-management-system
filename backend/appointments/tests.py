@@ -430,3 +430,101 @@ class DoubleBookingTests(TestCase):
         self.assertEqual(len(member['booked_times']), 1)
         self.assertEqual(datetime.fromisoformat(member['booked_times'][0]), self.slot)
         self.assertNotIn('Brian', str(member))
+
+
+@mock.patch('appointments.views.send_fcm_push_notification', return_value={'sent': True})
+@mock.patch('appointments.views.send_emailjs', return_value=True)
+@mock.patch('notifications.sms_service.send_sms', return_value=True)
+class ReassignTests(TestCase):
+    def setUp(self):
+        self.department = Department.objects.create(name='Academics')
+        self.division = Division.objects.create(name='Grade 5', department=self.department)
+        self.other_department = Department.objects.create(name='Finance')
+        self.other_division = Division.objects.create(name='Bursar', department=self.other_department)
+        self.admin = User.objects.create_user(
+            email='admin@example.com', full_name='Ada Admin', password='AdminPass123!', role=User.Role.ADMIN
+        )
+        self.jane = User.objects.create_user(
+            email='jane@example.com', full_name='Jane Wanjiru', password='StaffPass123!',
+            department=self.department, division=self.division, phone='0711000111',
+        )
+        self.peter = User.objects.create_user(
+            email='peter@example.com', full_name='Peter Otieno', password='StaffPass123!',
+            department=self.other_department, division=self.other_division, phone='0733000222',
+            fcm_token='peter-device',
+        )
+        self.visit = Appointment.objects.create(
+            visitor_name='Amina Hassan', visitor_phone='0722333444', department=self.department,
+            division=self.division, staff_member=self.jane, status='Accepted', response_note='See you',
+            appointment_date=timezone.now() + timedelta(days=1),
+        )
+        self.client = APIClient()
+
+    def _reassign(self, staff_id, user=None):
+        self.client.force_authenticate(user or self.admin)
+        return self.client.patch(f'/api/appointments/reassign/{self.visit.id}/', {'staff_member': staff_id}, format='json')
+
+    def test_reassign_moves_visit_and_resets_it_to_pending(self, _sms, _email, _push):
+        response = self._reassign(self.peter.id)
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.visit.refresh_from_db()
+        self.assertEqual(self.visit.staff_member, self.peter)
+        self.assertEqual(self.visit.department, self.other_department)
+        self.assertEqual(self.visit.division, self.other_division)
+        self.assertEqual(self.visit.status, 'Pending')
+        self.assertEqual(self.visit.response_note, '')
+
+    def test_reassign_alerts_new_staff_and_tells_visitor(self, send_sms, email, push):
+        self._reassign(self.peter.id)
+
+        texts = {call.args[0]: call.args[1] for call in send_sms.call_args_list}
+        self.assertIn('reassigned to you', texts['0733000222'])
+        self.assertIn('Amina Hassan', texts['0733000222'])
+        self.assertIn('is now with Peter Otieno', texts['0722333444'])
+        self.assertNotIn('0711000111', texts)
+        self.assertLessEqual(max(len(text) for text in texts.values()), 160)
+        self.assertEqual(email.call_args.args[1]['to_email'], 'peter@example.com')
+        self.assertEqual(push.call_args.kwargs['fcm_token'], 'peter-device')
+
+    def test_rejects_same_staff_member(self, send_sms, _email, _push):
+        response = self._reassign(self.jane.id)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('staff_member', response.data)
+        send_sms.assert_not_called()
+
+    def test_rejects_deactivated_staff(self, send_sms, _email, _push):
+        self.peter.is_active = False
+        self.peter.save()
+
+        response = self._reassign(self.peter.id)
+
+        self.assertEqual(response.status_code, 400)
+        send_sms.assert_not_called()
+
+    def test_rejects_staff_without_department(self, _sms, _email, _push):
+        unplaced = User.objects.create_user(email='new@example.com', full_name='New Teacher', password='StaffPass123!')
+
+        response = self._reassign(unplaced.id)
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_staff_cannot_use_reassign(self, send_sms, _email, _push):
+        response = self._reassign(self.peter.id, user=self.jane)
+
+        self.assertEqual(response.status_code, 404)
+        self.visit.refresh_from_db()
+        self.assertEqual(self.visit.staff_member, self.jane)
+
+    def test_staff_cannot_reassign_through_update_endpoint(self, _sms, _email, _push):
+        self.client.force_authenticate(self.jane)
+
+        self.client.patch(
+            f'/api/appointments/update/{self.visit.id}/',
+            {'status': 'Declined', 'response_note': 'Not mine', 'staff_member': self.peter.id},
+            format='json',
+        )
+
+        self.visit.refresh_from_db()
+        self.assertEqual(self.visit.staff_member, self.jane)

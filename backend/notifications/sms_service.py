@@ -167,6 +167,15 @@ def send_visitor_received_sms(phone_number, visitor_name, staff_name, visit_time
     return send_sms(phone_number, _fit(message))
 
 
+def send_visitor_reassigned_sms(phone_number, visitor_name, staff_name, visit_time):
+    """Tell the visitor their visit has moved to a different staff member."""
+    message = (
+        f"Hi {_first_name(visitor_name)}, your visit on {visit_time} is now with {staff_name}. "
+        f"We'll text you once they respond. - Gatepass"
+    )
+    return send_sms(phone_number, _fit(message))
+
+
 def send_visitor_sms(phone_number, visitor_name, staff_name, status, response_note, visit_time=""):
     """Send response notification to visitor."""
     print(f"SMS ATTEMPT — phone: {phone_number}, visitor: {visitor_name}, status: {status}")
