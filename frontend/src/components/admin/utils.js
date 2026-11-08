@@ -69,9 +69,18 @@ export function formatVisitDate(value) {
     timeZone: EAT_TIMEZONE,
     day: 'numeric',
     month: 'short',
-    hour: '2-digit',
+    hour: 'numeric',
     minute: '2-digit',
+    hour12: true,
   });
+}
+
+/** A time of day in Nairobi on the 12-hour clock, e.g. "2:00 pm". */
+export function formatClockTime(value = new Date()) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString('en-GB', { timeZone: EAT_TIMEZONE, hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
 /**

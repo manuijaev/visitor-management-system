@@ -12664,10 +12664,6 @@ tr:hover .row-actions {
     padding: 0 12px;
   }
 
-  .sd-availability-toggle .sd-availability-icon {
-    display: none;
-  }
-
   .sd-availability-toggle .sd-availability-text {
     letter-spacing: 0.04em;
   }
@@ -12723,10 +12719,166 @@ tr:hover .row-actions {
   }
 }
 
-/* Small phones: the screen refreshes itself and your name is under More, so drop those two. */
+/* Small phones: the screen refreshes itself, so drop the refresh button. */
 @media (max-width: 400px) {
-  .sd-topbar-right > .sd-icon-btn:not(.sd-notif-btn),
-  .sd-topbar-right > .sd-avatar {
+  .sd-topbar-right > .sd-icon-btn {
     display: none;
   }
+}
+
+/* ---------- Availability switch ---------- */
+.sd-availability-toggle {
+  gap: 8px;
+  padding: 0 14px 0 6px;
+  box-shadow: 0 1px 2px rgba(26, 23, 20, 0.08);
+}
+
+.sd-availability-toggle:hover:not(:disabled) {
+  box-shadow: 0 3px 10px rgba(26, 23, 20, 0.12);
+  transform: translateY(-1px);
+}
+
+.sd-availability-toggle:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+
+.sd-switch {
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--green, #2e7d4f);
+  transition: background 0.2s ease;
+}
+
+.sd-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 16px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: left 0.2s ease;
+}
+
+.sd-availability-toggle.offline .sd-switch {
+  background: var(--ink-faint, #a39d96);
+}
+
+.sd-availability-toggle.offline .sd-switch-knob {
+  left: 2px;
+}
+
+/* ---------- Profile menu (avatar) ---------- */
+.sd-profile {
+  position: relative;
+}
+
+button.sd-avatar {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  flex: none;
+}
+
+button.sd-avatar:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+
+.sd-profile-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 120;
+  width: 260px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+}
+
+.sd-profile-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 10px 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sd-profile-avatar {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--gold);
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.sd-profile-head > span:last-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sd-profile-head strong {
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.sd-profile-head small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--ink-light);
+}
+
+.sd-profile-item {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  text-align: left;
+  font-size: 14px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.sd-profile-item:hover {
+  background: var(--surface2);
+}
+
+.sd-profile-item.is-danger {
+  color: var(--red);
+}
+
+.sd-profile-item,
+.sd-profile-item:hover {
+  box-shadow: none;
+  transform: none;
+}
+
+/* Sidebar counts are small pills at the end of the row, not stretched bars. */
+.sd-nav-item .sd-nav-badge {
+  flex: none;
+  width: auto;
+  min-width: 22px;
+  margin-left: auto;
+  padding: 0 7px;
+  letter-spacing: 0;
 }

@@ -7,7 +7,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import DaysOffPanel from '../components/DaysOffPanel';
 import { sendVisitorResponseEmail } from '../services/emailjs';
 import api from '../services/api';
-import { eatDateKey, orderVisitsForReview } from '../components/admin/utils';
+import { eatDateKey, formatClockTime, orderVisitsForReview } from '../components/admin/utils';
 
 const studentLabel = (visit) =>
   [visit?.student_name?.trim(), visit?.student_class?.trim() && `(${visit.student_class.trim()})`].filter(Boolean).join(' ');
@@ -29,7 +29,7 @@ function rescheduleTimeError(value, appointment) {
 }
 
 const formatRescheduleTime = (value) =>
-  new Date(value).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  new Date(value).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true });
 
 /** Screen names shown in the phone top bar. */
 const TAB_TITLES = {
@@ -287,6 +287,24 @@ export default function StaffDashboardPage() {
   }, [subscribeToForegroundMessages]);
 
   const notificationRef = useRef(null);
+  const profileRef = useRef(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+
+  useEffect(() => {
+    if (!profileOpen) return undefined;
+    const closeOnOutsideClick = (event) => {
+      if (profileRef.current && !profileRef.current.contains(event.target)) setProfileOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setProfileOpen(false);
+    };
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [profileOpen]);
 
   const today = eatDateKey();
 
@@ -348,7 +366,7 @@ export default function StaffDashboardPage() {
 
   const formatTime = (dateStr) => {
     const date = new Date(dateStr);
-    return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+    return formatClockTime(date);
   };
 
   const getDateLabel = () => {
@@ -357,7 +375,7 @@ export default function StaffDashboardPage() {
   };
 
   const getTimeLabel = () => {
-    return currentTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }) + ' EAT';
+    return `${formatClockTime(currentTime)} EAT`;
   };
 
   const getRelativeTimeLabel = (timestamp) => {
@@ -661,17 +679,6 @@ export default function StaffDashboardPage() {
           </div>
         </div>
 
-        <div className="sd-user-card">
-          <div className="sd-user-avatar">{getInitials(user?.full_name)}</div>
-          <div className="sd-user-info">
-            <div className="sd-user-name">{user?.full_name || 'Staff Member'}</div>
-            <div className="sd-user-dept">
-              {user?.department_name || 'No Department'}
-              {user?.division_name && ` / ${user.division_name}`}
-            </div>
-          </div>
-        </div>
-
         <nav className="sd-nav">
           <div className="sd-nav-section">MAIN</div>
           <button className={`sd-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => { setActiveTab('dashboard'); setSidebarOpen(false); }}>
@@ -748,17 +755,19 @@ export default function StaffDashboardPage() {
               {getDateLabel()} - {getTimeLabel()}
             </div>
             <button
+              type="button"
+              role="switch"
+              aria-checked={isCurrentlyAvailable}
               className={`sd-availability-toggle ${isCurrentlyAvailable ? 'online' : 'offline'}`}
               onClick={handleAvailabilityToggle}
               disabled={availabilityLoading}
-              aria-live="polite"
+              title={isCurrentlyAvailable ? 'Tap to mark yourself away' : 'Tap to mark yourself available'}
             >
-              <span className="sd-availability-icon" aria-hidden="true">
-                {isCurrentlyAvailable ? ICONS.check : ICONS.alertCircle}
+              <span className="sd-switch" aria-hidden="true">
+                <span className="sd-switch-knob" />
               </span>
-              <span className="sd-availability-dot" aria-hidden="true"></span>
               <span className="sd-availability-text">
-                {isCurrentlyAvailable ? 'Available' : 'Unavailable'}
+                {isCurrentlyAvailable ? 'Available' : 'Away'}
               </span>
             </button>
             <div className="sd-notification-wrapper" ref={notificationRef}>
@@ -796,7 +805,7 @@ export default function StaffDashboardPage() {
                           <div className="sd-notification-dot"></div>
                           <div className="sd-notification-content">
                             <p>{n.message}</p>
-                            <span>{n.time || (n.timestamp ? new Date(n.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '')}</span>
+                            <span>{n.time || formatClockTime(n.timestamp)}</span>
                           </div>
                           <button
                             className="sd-notification-clear"
@@ -816,7 +825,39 @@ export default function StaffDashboardPage() {
               )}
             </div>
             <button className="sd-icon-btn" onClick={() => loadMyAppointments().then(() => showToast('Refreshed!'))}>{ICONS.refresh}</button>
-            <div className="sd-avatar">{getInitials(user?.full_name)}</div>
+            <div className="sd-profile" ref={profileRef}>
+              <button
+                type="button"
+                className="sd-avatar"
+                onClick={() => setProfileOpen((open) => !open)}
+                aria-haspopup="menu"
+                aria-expanded={profileOpen}
+                aria-label={`Account: ${user?.full_name || 'Staff member'}`}
+              >
+                {getInitials(user?.full_name)}
+              </button>
+              {profileOpen && (
+                <div className="sd-profile-menu" role="menu">
+                  <div className="sd-profile-head">
+                    <span className="sd-profile-avatar">{getInitials(user?.full_name)}</span>
+                    <span>
+                      <strong>{user?.full_name || 'Staff member'}</strong>
+                      <small>
+                        {user?.department_name || 'No department'}
+                        {user?.division_name && ` / ${user.division_name}`}
+                      </small>
+                      {user?.email && <small>{user.email}</small>}
+                    </span>
+                  </div>
+                  <button type="button" role="menuitem" className="sd-profile-item" onClick={() => { setProfileOpen(false); setActiveTab('settings'); }}>
+                    Settings
+                  </button>
+                  <button type="button" role="menuitem" className="sd-profile-item is-danger" onClick={handleLogout}>
+                    Sign out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 

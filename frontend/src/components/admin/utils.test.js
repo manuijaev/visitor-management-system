@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { eatDateKey, formatApiError, getInitials, orderVisitsForReview } from './utils';
+import { eatDateKey, formatApiError, formatClockTime, getInitials, orderVisitsForReview } from './utils';
 
 describe('eatDateKey', () => {
   it('uses the school day in Nairobi, not UTC', () => {
@@ -64,5 +64,17 @@ describe('orderVisitsForReview', () => {
     const visits = [visit('a', 'Accepted', '2026-11-20T09:00:00Z'), visit('b', 'Pending', '2026-11-21T09:00:00Z')];
     orderVisitsForReview(visits, now);
     expect(visits[0].id).toBe('a');
+  });
+});
+
+describe('formatClockTime', () => {
+  it('uses the 12-hour clock in Nairobi time', () => {
+    expect(formatClockTime('2026-11-10T11:00:00Z')).toBe('2:00 pm');
+    expect(formatClockTime('2026-11-10T05:30:00Z')).toBe('8:30 am');
+  });
+
+  it('returns an empty string for a missing or invalid time', () => {
+    expect(formatClockTime(null)).toBe('');
+    expect(formatClockTime('not a time')).toBe('');
   });
 });

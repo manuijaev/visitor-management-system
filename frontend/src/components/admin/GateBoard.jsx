@@ -13,7 +13,7 @@ const schoolDay = (value) =>
     : '';
 
 const clockTime = (value) =>
-  new Date(value).toLocaleTimeString('en-GB', { timeZone: EAT_TIMEZONE, hour: '2-digit', minute: '2-digit' });
+  new Date(value).toLocaleTimeString('en-GB', { timeZone: EAT_TIMEZONE, hour: 'numeric', minute: '2-digit', hour12: true });
 
 const matches = (visit, query) =>
   !query ||
