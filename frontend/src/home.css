@@ -878,6 +878,13 @@ body.home-background #root {
   border-color: var(--border2);
 }
 
+.gp-day:disabled {
+  border-style: dashed;
+  background: transparent;
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .gp-day span {
   font-size: 11px;
   font-weight: 600;

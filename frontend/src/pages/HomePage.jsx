@@ -12,7 +12,6 @@ const SLOT_MINUTES = 30;
 const LEAD_MINUTES = 30;
 const BOOKABLE_DAYS = 10;
 const RECEPTION_KEY = 'gp_reception_mode';
-const UNAVAILABLE_KEY = 'staff_unavailable_by_date';
 const RECEPTION_RESET_SECONDS = 20;
 const SLIDE_SECONDS = 6;
 
@@ -202,6 +201,7 @@ const toStaff = (member) => ({
   divisionName: member.division_name || '',
   available: member.is_available !== false,
   reason: (member.availability_reason || '').trim(),
+  unavailableDates: Array.isArray(member.unavailable_dates) ? member.unavailable_dates : [],
 });
 
 const firstName = (name) => (name || '').trim().split(/\s+/)[0] || '';
@@ -217,10 +217,10 @@ const placement = (host) => [host.departmentName, host.divisionName].filter(Bool
 const matchesQuery = (host, query) =>
   !query || `${host.name} ${host.departmentName} ${host.divisionName}`.toLowerCase().includes(query);
 
-function hostBlockReason(host, mode, dayKey, unavailableByDate) {
+function hostBlockReason(host, mode, dayKey) {
   if (!host.departmentId || !host.divisionId) return 'Not set up for visits yet';
   if (mode === 'later') {
-    const blocked = dayKey && (unavailableByDate[String(host.id)] || []).includes(dayKey);
+    const blocked = dayKey && host.unavailableDates.includes(dayKey);
     return blocked ? 'Unavailable on that day' : null;
   }
   if (!host.available) return host.reason || 'Unavailable right now';
@@ -268,14 +268,6 @@ function downloadCalendarInvite(visit) {
   link.download = `gatepass-${visit.reference}.ics`;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-function readUnavailableByDate() {
-  try {
-    return JSON.parse(localStorage.getItem(UNAVAILABLE_KEY) || '{}') || {};
-  } catch {
-    return {};
-  }
 }
 
 function HeroCarousel() {
@@ -437,7 +429,6 @@ export default function HomePage() {
   const [now, setNow] = useState(() => new Date());
   const [navOpen, setNavOpen] = useState(false);
   const [toast, setToast] = useState('');
-  const [unavailableByDate, setUnavailableByDate] = useState(readUnavailableByDate);
   const flowRef = useRef(null);
   const toastTimer = useRef(null);
 
@@ -463,14 +454,7 @@ export default function HomePage() {
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60 * 1000);
-    const onStorage = (event) => {
-      if (event.key === UNAVAILABLE_KEY) setUnavailableByDate(readUnavailableByDate());
-    };
-    window.addEventListener('storage', onStorage);
-    return () => {
-      clearInterval(timer);
-      window.removeEventListener('storage', onStorage);
-    };
+    return () => clearInterval(timer);
   }, []);
 
   useEffect(() => () => clearTimeout(toastTimer.current), []);
@@ -500,7 +484,7 @@ export default function HomePage() {
   const emailOk = !visitor.email.trim() || EMAIL_RE.test(visitor.email.trim());
   const whenOk = mode === 'now' || mode === 'onway' || (mode === 'later' && Boolean(slotStillOpen));
   const blockFor = (member, visitMode = mode) =>
-    hostBlockReason(member, visitMode, visitMode === 'later' ? dayKey : null, unavailableByDate);
+    hostBlockReason(member, visitMode, visitMode === 'later' ? dayKey : null);
   const hostOk = Boolean(host) && !blockFor(host);
   const detailsOk = nameOk && phoneOk && emailOk;
   const stepDone = [whenOk, hostOk, detailsOk, false];
@@ -527,7 +511,9 @@ export default function HomePage() {
     setMode(visitMode);
     if (visitMode === 'now') advanceFromWhen('now');
     if (visitMode === 'later' && !dayKey) {
-      const firstOpen = days.find((day) => buildSlots(day.key, now).some((item) => item.available));
+      const firstOpen = days.find(
+        (day) => !host?.unavailableDates.includes(day.key) && buildSlots(day.key, now).some((item) => item.available)
+      );
       if (firstOpen) setDayKey(firstOpen.key);
     }
   };
@@ -769,6 +755,8 @@ export default function HomePage() {
                 key={day.key}
                 type="button"
                 aria-pressed={dayKey === day.key}
+                disabled={Boolean(host?.unavailableDates.includes(day.key))}
+                title={host?.unavailableDates.includes(day.key) ? `${hostFirst} is away this day` : undefined}
                 className={`gp-day ${dayKey === day.key ? 'is-on' : ''}`}
                 onClick={() => {
                   setDayKey(day.key);

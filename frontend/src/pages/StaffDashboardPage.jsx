@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useAppointments } from '../context/AppointmentContext';
 import { useNotification } from '../context/NotificationContext';
 import ConfirmModal from '../components/ConfirmModal';
+import DaysOffPanel from '../components/DaysOffPanel';
 import { sendVisitorResponseEmail } from '../services/emailjs';
 import api from '../services/api';
 
@@ -1207,6 +1208,7 @@ export default function StaffDashboardPage() {
                   )}
                 </div>
               </div>
+              <DaysOffPanel icon={ICONS.calendar} />
             </div>
           )}
 
