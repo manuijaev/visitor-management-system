@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { eatDateKey, formatApiError, formatClockTime, getInitials, orderVisitsForReview } from './utils';
+import { eatDateKey, formatApiError, formatClockTime, formatTopbarDateTime, getInitials, orderVisitsForReview } from './utils';
 
 describe('eatDateKey', () => {
   it('uses the school day in Nairobi, not UTC', () => {
@@ -76,5 +76,12 @@ describe('formatClockTime', () => {
   it('returns an empty string for a missing or invalid time', () => {
     expect(formatClockTime(null)).toBe('');
     expect(formatClockTime('not a time')).toBe('');
+  });
+});
+
+describe('formatTopbarDateTime', () => {
+  it('shows the Nairobi date and 12-hour time', () => {
+    // 21:30 UTC on the 8th is 00:30 on the 9th in Nairobi.
+    expect(formatTopbarDateTime('2026-11-08T21:30:00Z')).toBe('Monday, 9 November 2026 - 12:30 am EAT');
   });
 });

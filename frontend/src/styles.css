@@ -13283,3 +13283,24 @@ button.sd-avatar:focus-visible {
 .ad-settings .sd-account-list > div:last-child {
   border-bottom: none;
 }
+
+/* Admin top bar: clock and refresh, as in the staff app. */
+.ad-clock {
+  margin-right: 6px;
+  font-size: 13px;
+  color: var(--ink-mid);
+  white-space: nowrap;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .ad-clock {
+    display: none;
+  }
+}
+
+@media (max-width: 400px) {
+  .ad-topbar-actions .ad-refresh {
+    display: none;
+  }
+}

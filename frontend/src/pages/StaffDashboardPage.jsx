@@ -7,7 +7,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import DaysOffPanel from '../components/DaysOffPanel';
 import { sendVisitorResponseEmail } from '../services/emailjs';
 import api from '../services/api';
-import { eatDateKey, formatClockTime, matchesVisitFilter, orderVisitsForReview, VISIT_FILTERS } from '../components/admin/utils';
+import { eatDateKey, formatClockTime, formatTopbarDateTime, matchesVisitFilter, orderVisitsForReview, VISIT_FILTERS } from '../components/admin/utils';
 
 const studentLabel = (visit) =>
   [visit?.student_name?.trim(), visit?.student_class?.trim() && `(${visit.student_class.trim()})`].filter(Boolean).join(' ');
@@ -374,15 +374,6 @@ export default function StaffDashboardPage() {
     return formatClockTime(date);
   };
 
-  const getDateLabel = () => {
-    const date = new Date();
-    return date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  };
-
-  const getTimeLabel = () => {
-    return `${formatClockTime(currentTime)} EAT`;
-  };
-
   const getRelativeTimeLabel = (timestamp) => {
     if (!timestamp) return 'just now';
     const createdTime = new Date(timestamp).getTime();
@@ -728,7 +719,7 @@ export default function StaffDashboardPage() {
           </div>
           <div className="sd-topbar-right">
             <div className="sd-date-display">
-              {getDateLabel()} - {getTimeLabel()}
+              {formatTopbarDateTime(currentTime)}
             </div>
             <button
               type="button"

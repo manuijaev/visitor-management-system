@@ -13,6 +13,7 @@ import {
   eatDateKey,
   firstName,
   formatApiError,
+  formatTopbarDateTime,
   formatVisitDate,
   getInitials,
   getRelativeTimeLabel,
@@ -27,7 +28,7 @@ const NAV_ITEMS = [
   { id: 'visitors', label: 'Visitors', icon: 'visitors' },
   { id: 'gate', label: 'Gate', icon: 'shield' },
   { id: 'team', label: 'Team', icon: 'team' },
-  { id: 'settings', label: 'Settings', icon: 'settings' },
+  { id: 'departments', label: 'Departments', icon: 'building' },
 ];
 
 /** The views on the phone tab bar; the rest stay under More. */
@@ -141,7 +142,13 @@ export default function AdminDashboardPage() {
   const { logout, user } = useAuth();
 
   const [view, setView] = useState('overview');
-  const [teamTab, setTeamTab] = useState('people');
+  const [now, setNow] = useState(() => new Date());
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 15000);
+    return () => clearInterval(id);
+  }, []);
   const [navOpen, setNavOpen] = useState(false);
 
   const [departments, setDepartments] = useState([]);
@@ -358,7 +365,7 @@ export default function AdminDashboardPage() {
     return [a.visitor_name, a.visitor_email, studentLabel(a), a.staff_name, a.department_name].some((v) => v?.toLowerCase().includes(q));
   }));
 
-  const pageTitle = { overview: 'Overview', visitors: 'Visitors', gate: 'Gate', team: 'Team', notifications: 'Notifications', settings: 'Settings' }[view];
+  const pageTitle = { overview: 'Overview', visitors: 'Visitors', gate: 'Gate', team: 'Team', departments: 'Departments', notifications: 'Notifications', settings: 'Settings' }[view];
 
   const renderVisitRow = (a, compact = false) => (
     <div key={a.id} className={`ad-row ${compact ? 'ad-row-compact' : ''}`}>
@@ -494,6 +501,7 @@ export default function AdminDashboardPage() {
                 <span>{item.label}</span>
                 {item.id === 'visitors' && stats.pending > 0 && <span className="ad-nav-count">{stats.pending}</span>}
                 {item.id === 'team' && <span className="ad-nav-count muted">{staff.length}</span>}
+                {item.id === 'departments' && <span className="ad-nav-count muted">{departments.length}</span>}
               </button>
             ))}
           </nav>
@@ -513,9 +521,25 @@ export default function AdminDashboardPage() {
             </button>
             <div className="ad-topbar-title">{pageTitle}</div>
             <div className="ad-topbar-actions">
+              <span className="ad-clock">{formatTopbarDateTime(now)}</span>
               <button type="button" className="ad-icon-btn ad-bell" onClick={() => goTo('notifications')} aria-label={`Notifications, ${unreadCount} unread`}>
                 <Icon name="bell" size={17} />
                 {unreadCount > 0 && <span className="ad-bell-dot">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+              </button>
+              <button
+                type="button"
+                className="ad-icon-btn ad-refresh"
+                disabled={refreshing}
+                aria-label="Refresh"
+                title="Refresh"
+                onClick={async () => {
+                  setRefreshing(true);
+                  await loadData();
+                  setRefreshing(false);
+                  notify('Up to date.');
+                }}
+              >
+                <Icon name="refresh" size={16} />
               </button>
               <div className="sd-profile" ref={profileRef}>
                 <button
@@ -679,18 +703,9 @@ export default function AdminDashboardPage() {
                     <h1>Team</h1>
                     <p>{staff.length} {staff.length === 1 ? 'person' : 'people'} across {departments.length} department{departments.length === 1 ? '' : 's'}</p>
                   </div>
-                  <div className="ad-segmented ad-segmented-lg" role="tablist">
-                    <button type="button" role="tab" aria-selected={teamTab === 'people'} className={teamTab === 'people' ? 'active' : ''} onClick={() => setTeamTab('people')}>
-                      <Icon name="team" size={15} /> People
-                    </button>
-                    <button type="button" role="tab" aria-selected={teamTab === 'departments'} className={teamTab === 'departments' ? 'active' : ''} onClick={() => setTeamTab('departments')}>
-                      <Icon name="building" size={15} /> Departments
-                    </button>
-                  </div>
                 </div>
 
-                {teamTab === 'people' ? (
-                  <section className="ad-card">
+                <section className="ad-card">
                     <div className="ad-toolbar">
                       <label className="ad-search">
                         <Icon name="search" size={15} />
@@ -710,17 +725,26 @@ export default function AdminDashboardPage() {
                       Add staff member
                     </button>
                   </section>
-                ) : (
-                  <DepartmentsBoard
-                    departments={departments}
-                    divisions={divisions}
-                    staff={staff}
-                    onChange={loadData}
-                    notify={notify}
-                    confirm={openConfirm}
-                    onAddStaff={(deptId) => openWizard(deptId)}
-                  />
-                )}
+              </>
+            )}
+
+            {view === 'departments' && (
+              <>
+                <div className="ad-page-head">
+                  <div>
+                    <h1>Departments</h1>
+                    <p>{departments.length} department{departments.length === 1 ? '' : 's'} and {divisions.length} division{divisions.length === 1 ? '' : 's'}. Visitors choose from these when they book.</p>
+                  </div>
+                </div>
+                <DepartmentsBoard
+                  departments={departments}
+                  divisions={divisions}
+                  staff={staff}
+                  onChange={loadData}
+                  notify={notify}
+                  confirm={openConfirm}
+                  onAddStaff={(deptId) => openWizard(deptId)}
+                />
               </>
             )}
 
@@ -769,7 +793,11 @@ export default function AdminDashboardPage() {
                     <div className="ad-settings-actions">
                       <button type="button" className="ad-btn ad-btn-ghost" onClick={() => goTo('team')}>
                         <Icon name="team" size={15} />
-                        Manage team and departments
+                        Manage team
+                      </button>
+                      <button type="button" className="ad-btn ad-btn-ghost" onClick={() => goTo('departments')}>
+                        <Icon name="building" size={15} />
+                        Manage departments
                       </button>
                     </div>
                   </section>
