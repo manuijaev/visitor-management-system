@@ -12973,3 +12973,171 @@ button.sd-avatar:focus-visible {
   font-size: 16px;
   font-weight: 600;
 }
+
+/* ---------- Requests screen: status tabs, today toggle, phone search ---------- */
+.sd-filter-bar {
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.sd-filter-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  flex: none;
+  white-space: nowrap;
+}
+
+.sd-filter-count {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(26, 23, 20, 0.07);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.sd-filter-tab.active .sd-filter-count {
+  background: rgba(201, 146, 42, 0.25);
+}
+
+.sd-today-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-mid);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sd-today-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--gold);
+}
+
+.sd-mobile-search {
+  display: none;
+}
+
+/* Home: panel header with a link on the right. */
+.sd-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sd-link-btn {
+  width: auto;
+  padding: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gold-dark);
+  cursor: pointer;
+}
+
+.sd-link-btn:hover {
+  text-decoration: underline;
+  transform: none;
+  box-shadow: none;
+}
+
+.sd-notification-backdrop {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .sd-mobile-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: 42px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface2);
+    color: var(--ink-light);
+  }
+
+  .sd-mobile-search svg {
+    width: 16px;
+    height: 16px;
+    flex: none;
+  }
+
+  .sd-mobile-search input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: transparent;
+    font-size: 15px;
+    color: var(--ink);
+    outline: none;
+  }
+
+  .sd-filter-tabs {
+    width: 100%;
+  }
+
+  .sd-filter-tab {
+    padding: 9px 12px;
+  }
+
+  /* Dim the page behind the notifications panel so it's clear it's open. */
+  .sd-notification-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 99998;
+    background: rgba(26, 23, 20, 0.35);
+  }
+}
+
+.sd-list-sub {
+  font-size: 12px;
+  color: var(--ink-mid);
+}
+
+/* Tabs switch instantly; a colour fade made the old tab look selected for a moment. */
+.app-tab,
+.app-tab .app-tab-icon {
+  transition: none;
+}
+
+/* The bell keeps its unread count on itself, even where its wrapper is static on phones. */
+.sd-notification-wrapper > .sd-icon-btn {
+  position: relative;
+}
+
+@media (max-width: 768px) {
+  /* All four status tabs fit across the screen. */
+  .sd-filter-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    overflow: visible;
+  }
+
+  .sd-filter-tab {
+    flex-direction: column;
+    gap: 2px;
+    padding: 7px 2px;
+    font-size: 12.5px;
+    justify-content: center;
+  }
+
+  .sd-filter-count {
+    padding: 0 6px;
+    font-size: 10.5px;
+  }
+}

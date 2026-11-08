@@ -36,12 +36,16 @@ const TAB_TITLES = {
   dashboard: 'Home',
   appointments: 'Requests',
   schedule: 'Schedule',
-  pending: 'Pending',
-  accepted: 'Accepted',
-  declined: 'Declined',
-  history: 'History',
   settings: 'Settings',
 };
+
+/** The status tabs on the Requests screen. Rescheduled visits count as accepted; cancelled and closed ones sit with declined. */
+const REQUEST_FILTERS = [
+  { id: 'pending', label: 'Pending', statuses: ['Pending'] },
+  { id: 'accepted', label: 'Accepted', statuses: ['Accepted', 'Rescheduled'] },
+  { id: 'declined', label: 'Declined', statuses: ['Declined', 'Cancelled', 'Expired'] },
+  { id: 'all', label: 'All', statuses: null },
+];
 
 const ICONS = {
   dashboard: (
@@ -289,6 +293,13 @@ export default function StaffDashboardPage() {
   const notificationRef = useRef(null);
   const profileRef = useRef(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [requestFilter, setRequestFilter] = useState('all');
+
+  const openRequests = (filter = 'all') => {
+    setRequestFilter(filter);
+    setActiveTab('appointments');
+    setSidebarOpen(false);
+  };
 
   useEffect(() => {
     if (!profileOpen) return undefined;
@@ -401,11 +412,8 @@ export default function StaffDashboardPage() {
   };
 
   const filteredAppointments = orderVisitsForReview(appointments.filter(a => {
-    // Filter by status for specific tabs
-    if (activeTab === 'pending' && a.status !== 'Pending') return false;
-    if (activeTab === 'accepted' && a.status !== 'Accepted') return false;
-    if (activeTab === 'declined' && a.status !== 'Declined') return false;
-    if (activeTab === 'history' && ['Pending', 'Accepted'].includes(a.status)) return false;
+    const statuses = REQUEST_FILTERS.find((filter) => filter.id === requestFilter)?.statuses;
+    if (statuses && !statuses.includes(a.status)) return false;
 
     if (dateFilter === 'today' && eatDateKey(a.appointment_date) !== today) return false;
     if (searchQuery) {
@@ -427,10 +435,14 @@ export default function StaffDashboardPage() {
     rescheduled: appointments.filter(a => a.status === 'Rescheduled').length,
     today: appointments.filter(a => eatDateKey(a.appointment_date) === today).length,
     total: appointments.length,
-    acceptRate: appointments.length > 0
-      ? Math.round((appointments.filter(a => a.status === 'Accepted').length / appointments.length) * 100)
-      : 0,
+    upcoming: appointments.filter(a => ['Accepted', 'Rescheduled'].includes(a.status) && new Date(a.appointment_date) > new Date()).length,
   };
+
+  /** Confirmed visits still to come, soonest first. */
+  const upcomingVisits = appointments
+    .filter(a => ['Accepted', 'Rescheduled'].includes(a.status) && new Date(a.appointment_date) > new Date())
+    .sort((a, b) => new Date(a.appointment_date) - new Date(b.appointment_date))
+    .slice(0, 3);
 
   const overdueAppointments = appointments
     .filter(a => a.status === 'Pending')
@@ -682,53 +694,24 @@ export default function StaffDashboardPage() {
         <nav className="sd-nav">
           <div className="sd-nav-section">MAIN</div>
           <button className={`sd-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => { setActiveTab('dashboard'); setSidebarOpen(false); }}>
-            {ICONS.dashboard}<span>Dashboard</span>
+            {ICONS.dashboard}<span>Home</span>
           </button>
-          <button className={`sd-nav-item ${activeTab === 'appointments' ? 'active' : ''}`} onClick={() => { setActiveTab('appointments'); setSidebarOpen(false); }}>
-            {ICONS.calendar}<span>Visitor queue</span>
+          <button className={`sd-nav-item ${activeTab === 'appointments' ? 'active' : ''}`} onClick={() => openRequests(stats.pending > 0 ? 'pending' : 'all')}>
+            {ICONS.calendar}<span>Requests</span>
             {stats.pending > 0 && <span className="sd-nav-badge">{stats.pending}</span>}
           </button>
           <button className={`sd-nav-item ${activeTab === 'schedule' ? 'active' : ''}`} onClick={() => { setActiveTab('schedule'); setSidebarOpen(false); }}>
             {ICONS.clock}<span>Schedule</span>
           </button>
 
-          <div className="sd-nav-section">MANAGE</div>
-          <button className={`sd-nav-item ${activeTab === 'pending' ? 'active' : ''}`} onClick={() => { setActiveTab('pending'); setSidebarOpen(false); }}>
-            {ICONS.activity}<span>Pending</span>
-            {stats.pending > 0 && <span className="sd-nav-badge red">{stats.pending}</span>}
-          </button>
-          <button className={`sd-nav-item ${activeTab === 'accepted' ? 'active' : ''}`} onClick={() => { setActiveTab('accepted'); setSidebarOpen(false); }}>
-            {ICONS.check}<span>Accepted</span>
-          </button>
-          <button className={`sd-nav-item ${activeTab === 'declined' ? 'active' : ''}`} onClick={() => { setActiveTab('declined'); setSidebarOpen(false); }}>
-            {ICONS.x}<span>Declined</span>
-          </button>
-          <button className={`sd-nav-item ${activeTab === 'history' ? 'active' : ''}`} onClick={() => { setActiveTab('history'); setSidebarOpen(false); }}>
-            {ICONS.refresh}<span>History</span>
-          </button>
-
-          <div className="sd-nav-section">ACTIONS</div>
+          <div className="sd-nav-section">MORE</div>
           <button className="sd-nav-item" onClick={() => { handleExportCSV(); setSidebarOpen(false); }}>
-            {ICONS.download}<span>Export visitor queue</span>
+            {ICONS.download}<span>Export requests</span>
           </button>
-          <button className="sd-nav-item" onClick={() => { setActiveTab('settings'); setSidebarOpen(false); }}>
+          <button className={`sd-nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => { setActiveTab('settings'); setSidebarOpen(false); }}>
             {ICONS.settings}<span>Settings</span>
           </button>
         </nav>
-
-        <div className="sd-sidebar-logout">
-          <button
-            className="sd-logout-btn"
-            onClick={() => {
-              setSidebarOpen(false);
-              handleLogout();
-            }}
-            aria-label="Sign out"
-          >
-            {ICONS.logout}
-            <span>Sign Out</span>
-          </button>
-        </div>
       </aside>
 
       {/* Main Content */}
@@ -777,6 +760,7 @@ export default function StaffDashboardPage() {
                   <span className="sd-notification-badge">{notifications.filter(n => !n.read).length}</span>
                 )}
               </button>
+              {notificationsOpen && <div className="sd-notification-backdrop" onClick={() => setNotificationsOpen(false)} aria-hidden="true" />}
               {notificationsOpen && (
                 <div className="sd-notification-dropdown">
                   <div className="sd-notification-header">
@@ -870,13 +854,13 @@ export default function StaffDashboardPage() {
             onKeyDown={handleOverdueAnnouncementKeyDown}
           >
             <div>
-              <p className="sd-overdue-announcement-title">⚠️ {overdueAppointments.length} pending {overdueAppointments.length === 1 ? 'request' : 'requests'} overdue</p>
+              <p className="sd-overdue-announcement-title">⚠️ {overdueAppointments.length} {overdueAppointments.length === 1 ? 'request needs' : 'requests need'} a reply</p>
               <p className="sd-overdue-announcement-detail">
-                Tap to open {overdueAppointments[0]?.visitor_name || 'the oldest request'} and see what needs attention.
+                {overdueAppointments.length === 1 ? `${overdueAppointments[0]?.visitor_name || 'A visitor'} is waiting for your reply.` : `${overdueAppointments[0]?.visitor_name || 'A visitor'} has waited longest.`} Tap to reply.
               </p>
             </div>
             <div className="sd-overdue-meta">
-              <span>Sent {getRelativeTimeLabel(overdueAppointments[0]?.created_at || overdueAppointments[0]?.appointment_date)}</span>
+              <span>Asked {getRelativeTimeLabel(overdueAppointments[0]?.created_at || overdueAppointments[0]?.appointment_date)}</span>
               <span className="sd-overdue-cta">Open now →</span>
             </div>
           </div>
@@ -917,33 +901,47 @@ export default function StaffDashboardPage() {
                 </div>
                 <div className="sd-stat-card">
                   <div className="sd-stat-icon" style={{ background: 'var(--gold-light)', color: 'var(--gold-dark)' }}>
-                    {ICONS.activity}
+                    {ICONS.check}
                   </div>
                   <div className="sd-stat-info">
-                    <div className="sd-stat-value">{stats.acceptRate}%</div>
-                    <div className="sd-stat-label">Accept Rate</div>
+                    <div className="sd-stat-value">{stats.upcoming}</div>
+                    <div className="sd-stat-label">Coming up</div>
                   </div>
                 </div>
               </div>
 
-              {/* Quick Actions */}
+              {/* Up next: confirmed visits still to come */}
               <div className="sd-section">
-                <div className="sd-section-header">
-                  <h3>Quick Actions</h3>
-                </div>
-                <div className="sd-actions-grid">
-                  <button className="sd-action-card" onClick={() => setActiveTab('appointments')}>
-                    <div className="sd-action-icon sd-action-icon-teal">{ICONS.calendar}</div>
-                    <span>View visitor queue</span>
-                  </button>
-                  <button className="sd-action-card" onClick={() => setActiveTab('pending')}>
-                    <div className="sd-action-icon sd-action-icon-gold">{ICONS.activity}</div>
-                    <span>Review Pending</span>
-                  </button>
-                  <button className="sd-action-card" onClick={handleExportCSV}>
-                    <div className="sd-action-icon sd-action-icon-green">{ICONS.download}</div>
-                    <span>Export Data</span>
-                  </button>
+                <div className="sd-panel">
+                  <div className="sd-panel-header">
+                    <h3>{ICONS.calendar} Up next</h3>
+                    {stats.pending > 0 && (
+                      <button type="button" className="sd-link-btn" onClick={() => openRequests('pending')}>
+                        {stats.pending} waiting for your reply →
+                      </button>
+                    )}
+                  </div>
+                  <div className="sd-list">
+                    {upcomingVisits.length === 0 ? (
+                      <div className="sd-empty">No confirmed visits coming up.</div>
+                    ) : (
+                      upcomingVisits.map((apt) => (
+                        <div key={apt.id} className="sd-list-item" onClick={() => openPreview(apt)}>
+                          <div className="sd-list-avatar" style={{ background: 'var(--green-light)', color: 'var(--green-dark)' }}>
+                            {getInitials(apt.visitor_name)}
+                          </div>
+                          <div className="sd-list-info">
+                            <div className="sd-list-name">{apt.visitor_name}</div>
+                            <div className="sd-list-meta">
+                              {formatDate(apt.appointment_date)} · {formatTime(apt.appointment_date)}
+                              {studentLabel(apt) && <span className="sd-list-sub">Student: {studentLabel(apt)}</span>}
+                            </div>
+                          </div>
+                          <span className={`sd-badge sd-badge-${apt.status?.toLowerCase()}`}>{apt.status}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -984,14 +982,46 @@ export default function StaffDashboardPage() {
             </>
           )}
 
-          {(activeTab === 'appointments' || activeTab === 'pending' || activeTab === 'accepted' || activeTab === 'declined' || activeTab === 'history') && (
+          {activeTab === 'appointments' && (
             <>
               {/* Filter Bar */}
               <div className="sd-filter-bar">
-                <div className="sd-filter-tabs">
-                  <button className={`sd-filter-tab ${dateFilter === 'all' ? 'active' : ''}`} onClick={() => setDateFilter('all')}>All</button>
-                  <button className={`sd-filter-tab ${dateFilter === 'today' ? 'active' : ''}`} onClick={() => setDateFilter('today')}>Today</button>
+                <div className="sd-mobile-search">
+                  {ICONS.search}
+                  <input
+                    type="search"
+                    placeholder="Search visitor or student"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    aria-label="Search visitor requests"
+                  />
                 </div>
+                <div className="sd-filter-tabs" role="tablist" aria-label="Request status">
+                  {REQUEST_FILTERS.map((filter) => {
+                    const count = filter.statuses ? appointments.filter((a) => filter.statuses.includes(a.status)).length : appointments.length;
+                    return (
+                      <button
+                        key={filter.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={requestFilter === filter.id}
+                        className={`sd-filter-tab ${requestFilter === filter.id ? 'active' : ''}`}
+                        onClick={() => setRequestFilter(filter.id)}
+                      >
+                        {filter.label}
+                        <span className="sd-filter-count">{count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <label className="sd-today-toggle">
+                  <input
+                    type="checkbox"
+                    checked={dateFilter === 'today'}
+                    onChange={(e) => setDateFilter(e.target.checked ? 'today' : 'all')}
+                  />
+                  <span>Today only</span>
+                </label>
                 <div className="sd-filter-actions">
                   <div className="sd-view-toggle">
                     <button className={viewMode === 'grid' ? 'active' : ''} onClick={() => setViewMode('grid')}>{ICONS.grid}</button>
@@ -1239,7 +1269,7 @@ export default function StaffDashboardPage() {
             type="button"
             className={`app-tab ${activeTab === tab.id ? 'is-active' : ''}`}
             aria-current={activeTab === tab.id ? 'page' : undefined}
-            onClick={() => { setActiveTab(tab.id); setSidebarOpen(false); }}
+            onClick={() => (tab.id === 'appointments' ? openRequests(stats.pending > 0 ? 'pending' : 'all') : (setActiveTab(tab.id), setSidebarOpen(false)))}
           >
             <span className="app-tab-icon">
               {tab.icon}
