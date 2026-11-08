@@ -7,6 +7,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import DaysOffPanel from '../components/DaysOffPanel';
 import { sendVisitorResponseEmail } from '../services/emailjs';
 import api from '../services/api';
+import { eatDateKey } from '../components/admin/utils';
 
 const studentLabel = (visit) =>
   [visit?.student_name?.trim(), visit?.student_class?.trim() && `(${visit.student_class.trim()})`].filter(Boolean).join(' ');
@@ -274,7 +275,7 @@ export default function StaffDashboardPage() {
   const longPressTimerRef = useRef(null);
   const notificationRef = useRef(null);
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = eatDateKey();
 
   useEffect(() => {
     document.body.classList.remove('home-background', 'auth-background', 'dashboard-background');
@@ -383,7 +384,7 @@ export default function StaffDashboardPage() {
     if (activeTab === 'declined' && a.status !== 'Declined') return false;
     if (activeTab === 'history' && ['Pending', 'Accepted'].includes(a.status)) return false;
     
-    if (dateFilter === 'today' && !a.appointment_date.startsWith(today)) return false;
+    if (dateFilter === 'today' && !eatDateKey(a.appointment_date) === today) return false;
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
@@ -401,7 +402,7 @@ export default function StaffDashboardPage() {
     accepted: appointments.filter(a => a.status === 'Accepted').length,
     declined: appointments.filter(a => a.status === 'Declined').length,
     rescheduled: appointments.filter(a => a.status === 'Rescheduled').length,
-    today: appointments.filter(a => a.appointment_date.startsWith(today)).length,
+    today: appointments.filter(a => eatDateKey(a.appointment_date) === today).length,
     total: appointments.length,
     acceptRate: appointments.length > 0 
       ? Math.round((appointments.filter(a => a.status === 'Accepted').length / appointments.length) * 100) 
@@ -634,7 +635,7 @@ export default function StaffDashboardPage() {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `visit_requests_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `visit_requests_${eatDateKey()}.csv`;
     link.click();
     showToast('Visit requests exported to CSV');
   };
@@ -646,7 +647,7 @@ export default function StaffDashboardPage() {
       { Metric: 'Accepted', Value: appointments.filter(a => a.status === 'Accepted').length },
       { Metric: 'Declined', Value: appointments.filter(a => a.status === 'Declined').length },
       { Metric: 'Rescheduled', Value: appointments.filter(a => a.status === 'Rescheduled').length },
-      { Metric: 'Today\'s visit requests', Value: appointments.filter(a => a.appointment_date.startsWith(today)).length },
+      { Metric: 'Today\'s visit requests', Value: appointments.filter(a => eatDateKey(a.appointment_date) === today).length },
       { Metric: 'Acceptance Rate', Value: appointments.length > 0 ? Math.round((appointments.filter(a => a.status === 'Accepted').length / appointments.length) * 100) + '%' : '0%' },
     ];
     
@@ -659,7 +660,7 @@ export default function StaffDashboardPage() {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `daily_statistics_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `daily_statistics_${eatDateKey()}.csv`;
     link.click();
     showToast('Daily statistics exported');
   };
@@ -686,7 +687,7 @@ export default function StaffDashboardPage() {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `staff_profile_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `staff_profile_${eatDateKey()}.csv`;
     link.click();
     showToast('Staff profile exported');
   };
@@ -1187,11 +1188,11 @@ export default function StaffDashboardPage() {
                   <h3>{ICONS.calendar} Today's Schedule</h3>
                 </div>
                 <div className="sd-timeline">
-                  {appointments.filter(a => a.appointment_date.startsWith(today)).length === 0 ? (
+                  {appointments.filter(a => eatDateKey(a.appointment_date) === today).length === 0 ? (
                     <div className="sd-empty">No visit requests scheduled for today</div>
                   ) : (
                     appointments
-                      .filter(a => a.appointment_date.startsWith(today))
+                      .filter(a => eatDateKey(a.appointment_date) === today)
                       .sort((a, b) => new Date(a.appointment_date) - new Date(b.appointment_date))
                       .map(apt => (
                         <div key={apt.id} className="sd-timeline-item">

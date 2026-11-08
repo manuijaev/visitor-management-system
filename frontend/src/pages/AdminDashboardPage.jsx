@@ -9,6 +9,7 @@ import EditStaffModal from '../components/admin/EditStaffModal';
 import DepartmentsBoard from '../components/admin/DepartmentsBoard';
 import {
   EAT_TIMEZONE,
+  eatDateKey,
   firstName,
   formatApiError,
   formatVisitDate,
@@ -295,7 +296,7 @@ export default function AdminDashboardPage() {
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
     const link = document.createElement('a');
     link.href = url;
-    link.download = `visit_requests_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `visit_requests_${eatDateKey()}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
