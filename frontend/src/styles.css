@@ -10650,7 +10650,8 @@ tr:hover .row-actions {
   color: #1e7e4a;
 }
 
-.sd-list-simple-status-declined {
+.sd-list-simple-status-declined,
+.sd-list-simple-status-cancelled {
   background: rgba(255, 186, 186, 0.9);
   color: #c0392b;
 }

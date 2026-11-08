@@ -1,6 +1,8 @@
 import logging
 
-from rest_framework import generics, permissions
+from rest_framework import generics, permissions, status
+from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.utils import timezone
 
@@ -20,7 +22,14 @@ from notifications.sms_service import (
 from users.models import UserDeviceToken
 
 from .models import Appointment
-from .serializers import AppointmentCreateSerializer, AppointmentListSerializer, AppointmentUpdateSerializer, AppointmentReassignSerializer
+from .serializers import (
+    AppointmentCreateSerializer,
+    AppointmentListSerializer,
+    AppointmentReassignSerializer,
+    AppointmentUpdateSerializer,
+    VisitLookupSerializer,
+    VisitStatusSerializer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -408,3 +417,57 @@ class AppointmentReassignView(generics.UpdateAPIView):
             'message': f'Appointment reassigned from {old_staff.full_name} to {new_staff.full_name}',
             'data': response.data
         })
+
+
+def _notify_staff_of_cancellation(appointment):
+    """Tell the host by SMS and push that the visitor cancelled."""
+    staff = appointment.staff_member
+    body = f"{appointment.visitor_name} cancelled their visit on {_format_local_time(appointment.appointment_date)}."
+    try:
+        if staff.phone:
+            send_staff_sms(phone_number=staff.phone, staff_name=staff.full_name or staff.email, message=body)
+    except Exception:
+        logger.exception('Failed to send cancellation SMS for appointment_id=%s', appointment.id)
+
+    try:
+        tokens = set(UserDeviceToken.objects.filter(user=staff, is_active=True).values_list('token', flat=True))
+        if staff.fcm_token:
+            tokens.add(staff.fcm_token)
+        for token in tokens:
+            send_fcm_push_notification(fcm_token=token, title='Visit cancelled', body=body)
+    except Exception:
+        logger.exception('Failed to send cancellation push for appointment_id=%s', appointment.id)
+
+
+class VisitLookupView(APIView):
+    """Public: a visitor checks their visit with the reference from their pass and their phone number."""
+
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'visit-lookup'
+
+    def post(self, request):
+        lookup = VisitLookupSerializer(data=request.data)
+        if not lookup.is_valid():
+            return Response({'detail': VisitLookupSerializer.NOT_FOUND}, status=status.HTTP_404_NOT_FOUND)
+        return Response(VisitStatusSerializer(lookup.validated_data['appointment']).data)
+
+
+class VisitCancelView(VisitLookupView):
+    """Public: a visitor cancels their own upcoming visit."""
+
+    def post(self, request):
+        lookup = VisitLookupSerializer(data=request.data)
+        if not lookup.is_valid():
+            return Response({'detail': VisitLookupSerializer.NOT_FOUND}, status=status.HTTP_404_NOT_FOUND)
+        appointment = lookup.validated_data['appointment']
+        if not VisitStatusSerializer().get_can_cancel(appointment):
+            return Response(
+                {'detail': 'This visit can no longer be cancelled.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        appointment.status = Appointment.Status.CANCELLED
+        appointment.save(update_fields=['status'])
+        _notify_staff_of_cancellation(appointment)
+        return Response(VisitStatusSerializer(appointment).data)

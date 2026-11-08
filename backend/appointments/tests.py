@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from unittest import mock
 
+from django.core.cache import cache
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -528,3 +529,113 @@ class ReassignTests(TestCase):
 
         self.visit.refresh_from_db()
         self.assertEqual(self.visit.staff_member, self.jane)
+
+
+@mock.patch('appointments.views.send_fcm_push_notification', return_value={'sent': True})
+@mock.patch('notifications.sms_service.send_sms', return_value=True)
+class VisitLookupTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.department = Department.objects.create(name='Academics')
+        self.division = Division.objects.create(name='Grade 5', department=self.department)
+        self.staff = User.objects.create_user(
+            email='jane@example.com', full_name='Jane Wanjiru', password='StaffPass123!',
+            department=self.department, division=self.division, phone='0711000111', fcm_token='jane-device',
+        )
+        self.visit = Appointment.objects.create(
+            visitor_name='Amina Hassan', visitor_phone='0722 333 444', visitor_email='amina@example.com',
+            department=self.department, division=self.division, staff_member=self.staff,
+            appointment_date=timezone.now() + timedelta(days=1), status='Accepted', response_note='Come to Block B',
+        )
+        self.reference = f'GP-{self.visit.id:05d}'
+        self.client = APIClient()
+
+    def _lookup(self, reference=None, phone='0722333444'):
+        return self.client.post(
+            '/api/visits/lookup/', {'reference': reference or self.reference, 'phone': phone}, format='json'
+        )
+
+    def _cancel(self, reference=None, phone='0722333444'):
+        return self.client.post(
+            '/api/visits/cancel/', {'reference': reference or self.reference, 'phone': phone}, format='json'
+        )
+
+    def test_lookup_returns_visit_status(self, _sms, _push):
+        response = self._lookup()
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['reference'], self.reference)
+        self.assertEqual(response.data['status'], 'Accepted')
+        self.assertEqual(response.data['staff_name'], 'Jane Wanjiru')
+        self.assertEqual(response.data['response_note'], 'Come to Block B')
+        self.assertTrue(response.data['can_cancel'])
+
+    def test_lookup_hides_contact_details(self, _sms, _push):
+        response = self._lookup()
+
+        body = str(response.data)
+        self.assertNotIn('0711000111', body)
+        self.assertNotIn('jane@example.com', body)
+        self.assertNotIn('amina@example.com', body)
+
+    def test_lookup_accepts_reference_and_phone_in_other_formats(self, _sms, _push):
+        for reference, phone in [
+            (f'gp{self.visit.id}', '+254 722 333 444'),
+            (str(self.visit.id), '254722333444'),
+            (f' GP {self.visit.id:05d} ', '0722-333-444'),
+        ]:
+            with self.subTest(reference=reference, phone=phone):
+                self.assertEqual(self._lookup(reference, phone).status_code, 200)
+
+    def test_lookup_rejects_wrong_phone_without_revealing_the_visit(self, _sms, _push):
+        wrong_phone = self._lookup(phone='0799999999')
+        unknown_reference = self._lookup(reference='GP-99999')
+
+        self.assertEqual(wrong_phone.status_code, 404)
+        self.assertEqual(wrong_phone.data, unknown_reference.data)
+        self.assertEqual(wrong_phone.data, {'detail': 'We could not find a visit with that reference and phone number.'})
+        self.assertNotIn('Amina', str(wrong_phone.data))
+
+    def test_lookup_is_rate_limited(self, _sms, _push):
+        for _ in range(20):
+            self._lookup(phone='0799999999')
+
+        response = self._lookup()
+
+        self.assertEqual(response.status_code, 429)
+
+    def test_cancel_marks_visit_cancelled_and_alerts_staff(self, send_sms, push):
+        response = self._cancel()
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['status'], 'Cancelled')
+        self.assertFalse(response.data['can_cancel'])
+        self.visit.refresh_from_db()
+        self.assertEqual(self.visit.status, 'Cancelled')
+        phone, text = send_sms.call_args.args
+        self.assertEqual(phone, '0711000111')
+        self.assertIn('Amina Hassan cancelled', text)
+        self.assertLessEqual(len(text), 160)
+        self.assertEqual(push.call_args.kwargs['fcm_token'], 'jane-device')
+
+    def test_cannot_cancel_with_wrong_phone(self, send_sms, _push):
+        response = self._cancel(phone='0799999999')
+
+        self.assertEqual(response.status_code, 404)
+        self.visit.refresh_from_db()
+        self.assertEqual(self.visit.status, 'Accepted')
+        send_sms.assert_not_called()
+
+    def test_cannot_cancel_a_past_or_closed_visit(self, send_sms, _push):
+        for visit_status, when in [
+            ('Declined', timezone.now() + timedelta(days=1)),
+            ('Cancelled', timezone.now() + timedelta(days=1)),
+            ('Accepted', timezone.now() - timedelta(hours=1)),
+        ]:
+            with self.subTest(status=visit_status, when=when):
+                Appointment.objects.filter(id=self.visit.id).update(status=visit_status, appointment_date=when)
+
+                response = self._cancel()
+
+                self.assertEqual(response.status_code, 400)
+        send_sms.assert_not_called()

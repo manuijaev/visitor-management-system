@@ -1,3 +1,5 @@
+import re
+
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -149,3 +151,59 @@ class AppointmentReassignSerializer(serializers.ModelSerializer):
     class Meta:
         model = Appointment
         fields = ['staff_member']
+
+
+REFERENCE_RE = re.compile(r'^\s*(?:GP)?[\s-]*0*(\d{1,9})\s*$', re.IGNORECASE)
+CANCELLABLE_STATUSES = (
+    Appointment.Status.PENDING,
+    Appointment.Status.ACCEPTED,
+    Appointment.Status.RESCHEDULED,
+)
+
+
+class VisitLookupSerializer(serializers.Serializer):
+    """Finds a visit from the reference on the visitor's pass plus the phone number they booked with."""
+
+    NOT_FOUND = 'We could not find a visit with that reference and phone number.'
+
+    reference = serializers.CharField(max_length=20)
+    phone = serializers.CharField(max_length=20)
+
+    def validate(self, attrs):
+        match = REFERENCE_RE.match(attrs['reference'])
+        phone = normalize_phone(attrs['phone'])
+        if not match or not phone:
+            raise serializers.ValidationError({'detail': self.NOT_FOUND})
+        appointment = (
+            Appointment.objects.select_related('staff_member', 'department')
+            .filter(id=int(match.group(1)))
+            .first()
+        )
+        if not appointment or normalize_phone(appointment.visitor_phone) != phone:
+            raise serializers.ValidationError({'detail': self.NOT_FOUND})
+        attrs['appointment'] = appointment
+        return attrs
+
+
+class VisitStatusSerializer(serializers.ModelSerializer):
+    """What a visitor may see about their own visit. Deliberately excludes other visitors and staff contact details."""
+
+    staff_name = serializers.CharField(source='staff_member.full_name', read_only=True)
+    department_name = serializers.CharField(source='department.name', read_only=True)
+    can_cancel = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Appointment
+        fields = [
+            'reference',
+            'visitor_name',
+            'staff_name',
+            'department_name',
+            'appointment_date',
+            'status',
+            'response_note',
+            'can_cancel',
+        ]
+
+    def get_can_cancel(self, obj) -> bool:
+        return obj.status in CANCELLABLE_STATUSES and obj.appointment_date > timezone.now()

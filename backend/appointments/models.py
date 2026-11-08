@@ -11,6 +11,7 @@ class Appointment(models.Model):
         ACCEPTED = 'Accepted', 'Accepted'
         RESCHEDULED = 'Rescheduled', 'Rescheduled'
         DECLINED = 'Declined', 'Declined'
+        CANCELLED = 'Cancelled', 'Cancelled'
 
     visitor_name = models.CharField(max_length=120)
     visitor_phone = models.CharField(max_length=20, blank=True, null=True)
@@ -34,6 +35,11 @@ class Appointment(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+    @property
+    def reference(self):
+        """The code visitors see on their pass, e.g. GP-00012."""
+        return f'GP-{self.id:05d}'
 
     def __str__(self):
         return f'{self.visitor_name} -> {self.staff_member.full_name} ({self.status})'
