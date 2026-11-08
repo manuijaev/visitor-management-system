@@ -12624,3 +12624,69 @@ tr:hover .row-actions {
     bottom: calc(62px + 12px + env(safe-area-inset-bottom));
   }
 }
+
+/* Visiting hours */
+.ad-hours-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 640px;
+}
+
+.ad-hours-summary {
+  font-size: 13px;
+  color: var(--ink-light);
+}
+
+.ad-hours-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ad-hours-day {
+  min-width: 56px;
+  padding: 9px 12px;
+  border-radius: 11px;
+  border: 1.5px solid var(--line);
+  background: var(--surface2);
+  color: var(--ink-light);
+  font-size: 13.5px;
+  font-weight: 600;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.ad-hours-day.is-on {
+  border-color: var(--gold);
+  background: var(--gold-light);
+  color: var(--gold-dark);
+}
+
+.ad-hours-times {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.ad-hours-error {
+  font-size: 12.5px;
+  color: var(--red);
+}
+
+.ad-hours-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+@media (max-width: 520px) {
+  .ad-hours-times {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ad-hours-day {
+    flex: 1 0 calc(25% - 8px);
+    min-width: 0;
+  }
+}

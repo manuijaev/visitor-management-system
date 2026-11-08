@@ -14,8 +14,9 @@ import '../home.css';
 
 const TZ = 'Africa/Nairobi';
 const TZ_OFFSET = '+03:00';
-const OPEN_HOUR = 8;
-const CLOSE_HOUR = 17;
+const WEEKDAY_INDEX = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+/** Used until the school's hours load, and if they fail to. Matches the server default. */
+const DEFAULT_HOURS = { opens: 8 * 60, closes: 17 * 60, days: [0, 1, 2, 3, 4], summary: 'Mon–Fri, 8:00 AM to 5:00 PM' };
 const SLOT_MINUTES = 30;
 const LEAD_MINUTES = 30;
 const BOOKABLE_DAYS = 10;
@@ -53,25 +54,41 @@ function eatParts(date) {
   return {
     dateKey: `${parts.year}-${parts.month}-${parts.day}`,
     hour: Number(parts.hour),
+    minute: Number(parts.minute),
     weekday: parts.weekday,
   };
 }
 
-const isWeekend = (weekday) => weekday === 'Sat' || weekday === 'Sun';
+const toMinutes = (clock) => {
+  const [hh, mm] = String(clock || '').split(':').map(Number);
+  return Number.isFinite(hh) && Number.isFinite(mm) ? hh * 60 + mm : null;
+};
+
+/** Turns the /office-hours/ response into minutes since midnight and weekday numbers (Mon=0). */
+const toHours = (data) => {
+  const opens = toMinutes(data?.opens_at);
+  const closes = toMinutes(data?.closes_at);
+  const days = Array.isArray(data?.open_days) ? data.open_days : null;
+  if (opens === null || closes === null || closes <= opens || !days?.length) return DEFAULT_HOURS;
+  return { opens, closes, days, summary: data.summary || DEFAULT_HOURS.summary };
+};
+
+const isOpenDay = (hours, weekday) => hours.days.includes(WEEKDAY_INDEX[weekday]);
 const formatInTz = (value, options, locale = 'en-GB') =>
   new Intl.DateTimeFormat(locale, { timeZone: TZ, ...options }).format(new Date(value));
 const formatTime = (value) => formatInTz(value, { hour: 'numeric', minute: '2-digit' }, 'en-US');
 const formatDayLong = (value) => formatInTz(value, { weekday: 'long', day: 'numeric', month: 'long' });
 
-function isOfficeOpen(now) {
-  const { hour, weekday } = eatParts(now);
-  return !isWeekend(weekday) && hour >= OPEN_HOUR && hour < CLOSE_HOUR;
+function isOfficeOpen(now, hours) {
+  const { hour, minute, weekday } = eatParts(now);
+  const minutes = hour * 60 + minute;
+  return isOpenDay(hours, weekday) && minutes >= hours.opens && minutes < hours.closes;
 }
 
-function buildSlots(dateKey, now) {
+function buildSlots(dateKey, now, hours) {
   const earliest = now.getTime() + LEAD_MINUTES * 60 * 1000;
   const slots = [];
-  for (let minutes = OPEN_HOUR * 60; minutes < CLOSE_HOUR * 60; minutes += SLOT_MINUTES) {
+  for (let minutes = hours.opens; minutes < hours.closes; minutes += SLOT_MINUTES) {
     const hh = String(Math.floor(minutes / 60)).padStart(2, '0');
     const mm = String(minutes % 60).padStart(2, '0');
     const value = `${dateKey}T${hh}:${mm}:00${TZ_OFFSET}`;
@@ -85,11 +102,11 @@ function buildSlots(dateKey, now) {
   return slots;
 }
 
-function buildDays(now) {
+function buildDays(now, hours) {
   const days = [];
   for (let offset = 0; days.length < BOOKABLE_DAYS && offset < 21; offset += 1) {
     const { dateKey, weekday } = eatParts(new Date(now.getTime() + offset * 86400000));
-    if (isWeekend(weekday) || !buildSlots(dateKey, now).some((slot) => slot.available)) continue;
+    if (!isOpenDay(hours, weekday) || !buildSlots(dateKey, now, hours).some((slot) => slot.available)) continue;
     const noon = `${dateKey}T12:00:00${TZ_OFFSET}`;
     days.push({
       key: dateKey,
@@ -253,6 +270,7 @@ export default function HomePage() {
   const [hostQuery, setHostQuery] = useState('');
   const [hostDept, setHostDept] = useState('all');
   const [now, setNow] = useState(() => new Date());
+  const [hours, setHours] = useState(DEFAULT_HOURS);
   const [toast, setToast] = useState('');
   const flowRef = useRef(null);
   const toastTimer = useRef(null);
@@ -267,6 +285,17 @@ export default function HomePage() {
       })
       .catch((error) => console.error('Failed to load hosts', error))
       .finally(() => active && setLoading(false));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .get('/office-hours/')
+      .then(({ data }) => active && setHours(toHours(data)))
+      .catch(() => {});
     return () => {
       active = false;
     };
@@ -292,9 +321,9 @@ export default function HomePage() {
     toastTimer.current = setTimeout(() => setToast(''), 3200);
   }, []);
 
-  const days = useMemo(() => buildDays(now), [now]);
-  const slots = useMemo(() => (dayKey ? buildSlots(dayKey, now) : []), [dayKey, now]);
-  const officeOpen = isOfficeOpen(now);
+  const days = useMemo(() => buildDays(now, hours), [now, hours]);
+  const slots = useMemo(() => (dayKey ? buildSlots(dayKey, now, hours) : []), [dayKey, now, hours]);
+  const officeOpen = isOfficeOpen(now, hours);
   const host = staff.find((member) => member.id === hostId) || null;
   const hostFirst = host ? firstName(host.name) : '';
   const slotStillOpen = slot && slots.some((item) => item.value === slot && item.available && !isSlotTaken(host, item.value));
@@ -340,7 +369,7 @@ export default function HomePage() {
     if (visitMode === 'now') advanceFromWhen('now');
     if (visitMode === 'later' && !dayKey) {
       const firstOpen = days.find(
-        (day) => !host?.unavailableDates.includes(day.key) && buildSlots(day.key, now).some((item) => item.available)
+        (day) => !host?.unavailableDates.includes(day.key) && buildSlots(day.key, now, hours).some((item) => item.available)
       );
       if (firstOpen) setDayKey(firstOpen.key);
     }
@@ -539,7 +568,7 @@ export default function HomePage() {
       {!officeOpen && mode && mode !== 'later' && (
         <p className="gp-note gp-note--warn">
           <Icon name="clock" />
-          <span>The school office is closed right now (open weekdays 8 AM to 5 PM). Staff may reply when they are back.</span>
+          <span>The school office is closed right now (open {hours.summary}). Staff may reply when they are back.</span>
         </p>
       )}
 
