@@ -5,6 +5,7 @@ import { useAuth } from './context/AuthContext';
 import Navbar from './components/Navbar';
 import LogoLoader, { hideBootSplash } from './components/LogoLoader';
 import ErrorBoundary, { CHUNK_RELOAD_KEY } from './components/ErrorBoundary';
+import InstallPrompt from './components/InstallPrompt';
 
 // A tab left open across a deploy asks for chunk files that no longer exist; reload once to pick up the new build.
 function lazyPage(load) {
@@ -102,6 +103,7 @@ export default function App() {
           />
         </Routes>
       </Suspense>
+      <InstallPrompt />
     </ErrorBoundary>
   );
 }

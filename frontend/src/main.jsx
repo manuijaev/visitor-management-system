@@ -5,13 +5,10 @@ import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import { AppointmentProvider } from './context/AppointmentContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { initPwa } from './services/pwa';
 import './styles.css';
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
-  });
-}
+initPwa();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
