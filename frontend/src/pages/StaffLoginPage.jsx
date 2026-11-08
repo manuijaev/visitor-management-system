@@ -254,7 +254,6 @@ export default function StaffLoginPage() {
                         value={form.password}
                         onChange={onChange}
                         autoComplete="current-password"
-                        minLength={8}
                         required
                       />
                     </div>
