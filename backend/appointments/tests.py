@@ -51,6 +51,28 @@ class AppointmentSmsTests(TestCase):
         self.assertIn('received', visitor_text)
         self.assertLessEqual(len(visitor_text), 160)
 
+    def test_booking_reaches_the_assigned_teacher_who_can_answer_it(self, _sms, _email):
+        other_teacher = User.objects.create_user(
+            email='otieno@example.com', full_name='Peter Otieno', password='StaffPass123!',
+            department=self.department, division=self.division,
+        )
+        booked = self.client.post('/api/appointments/create/', self._payload(), format='json')
+        self.assertEqual(booked.status_code, 201, booked.data)
+
+        teacher = APIClient()
+        teacher.force_authenticate(self.staff)
+        mine = teacher.get('/api/appointments/my/')
+        self.assertEqual([visit['visitor_name'] for visit in mine.data], ['Amina Hassan'])
+
+        someone_else = APIClient()
+        someone_else.force_authenticate(other_teacher)
+        self.assertEqual(someone_else.get('/api/appointments/my/').data, [])
+
+        visit_id = mine.data[0]['id']
+        answered = teacher.patch(f'/api/appointments/update/{visit_id}/', {'status': 'Accepted', 'response_note': 'See you then.'}, format='json')
+        self.assertEqual(answered.status_code, 200, answered.data)
+        self.assertEqual(teacher.get('/api/appointments/my/').data[0]['status'], 'Accepted')
+
     def test_phone_is_required(self, send_sms, _email):
         response = self.client.post('/api/appointments/create/', self._payload(visitor_phone=''), format='json')
 

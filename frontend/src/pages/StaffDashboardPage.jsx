@@ -517,6 +517,8 @@ export default function StaffDashboardPage() {
     setIsSendingResponse(true);
     try {
       await updateStatus(appointmentId, status);
+      closeResponseArea(appointmentId);
+      setResponseNote((prev) => ({ ...prev, [appointmentId]: '' }));
       setTimeout(() => {
         setPendingStatusUpdate(null);
       }, 220);
@@ -906,7 +908,7 @@ export default function StaffDashboardPage() {
             onKeyDown={handleOverdueAnnouncementKeyDown}
           >
             <div>
-              <p className="sd-overdue-announcement-title">⚠️ {overdueAppointments.length} pending requests overdue</p>
+              <p className="sd-overdue-announcement-title">⚠️ {overdueAppointments.length} pending {overdueAppointments.length === 1 ? 'request' : 'requests'} overdue</p>
               <p className="sd-overdue-announcement-detail">
                 Tap to open {overdueAppointments[0]?.visitor_name || 'the oldest request'} and see what needs attention.
               </p>
@@ -1115,7 +1117,7 @@ export default function StaffDashboardPage() {
                             </div>
                           )}
 
-                          {responseAreaOpen[apt.id] && (
+                          {apt.status === 'Pending' && responseAreaOpen[apt.id] && (
                             <div className="sd-response-area">
                               {responseAction[apt.id] === 'Rescheduled' && (
                                 <label className="sd-reschedule-field">
@@ -1360,16 +1362,18 @@ export default function StaffDashboardPage() {
                 </div>
               )}
 
-              <div className="sd-modal-section">
-                <h5>Response note (optional)</h5>
-                <textarea
-                  className="sd-modal-response-input"
-                  placeholder="Add a brief response note (optional)..."
-                  value={responseNote[previewItem.id] || ''}
-                  onChange={(e) => setResponseNote((prev) => ({ ...prev, [previewItem.id]: e.target.value }))}
-                  rows="3"
-                />
-              </div>
+              {previewItem.status === 'Pending' && (
+                <div className="sd-modal-section">
+                  <h5>Response note (optional)</h5>
+                  <textarea
+                    className="sd-modal-response-input"
+                    placeholder="Add a brief response note (optional)..."
+                    value={responseNote[previewItem.id] || ''}
+                    onChange={(e) => setResponseNote((prev) => ({ ...prev, [previewItem.id]: e.target.value }))}
+                    rows="3"
+                  />
+                </div>
+              )}
             </div>
             <div className="sd-modal-footer">
               <button type="button" className="sd-btn sd-btn-view" onClick={closePreview}>Return</button>
