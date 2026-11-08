@@ -12610,3 +12610,50 @@ tr:hover .row-actions {
     bottom: calc(62px + 12px + env(safe-area-inset-bottom));
   }
 }
+
+/* Staff app on phones: let the screen shrink to the phone instead of growing to fit the top bar. */
+@media (max-width: 760px) {
+  .sd-main {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .sd-topbar {
+    gap: 8px;
+  }
+
+  .sd-topbar-left {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .sd-topbar-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sd-topbar-right {
+    flex: none;
+  }
+
+  .sd-availability-toggle {
+    padding: 0 12px;
+  }
+
+  .sd-availability-toggle .sd-availability-icon {
+    display: none;
+  }
+
+  .sd-availability-toggle .sd-availability-text {
+    letter-spacing: 0.04em;
+  }
+}
+
+/* Small phones: the screen refreshes itself and your name is under More, so drop those two. */
+@media (max-width: 400px) {
+  .sd-topbar-right > .sd-icon-btn:not(.sd-notif-btn),
+  .sd-topbar-right > .sd-avatar {
+    display: none;
+  }
+}
