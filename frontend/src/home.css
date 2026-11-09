@@ -1,8 +1,5 @@
-/* Home page: visitor check-in. Everything is scoped under .gp-root. */
-
 body.home-background,
 body.home-background #root {
-  /* `hidden` turns these into scroll containers, which breaks the sticky nav and step footer. */
   overflow-x: clip;
 }
 
@@ -16,7 +13,6 @@ body.home-background #root {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Neutralise the global button/input styles from styles.css without raising specificity. */
 :where(.gp-root) button {
   width: auto;
   padding: 0;
@@ -48,8 +44,6 @@ body.home-background #root {
   height: 20px;
   flex: none;
 }
-
-/* ---------- Buttons ---------- */
 
 .gp-btn {
   display: inline-flex;
@@ -118,8 +112,6 @@ body.home-background #root {
   opacity: 1;
 }
 
-/* ---------- Navigation ---------- */
-
 .gp-brand {
   display: flex;
   align-items: center;
@@ -156,10 +148,6 @@ body.home-background #root {
   text-transform: uppercase;
   color: var(--ink-faint);
 }
-
-/* ---------- Hero ---------- */
-
-/* ---------- Check-in card ---------- */
 
 .gp-flow {
   position: relative;
@@ -344,8 +332,6 @@ body.home-background #root {
   border-radius: 0 0 28px 28px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0), #fff 34%);
 }
-
-/* Step 1: when */
 
 .gp-modes {
   display: grid;
@@ -669,8 +655,6 @@ body.home-background #root {
   color: var(--gold-dark);
 }
 
-/* Step 2: host */
-
 .gp-search {
   position: relative;
   margin-bottom: 12px;
@@ -861,8 +845,6 @@ textarea.gp-input {
   animation: gpShimmer 1.2s linear infinite;
 }
 
-/* Step 3: details */
-
 .gp-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -904,8 +886,6 @@ textarea.gp-input {
 .gp-hint.is-error {
   color: var(--red);
 }
-
-/* Step 4: review */
 
 .gp-review {
   border: 1.5px solid var(--border);
@@ -1008,8 +988,6 @@ textarea.gp-input {
   color: var(--red);
   font-size: 13.5px;
 }
-
-/* Success pass */
 
 .gp-pass {
   padding: 34px var(--gp-pad) 28px;
@@ -1155,8 +1133,6 @@ textarea.gp-input {
   color: var(--ink-faint);
 }
 
-/* ---------- Sections ---------- */
-
 .gp-toast {
   position: fixed;
   left: 50%;
@@ -1173,8 +1149,6 @@ textarea.gp-input {
   transform: translateX(-50%);
   animation: gpToast 0.3s ease both;
 }
-
-/* ---------- Animations ---------- */
 
 @keyframes gpStepIn {
   from { opacity: 0; transform: translateY(8px); }
@@ -1205,9 +1179,6 @@ textarea.gp-input {
   to { opacity: 1; transform: translate(-50%, 0); }
 }
 
-/* ---------- Responsive ---------- */
-
-/* Tablet and small laptop */
 @media (max-width: 1099px) {
   .gp-flow {
     width: min(100%, 760px);
@@ -1220,7 +1191,6 @@ textarea.gp-input {
   }
 }
 
-/* Phones */
 @media (max-width: 759px) {
   .gp-root {
     --gp-pad: 18px;
@@ -1303,8 +1273,6 @@ textarea.gp-input {
   }
 }
 
-/* Visit status page (/visit) */
-
 .gp-lookup {
   max-width: 560px;
   margin: 12px auto 0;
@@ -1382,8 +1350,6 @@ textarea.gp-input {
     flex: 1 1 100%;
   }
 }
-
-/* ---------- App shell: top bar, screen, bottom tabs ---------- */
 
 .gp-app {
   --gp-tab-h: 62px;
@@ -1508,7 +1474,6 @@ textarea.gp-input {
   color: var(--gold);
 }
 
-/* The booking card fills the screen column; its Continue bar sits just above the tabs. */
 .gp-app .gp-flow {
   width: 100%;
   scroll-margin-top: 76px;
@@ -1531,8 +1496,6 @@ textarea.gp-input {
   font-style: italic;
   color: var(--ink-mid);
 }
-
-/* ---------- Simple screens (My visits, Help) ---------- */
 
 .gp-screen {
   display: flex;
@@ -1766,7 +1729,6 @@ textarea.gp-input {
 }
 
 @media (min-width: 760px) {
-  /* Fade the right edge so it's clear the day strip scrolls. */
   .gp-days {
     -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent);
     mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent);
