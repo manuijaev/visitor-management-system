@@ -138,13 +138,29 @@ class AppointmentUpdateSerializer(serializers.ModelSerializer):
         return attrs
 
     def _validate_new_time(self, new_time):
-        """A reschedule must move the visit to a different time in the future."""
+        """A reschedule must move the visit to a free, future time inside visiting hours and not on a day off."""
         if not new_time:
             raise serializers.ValidationError({'appointment_date': 'Pick a new date and time for the visit.'})
         if new_time <= timezone.now():
             raise serializers.ValidationError({'appointment_date': 'The new time must be in the future.'})
         if self.instance and new_time == self.instance.appointment_date:
             raise serializers.ValidationError({'appointment_date': 'Pick a time different from the original one.'})
+        hours = OfficeHours.load()
+        if not hours.is_open_at(new_time):
+            raise serializers.ValidationError(
+                {'appointment_date': f'The school is closed then. Visiting hours are {describe_hours(hours)}.'}
+            )
+        staff = self.instance.staff_member if self.instance else None
+        if staff is None:
+            return
+        if staff.unavailable_days.filter(date=timezone.localtime(new_time).date()).exists():
+            raise serializers.ValidationError(
+                {'appointment_date': 'You marked that day as a day off. Pick another day, or remove the day off first.'}
+            )
+        if Appointment.active_for_staff_near(staff, new_time).exclude(pk=self.instance.pk).exists():
+            raise serializers.ValidationError(
+                {'appointment_date': 'You already have a visit at that time. Pick another time.'}
+            )
 
     class Meta:
         model = Appointment

@@ -9,7 +9,7 @@ from rest_framework.test import APIClient
 
 from departments.models import Department, Division
 from notifications.sms_service import normalize_phone
-from users.models import User
+from users.models import StaffUnavailableDay, User
 
 from .models import Appointment, OfficeHours
 
@@ -176,7 +176,7 @@ class AppointmentSmsTests(TestCase):
 
     def test_reschedule_saves_new_time_and_texts_it(self, send_sms, email):
         appointment = self._pending_visit()
-        new_time = (timezone.now() + timedelta(days=2)).replace(hour=11, minute=30, second=0, microsecond=0)
+        new_time = next_weekday_at(11, 30)
         self.client.force_authenticate(self.staff)
 
         response = self.client.patch(
@@ -915,3 +915,81 @@ class OfficeHoursTests(TestCase):
 
     def test_walk_ins_are_never_blocked_by_hours(self, _sms, _email):
         self.assertEqual(self._book(next_weekday_at(19), is_scheduled=False).status_code, 201)
+
+
+@mock.patch('appointments.views.send_emailjs', return_value=True)
+@mock.patch('notifications.sms_service.send_sms', return_value=True)
+class RescheduleClashTests(TestCase):
+    def setUp(self):
+        self.department = Department.objects.create(name='Academics')
+        self.division = Division.objects.create(name='Grade 5', department=self.department)
+        self.staff = User.objects.create_user(
+            email='jane@example.com', full_name='Jane Wanjiru', password='StaffPass123!',
+            department=self.department, division=self.division,
+        )
+        self.visit = self._visit(next_weekday_at(9))
+        self.client = APIClient()
+        self.client.force_authenticate(self.staff)
+
+    def _visit(self, when, status='Pending', staff=None):
+        return Appointment.objects.create(
+            visitor_name='Amina Hassan', visitor_phone='0722333444', department=self.department,
+            division=self.division, staff_member=staff or self.staff, appointment_date=when, status=status,
+        )
+
+    def _reschedule(self, when):
+        return self.client.patch(
+            f'/api/appointments/update/{self.visit.id}/',
+            {'status': 'Rescheduled', 'response_note': 'Clashes with assembly', 'appointment_date': when.isoformat()},
+            format='json',
+        )
+
+    def _assert_rejected(self, response, message):
+        self.assertEqual(response.status_code, 400)
+        self.assertIn(message, response.data['appointment_date'][0])
+        self.visit.refresh_from_db()
+        self.assertEqual(self.visit.status, 'Pending')
+
+    def test_rejects_a_time_already_booked(self, send_sms, _email):
+        self._visit(next_weekday_at(11), status='Accepted')
+
+        self._assert_rejected(self._reschedule(next_weekday_at(11, 15)), 'You already have a visit at that time')
+        send_sms.assert_not_called()
+
+    def test_allows_a_free_time(self, _sms, _email):
+        self._visit(next_weekday_at(11), status='Accepted')
+
+        self.assertEqual(self._reschedule(next_weekday_at(11, 30)).status_code, 200)
+
+    def test_moving_a_visit_a_few_minutes_does_not_clash_with_itself(self, _sms, _email):
+        self.assertEqual(self._reschedule(next_weekday_at(9, 15)).status_code, 200)
+
+    def test_declined_and_cancelled_visits_do_not_block(self, _sms, _email):
+        self._visit(next_weekday_at(11), status='Declined')
+        self._visit(next_weekday_at(11), status='Cancelled')
+
+        self.assertEqual(self._reschedule(next_weekday_at(11)).status_code, 200)
+
+    def test_another_teachers_visit_does_not_block(self, _sms, _email):
+        colleague = User.objects.create_user(
+            email='brian@example.com', full_name='Brian Otieno', password='StaffPass123!',
+            department=self.department, division=self.division,
+        )
+        self._visit(next_weekday_at(11), status='Accepted', staff=colleague)
+
+        self.assertEqual(self._reschedule(next_weekday_at(11)).status_code, 200)
+
+    def test_rejects_a_time_outside_visiting_hours(self, _sms, _email):
+        self._assert_rejected(self._reschedule(next_weekday_at(18)), 'Visiting hours are Mon–Fri, 8:00 AM to 5:00 PM')
+
+    def test_rejects_a_closed_day(self, _sms, _email):
+        saturday = next_weekday_at(10)
+        saturday += timedelta(days=5 - saturday.weekday())
+
+        self._assert_rejected(self._reschedule(saturday), 'The school is closed then')
+
+    def test_rejects_the_teachers_day_off(self, _sms, _email):
+        new_time = next_weekday_at(10, days_ahead=3)
+        StaffUnavailableDay.objects.create(user=self.staff, date=new_time.date())
+
+        self._assert_rejected(self._reschedule(new_time), 'You marked that day as a day off')
