@@ -8,7 +8,12 @@ vi.mock("../../services/api", () => ({ default: { get: vi.fn() } }));
 describe("OfficeHoursBoard", () => {
   it("groups the open-day toggles in a labelled fieldset", async () => {
     api.get.mockResolvedValue({
-      data: { opens_at: "08:00:00", closes_at: "17:00:00", open_days: [0, 1, 2, 3, 4], summary: "Mon–Fri" },
+      data: {
+        opens_at: "08:00:00",
+        closes_at: "17:00:00",
+        open_days: [0, 1, 2, 3, 4],
+        summary: "Mon–Fri",
+      },
     });
     render(<OfficeHoursBoard notify={vi.fn()} />);
     const group = await screen.findByRole("group", { name: "Open days" });

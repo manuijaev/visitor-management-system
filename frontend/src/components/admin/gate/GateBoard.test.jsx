@@ -1,9 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import api from "../../../services/api";
 import GateBoard from "./GateBoard";
 
-vi.mock("../../services/api", () => ({ default: { post: vi.fn() } }));
-
+vi.mock("../../../services/api", () => ({ default: { post: vi.fn() } }));
 
 const visit = (id, visitor_name, status) => ({
   id,
@@ -36,5 +36,26 @@ describe("GateBoard", () => {
     expect(screen.queryByText("Cara Declined")).toBeNull();
     expect(screen.queryByText("Dan Cancelled")).toBeNull();
     expect(screen.queryByText("Eve Expired")).toBeNull();
+  });
+});
+
+describe("GateBoard actions", () => {
+  it("checks a visitor in and reports it", async () => {
+    api.post.mockResolvedValue({});
+    const onChanged = vi.fn().mockResolvedValue();
+    const notify = vi.fn();
+    render(
+      <GateBoard
+        appointments={[visit(1, "Alice Open", "Accepted")]}
+        onChanged={onChanged}
+        notify={notify}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Mark arrived" }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    expect(api.post).toHaveBeenCalledWith("/appointments/1/check-in/");
+    expect(notify).toHaveBeenCalledWith(
+      "Alice Open has arrived. Host has been told.",
+    );
   });
 });

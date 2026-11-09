@@ -112,12 +112,16 @@ export function orderVisitsForReview(visits, now = Date.now()) {
 }
 
 export const VISIT_FILTERS = [
-  { id: "pending", label: "Pending", statuses: ["Pending"] },
-  { id: "accepted", label: "Accepted", statuses: ["Accepted", "Rescheduled"] },
+  { id: "pending", label: "Pending", statuses: new Set(["Pending"]) },
+  {
+    id: "accepted",
+    label: "Accepted",
+    statuses: new Set(["Accepted", "Rescheduled"]),
+  },
   {
     id: "declined",
     label: "Declined",
-    statuses: ["Declined", "Cancelled", "Expired"],
+    statuses: new Set(["Declined", "Cancelled", "Expired"]),
   },
   { id: "all", label: "All", statuses: null },
 ];
@@ -126,5 +130,5 @@ export function matchesVisitFilter(visit, filterId) {
   const statuses = VISIT_FILTERS.find(
     (filter) => filter.id === filterId,
   )?.statuses;
-  return !statuses || statuses.includes(visit.status);
+  return !statuses || statuses.has(visit.status);
 }

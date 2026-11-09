@@ -1,11 +1,12 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import AddStaffWizard, {
+import AddStaffWizard from "./AddStaffWizard";
+import {
   buildPayload,
   initialPlacement,
   validateDetails,
   validatePlacement,
-} from "./AddStaffWizard";
+} from "./add-staff/staffForm";
 
 vi.mock("../../services/api", () => ({ default: { post: vi.fn() } }));
 

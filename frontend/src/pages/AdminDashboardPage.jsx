@@ -1,976 +1,180 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
-import { useAuth } from '../context/AuthContext';
-import ModalDialog from '../components/ModalDialog';
-import ConfirmModal from '../components/ConfirmModal';
-import Icon from '../components/admin/Icon';
-import AddStaffWizard from '../components/admin/AddStaffWizard';
-import EditStaffModal from '../components/admin/EditStaffModal';
-import DepartmentsBoard from '../components/admin/DepartmentsBoard';
-import GateBoard from '../components/admin/GateBoard';
-import OfficeHoursBoard from '../components/admin/OfficeHoursBoard';
-import NotificationsMenu from '../components/NotificationsMenu';
-import ViewToggle from '../components/ViewToggle';
+import { useCallback, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { eatDateKey } from "../components/admin/utils";
+import AdminToast from "../components/admin/dashboard/AdminToast";
+import DashboardConfirm from "../components/admin/dashboard/DashboardConfirm";
+import DashboardContent from "../components/admin/dashboard/DashboardContent";
+import DashboardDialogs from "../components/admin/dashboard/DashboardDialogs";
+import Sidebar from "../components/admin/dashboard/Sidebar";
+import TabBar from "../components/admin/dashboard/TabBar";
+import Topbar from "../components/admin/dashboard/Topbar";
+import { PAGE_TITLES } from "../components/admin/dashboard/constants";
 import {
-  EAT_TIMEZONE,
-  eatDateKey,
-  firstName,
-  formatApiError,
-  formatTopbarDateTime,
-  formatVisitDate,
-  getInitials,
-  getRelativeTimeLabel,
-  matchesVisitFilter,
-  orderVisitsForReview,
-  staffStatus,
-  VISIT_FILTERS,
-} from '../components/admin/utils';
+  computeStats,
+  downloadCsv,
+  visitsToCsv,
+} from "../components/admin/dashboard/helpers";
+import useAdminData from "../components/admin/dashboard/useAdminData";
+import useDashboardDialogs from "../components/admin/dashboard/useDashboardDialogs";
+import useDashboardFilters from "../components/admin/dashboard/useDashboardFilters";
+import useStaffActions from "../components/admin/dashboard/useStaffActions";
+import useToast from "../hooks/useToast";
 
-const NAV_ITEMS = [
-  { id: 'overview', label: 'Overview', icon: 'overview' },
-  { id: 'visitors', label: 'Visitors', icon: 'visitors' },
-  { id: 'gate', label: 'Arrivals', icon: 'arrivals' },
-  { id: 'hours', label: 'Visiting hours', icon: 'clock' },
-  { id: 'team', label: 'Team', icon: 'team' },
-  { id: 'departments', label: 'Departments', icon: 'building' },
-];
-
-const TAB_ITEMS = ['overview', 'visitors', 'gate'];
-
-const STATUS_TONE = { Pending: 'gold', Accepted: 'green', Approved: 'green', Declined: 'red', Rejected: 'red', Rescheduled: 'purple', Cancelled: 'muted', Expired: 'muted' };
-const OVERDUE_MS = 30 * 60 * 1000;
-
-const asList = (data) => (Array.isArray(data) ? data : []);
-
-function Pill({ tone = 'muted', children }) {
-  return <span className={`ad-pill ad-pill-${tone}`}>{children}</span>;
-}
-
-function Avatar({ name, tone = 'gold' }) {
-  return <span className={`ad-avatar ad-avatar-${tone}`}>{getInitials(name)}</span>;
-}
-
-function RowMenu({ items }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const close = (e) => {
-      if (!ref.current?.contains(e.target)) setOpen(false);
-    };
-    const onKey = (e) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', close);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', close);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
-
-  return (
-    <div className="ad-menu" ref={ref}>
-      <button type="button" className="ad-icon-btn ad-icon-btn-sm" onClick={() => setOpen((v) => !v)} aria-label="More actions" aria-expanded={open}>
-        <Icon name="more" size={16} />
-      </button>
-      {open && (
-        <div className="ad-menu-list" role="menu">
-          {items.filter(Boolean).map((item) => (
-            <button
-              type="button"
-              role="menuitem"
-              key={item.label}
-              className={item.danger ? 'danger' : ''}
-              onClick={() => {
-                setOpen(false);
-                item.onClick();
-              }}
-            >
-              <Icon name={item.icon} size={14} />
-              {item.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function buildNotifications(appointments) {
-  const now = Date.now();
-  const items = [];
-  appointments.forEach((a) => {
-    const created = new Date(a.created_at || a.appointment_date).getTime();
-    if (Number.isNaN(created)) return;
-    const staffName = a.staff_name || 'Staff';
-    const overdue = a.status === 'Pending' && now - created >= OVERDUE_MS;
-    items.push({
-      id: `request-${a.id}`,
-      tone: overdue ? 'red' : 'gold',
-      icon: overdue ? 'alert' : 'visitors',
-      title: overdue ? `${a.visitor_name} is still waiting on ${staffName}` : `${a.visitor_name} requested a visit with ${staffName}`,
-      message: a.message?.trim() || [a.department_name, a.division_name].filter(Boolean).join(' · '),
-      timestamp: created,
-      urgent: overdue,
-    });
-    if (a.status !== 'Pending') {
-      items.push({
-        id: `response-${a.id}-${a.status}`,
-        tone: STATUS_TONE[a.status] || 'muted',
-        icon: a.status === 'Declined' ? 'x' : 'check',
-        title: `${staffName} ${a.status.toLowerCase()} ${a.visitor_name}'s visit`,
-        message: a.response_note?.trim() || '',
-        timestamp: created,
-        urgent: false,
-      });
-    }
-  });
-  return items.sort((x, y) => y.timestamp - x.timestamp).slice(0, 40);
-}
-
-function greeting() {
-  const hour = Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: EAT_TIMEZONE }).format(new Date()));
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  return 'Good evening';
-}
-
-const studentLabel = (visit) =>
-  [visit?.student_name?.trim(), visit?.student_class?.trim() && `(${visit.student_class.trim()})`].filter(Boolean).join(' ');
+const DOT_PATTERN = {
+  backgroundImage:
+    "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23a39d96' fill-opacity='0.06'%3E%3Ccircle cx='30' cy='30' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")",
+};
 
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
   const { logout, user } = useAuth();
-
-  const [view, setView] = useState('overview');
-  const [now, setNow] = useState(() => new Date());
-  const [refreshing, setRefreshing] = useState(false);
-
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 15000);
-    return () => clearInterval(id);
-  }, []);
+  const [view, setView] = useState("overview");
   const [navOpen, setNavOpen] = useState(false);
-
-  const [departments, setDepartments] = useState([]);
-  const [divisions, setDivisions] = useState([]);
-  const [staff, setStaff] = useState([]);
-  const [appointments, setAppointments] = useState([]);
-  const [loaded, setLoaded] = useState(false);
-
-  const [wizard, setWizard] = useState({ open: false, presetDepartmentId: null });
-  const [editingMember, setEditingMember] = useState(null);
-  const [reassign, setReassign] = useState(null);
-  const [reassignTo, setReassignTo] = useState('');
-  const [inviteLink, setInviteLink] = useState(null);
-  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false });
-  const [toast, setToast] = useState(null);
-
-  const [peopleSearch, setPeopleSearch] = useState('');
-  const [peopleDept, setPeopleDept] = useState('');
-  const [visitorSearch, setVisitorSearch] = useState('');
-  const [visitorStatus, setVisitorStatus] = useState('all');
-  const [profileOpen, setProfileOpen] = useState(false);
-  const profileRef = useRef(null);
-
-  useEffect(() => {
-    if (!profileOpen) return undefined;
-    const closeOnOutsideClick = (event) => {
-      if (profileRef.current && !profileRef.current.contains(event.target)) setProfileOpen(false);
-    };
-    const closeOnEscape = (event) => {
-      if (event.key === 'Escape') setProfileOpen(false);
-    };
-    document.addEventListener('mousedown', closeOnOutsideClick);
-    document.addEventListener('keydown', closeOnEscape);
-    return () => {
-      document.removeEventListener('mousedown', closeOnOutsideClick);
-      document.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [profileOpen]);
-  const [layout, setLayout] = useState(() =>
-    typeof window !== 'undefined' && window.matchMedia?.('(max-width: 768px)').matches ? 'grid' : 'list'
+  const { toast, showToast } = useToast();
+  const closeNav = useCallback(() => setNavOpen(false), []);
+  const notify = useCallback(
+    (msg, type = "success") => showToast({ msg, type }),
+    [showToast],
   );
-  const [readIds, setReadIds] = useState(() => new Set());
-  const [dismissedIds, setDismissedIds] = useState(() => new Set());
+  const data = useAdminData(notify);
+  const filters = useDashboardFilters();
+  const dialogs = useDashboardDialogs();
+  const actions = useStaffActions({
+    notify,
+    loadData: data.loadData,
+    openConfirm: dialogs.openConfirm,
+    onInviteLink: dialogs.setInviteLink,
+  });
 
-  const notify = useCallback((msg, type = 'success') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3200);
-  }, []);
-
-  const handleAuthError = useCallback(
-    (error) => {
-      if (error?.response?.status === 401) {
-        logout();
-        navigate('/staff');
-        return true;
-      }
-      return false;
-    },
-    [logout, navigate]
+  const { appointments, staff, departments } = data;
+  const stats = useMemo(
+    () => computeStats(appointments, staff),
+    [appointments, staff],
   );
-
-  const loadData = useCallback(async () => {
-    try {
-      const [depRes, divRes, staffRes, apptRes] = await Promise.all([
-        api.get('/departments/'),
-        api.get('/divisions/'),
-        api.get('/staff/?include_inactive=1'),
-        api.get('/appointments/my/'),
-      ]);
-      setDepartments(asList(depRes.data));
-      setDivisions(asList(divRes.data));
-      setStaff(asList(staffRes.data));
-      setAppointments(asList(apptRes.data));
-      setLoaded(true);
-    } catch (error) {
-      if (!handleAuthError(error)) notify('Could not refresh data.', 'error');
-    }
-  }, [handleAuthError, notify]);
-
-  useEffect(() => {
-    if (!user) return undefined;
-    loadData();
-    const id = setInterval(loadData, 15000);
-    return () => clearInterval(id);
-  }, [user, loadData]);
-
-  useEffect(() => {
-    document.body.classList.add('admin-background');
-    return () => document.body.classList.remove('admin-background');
-  }, []);
 
   const goTo = (next) => {
     setView(next);
     setNavOpen(false);
   };
 
-  const openWizard = (presetDepartmentId = null) => setWizard({ open: true, presetDepartmentId });
-  const closeWizard = useCallback(() => setWizard({ open: false, presetDepartmentId: null }), []);
-
-  const openConfirm = (options) => setConfirmDialog({ isOpen: true, ...options });
-  const closeConfirm = () => setConfirmDialog({ isOpen: false });
-  const runConfirm = async () => {
-    const action = confirmDialog.action;
-    closeConfirm();
-    if (action) await action();
+  const showVisits = (status) => {
+    filters.updateVisitFilters({ status });
+    goTo("visitors");
   };
 
   const handleLogout = () => {
-    sessionStorage.setItem('app_toast', 'Logged out successfully.');
+    sessionStorage.setItem("app_toast", "Logged out successfully.");
     logout();
-    navigate('/staff');
-  };
-
-  const sendInvite = async (member) => {
-    try {
-      const { data } = await api.post(`/staff/${member.id}/send-invite/`);
-      if (data.invite.email_sent) {
-        notify(`Link emailed to ${member.email}`);
-      } else {
-        setInviteLink({ member, url: data.invite.invite_url, hours: data.invite.expires_in_hours });
-      }
-    } catch (err) {
-      notify(formatApiError(err), 'error');
-    }
-  };
-
-  const toggleActive = async (member) => {
-    try {
-      await api.patch(`/staff/${member.id}/${member.is_active ? 'deactivate' : 'activate'}/`);
-      notify(`${member.full_name} ${member.is_active ? 'deactivated' : 'activated'}`);
-      await loadData();
-    } catch (err) {
-      notify(formatApiError(err), 'error');
-    }
-  };
-
-  const deleteMember = async (member) => {
-    try {
-      await api.delete(`/staff/${member.id}/`);
-      notify(`${member.full_name} removed`);
-      await loadData();
-    } catch (err) {
-      notify(formatApiError(err), 'error');
-    }
-  };
-
-  const submitReassign = async () => {
-    if (!reassign || !reassignTo) return;
-    try {
-      await api.patch(`/appointments/reassign/${reassign.id}/`, { staff_member: Number(reassignTo) });
-      notify(`Reassigned to ${staff.find((s) => s.id === Number(reassignTo))?.full_name}`);
-      setReassign(null);
-      await loadData();
-    } catch (err) {
-      notify(formatApiError(err), 'error');
-    }
-  };
-
-  const deleteVisit = async (visit) => {
-    try {
-      await api.delete(`/appointments/delete/${visit.id}/`);
-      notify('Visit request deleted');
-      await loadData();
-    } catch (err) {
-      notify(formatApiError(err), 'error');
-    }
+    navigate("/staff");
   };
 
   const exportVisits = () => {
     if (!appointments.length) {
-      notify('No visit requests to export.', 'error');
+      notify("No visit requests to export.", "error");
       return;
     }
-    const rows = [
-      ['ID', 'Visitor', 'Visitor email', 'Staff', 'Department', 'Status', 'Visit date'],
-      ...appointments.map((a) => [a.id, a.visitor_name, a.visitor_email, a.staff_name, a.department_name, a.status, a.appointment_date]),
-    ];
-    const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? '').replaceAll('"', '""')}"`).join(',')).join('\n');
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `visit_requests_${eatDateKey()}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadCsv(
+      visitsToCsv(appointments),
+      `visit_requests_${eatDateKey()}.csv`,
+    );
   };
 
-  const stats = useMemo(() => {
-    const pending = appointments.filter((a) => a.status === 'Pending');
-    return {
-      total: appointments.length,
-      pending: pending.length,
-      overdue: pending.filter((a) => Date.now() - new Date(a.created_at || a.appointment_date).getTime() >= OVERDUE_MS).length,
-      active: staff.filter((s) => s.is_active && !s.invite_pending).length,
-      invited: staff.filter((s) => s.is_active && s.invite_pending).length,
-    };
-  }, [appointments, staff]);
-
-  const notifications = useMemo(
-    () => buildNotifications(appointments).filter((n) => !dismissedIds.has(n.id)).map((n) => ({ ...n, unread: !readIds.has(n.id) })),
-    [appointments, readIds, dismissedIds]
-  );
-  const unreadCount = notifications.filter((n) => n.unread).length;
-
-  const filteredPeople = staff.filter((s) => {
-    if (peopleDept && String(s.department) !== peopleDept) return false;
-    if (!peopleSearch) return true;
-    const q = peopleSearch.toLowerCase();
-    return [s.full_name, s.email, s.department_name, s.division_name].some((v) => v?.toLowerCase().includes(q));
-  });
-
-  const filteredVisits = orderVisitsForReview(appointments.filter((a) => {
-    if (!matchesVisitFilter(a, visitorStatus)) return false;
-    if (!visitorSearch) return true;
-    const q = visitorSearch.toLowerCase();
-    return [a.visitor_name, a.visitor_email, studentLabel(a), a.staff_name, a.department_name].some((v) => v?.toLowerCase().includes(q));
-  }));
-
-  const pageTitle = { overview: 'Overview', visitors: 'Visitors', gate: 'Arrivals', hours: 'Visiting hours', team: 'Team', departments: 'Departments', settings: 'Settings' }[view];
-
-  const renderVisitRow = (a, compact = false) => (
-    <div key={a.id} className={`ad-row ${compact ? 'ad-row-compact' : ''}`}>
-      <div className="ad-row-main">
-        <Avatar name={a.visitor_name} />
-        <div className="ad-row-text">
-          <strong>{a.visitor_name}</strong>
-          <span>{compact ? `with ${a.staff_name || 'Unassigned'}` : [a.visitor_email || a.visitor_phone, studentLabel(a) && `re ${studentLabel(a)}`].filter(Boolean).join(' · ')}</span>
-        </div>
-      </div>
-      {!compact && (
-        <div className="ad-row-cell">
-          <strong>{a.staff_name || 'Unassigned'}</strong>
-          <span>{a.department_name}</span>
-        </div>
-      )}
-      <div className="ad-row-cell ad-row-date">
-        <strong>{formatVisitDate(a.appointment_date)}</strong>
-        <span>Sent {getRelativeTimeLabel(a.created_at || a.appointment_date)}</span>
-      </div>
-      <Pill tone={STATUS_TONE[a.status]}>{a.status}</Pill>
-      {!compact && (
-        <div className="ad-row-tools always">
-          <button
-            type="button"
-            className="ad-icon-btn ad-icon-btn-sm"
-            title="Reassign"
-            aria-label={`Reassign ${a.visitor_name}`}
-            onClick={() => {
-              setReassign(a);
-              setReassignTo('');
-            }}
-          >
-            <Icon name="swap" size={14} />
-          </button>
-          <button
-            type="button"
-            className="ad-icon-btn ad-icon-btn-sm danger"
-            title="Delete"
-            aria-label={`Delete visit from ${a.visitor_name}`}
-            onClick={() => openConfirm({
-              title: 'Delete visit request?',
-              message: `Remove ${a.visitor_name}'s request permanently?`,
-              confirmText: 'Delete',
-              tone: 'danger',
-              action: () => deleteVisit(a),
-            })}
-          >
-            <Icon name="trash" size={14} />
-          </button>
-        </div>
-      )}
-    </div>
-  );
-
-  const renderPersonRow = (s, compact = false) => {
-    const status = staffStatus(s);
-    const isSelf = s.id === user?.id;
-    return (
-      <div key={s.id} className={`ad-row ${compact ? 'ad-row-compact' : ''}`}>
-        <div className="ad-row-main">
-          <Avatar name={s.full_name} tone={s.role === 'Admin' ? 'ink' : 'gold'} />
-          <div className="ad-row-text">
-            <strong>{s.full_name}{isSelf && <span className="ad-you">you</span>}</strong>
-            <span>{s.email}</span>
-          </div>
-        </div>
-        {!compact && (
-          <div className="ad-row-cell">
-            <strong>{s.department_name || 'No department'}</strong>
-            <span>{s.division_name || 'No division'}</span>
-          </div>
-        )}
-        {!compact && <Pill tone={s.role === 'Admin' ? 'ink' : 'muted'}>{s.role}</Pill>}
-        <Pill tone={status.tone}>{status.label}</Pill>
-        {!compact && (
-          <div className="ad-row-tools always">
-            <button type="button" className="ad-icon-btn ad-icon-btn-sm" onClick={() => setEditingMember(s)} aria-label={`Edit ${s.full_name}`} title="Edit">
-              <Icon name="edit" size={14} />
-            </button>
-            {!isSelf && (
-              <RowMenu
-                items={[
-                  s.is_active && {
-                    label: s.invite_pending ? 'Resend invite' : 'Send password reset link',
-                    icon: 'mail',
-                    onClick: () => sendInvite(s),
-                  },
-                  { label: s.is_active ? 'Deactivate' : 'Activate', icon: s.is_active ? 'x' : 'check', onClick: () => toggleActive(s) },
-                  {
-                    label: 'Remove',
-                    icon: 'trash',
-                    danger: true,
-                    onClick: () => openConfirm({
-                      title: `Remove ${s.full_name}?`,
-                      message: 'Their account will be deleted permanently.',
-                      confirmText: 'Remove',
-                      tone: 'danger',
-                      action: () => deleteMember(s),
-                    }),
-                  },
-                ]}
-              />
-            )}
-          </div>
-        )}
-      </div>
-    );
+  const refresh = async () => {
+    await data.loadData();
+    notify("Up to date.");
   };
 
   return (
     <>
-      <div className={`ad-shell ${navOpen ? 'nav-open' : ''}`}>
-        <aside className="ad-sidebar">
-          <div className="ad-brand">
-            <span className="ad-brand-mark" />
-            <div>
-              <div className="ad-brand-name">Gatepass</div>
-              <div className="ad-brand-sub">Admin console</div>
-            </div>
-          </div>
-
-          <nav className="ad-nav">
-            {NAV_ITEMS.map((item) => (
-              <button
-                type="button"
-                key={item.id}
-                className={`ad-nav-item ${view === item.id ? 'active' : ''}`}
-                onClick={() => goTo(item.id)}
-                aria-current={view === item.id ? 'page' : undefined}
-              >
-                <Icon name={item.icon} size={17} />
-                <span>{item.label}</span>
-                {item.id === 'visitors' && stats.pending > 0 && <span className="ad-nav-count">{stats.pending}</span>}
-                {item.id === 'team' && <span className="ad-nav-count muted">{staff.length}</span>}
-                {item.id === 'departments' && <span className="ad-nav-count muted">{departments.length}</span>}
-              </button>
-            ))}
-          </nav>
-
-          <button type="button" className="ad-sidebar-cta" onClick={() => { setNavOpen(false); openWizard(); }}>
-            <Icon name="userPlus" size={16} />
-            Add staff member
-          </button>
-
-        </aside>
-        <div className="ad-backdrop" onClick={() => setNavOpen(false)} />
-
-        <div className="ad-main">
-          <header className="ad-topbar">
-            <button type="button" className="ad-icon-btn ad-menu-toggle" onClick={() => setNavOpen(true)} aria-label="Open menu">
-              <Icon name="menu" size={18} />
-            </button>
-            <div className="ad-topbar-title">{pageTitle}</div>
-            <div className="ad-topbar-actions">
-              <span className="ad-clock">{formatTopbarDateTime(now)}</span>
-              <NotificationsMenu
-                items={notifications.map((n) => ({
-                  id: n.id,
-                  text: n.message ? `${n.title}. ${n.message}` : n.title,
-                  time: getRelativeTimeLabel(n.timestamp),
-                  unread: n.unread,
-                  urgent: n.urgent,
-                }))}
-                onOpenItem={(item) => {
-                  setReadIds((prev) => new Set(prev).add(item.id));
-                  setVisitorStatus('all');
-                  goTo('visitors');
-                }}
-                onDismiss={(id) => setDismissedIds((prev) => new Set(prev).add(id))}
-                action={unreadCount ? { label: 'Mark all read', onClick: () => setReadIds(new Set(notifications.map((n) => n.id))) } : null}
-              />
-              <button
-                type="button"
-                className="ad-icon-btn ad-refresh"
-                disabled={refreshing}
-                aria-label="Refresh"
-                title="Refresh"
-                onClick={async () => {
-                  setRefreshing(true);
-                  await loadData();
-                  setRefreshing(false);
-                  notify('Up to date.');
-                }}
-              >
-                <Icon name="refresh" size={16} />
-              </button>
-              <div className="sd-profile" ref={profileRef}>
-                <button
-                  type="button"
-                  className="ad-profile-btn"
-                  onClick={() => setProfileOpen((open) => !open)}
-                  aria-haspopup="menu"
-                  aria-expanded={profileOpen}
-                  aria-label={`Account: ${user?.full_name || 'Administrator'}`}
-                >
-                  {getInitials(user?.full_name || 'Admin')}
-                </button>
-                {profileOpen && (
-                  <div className="sd-profile-menu" role="menu">
-                    <div className="sd-profile-head">
-                      <span className="sd-profile-avatar">{getInitials(user?.full_name || 'Admin')}</span>
-                      <span>
-                        <strong>{user?.full_name || 'Administrator'}</strong>
-                        <small>Administrator</small>
-                        {user?.email && <small>{user.email}</small>}
-                      </span>
-                    </div>
-                    <button type="button" role="menuitem" className="sd-profile-item" onClick={() => { setProfileOpen(false); goTo('settings'); }}>
-                      Settings
-                    </button>
-                    <button type="button" role="menuitem" className="sd-profile-item is-danger" onClick={handleLogout}>
-                      Log out
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </header>
-
-          <main className="ad-content">
-            {view === 'overview' && (
-              <>
-                <div className="ad-page-head">
-                  <div>
-                    <h1>{greeting()}, <em>{firstName(user?.full_name || 'Admin')}</em></h1>
-                    <p>{new Date().toLocaleDateString('en-GB', { timeZone: EAT_TIMEZONE, weekday: 'long', day: 'numeric', month: 'long' })}</p>
-                  </div>
-                </div>
-
-                {stats.pending > 0 && (
-                  <div className="ad-banner">
-                    <Icon name="clock" size={18} />
-                    <p>
-                      <strong>{stats.pending} visit {stats.pending === 1 ? 'request is' : 'requests are'} awaiting a response</strong>
-                      {stats.overdue > 0 && ` · ${stats.overdue} waiting longer than 30 minutes`}
-                    </p>
-                    <button type="button" className="ad-btn ad-btn-ghost" onClick={() => { setVisitorStatus('pending'); goTo('visitors'); }}>Review</button>
-                  </div>
-                )}
-
-                <div className="ad-stats">
-                  <div className="ad-stat">
-                    <span>Visit requests</span>
-                    <strong>{stats.total}</strong>
-                    <small>All time</small>
-                  </div>
-                  <div className="ad-stat">
-                    <span>Awaiting response</span>
-                    <strong className={stats.pending ? 'gold' : ''}>{stats.pending}</strong>
-                    <small>{stats.overdue ? `${stats.overdue} overdue` : 'Nothing overdue'}</small>
-                  </div>
-                  <div className="ad-stat">
-                    <span>Active staff</span>
-                    <strong>{stats.active}</strong>
-                    <small>{stats.invited ? `${stats.invited} invite${stats.invited === 1 ? '' : 's'} pending` : 'Everyone is set up'}</small>
-                  </div>
-                  <div className="ad-stat">
-                    <span>Departments</span>
-                    <strong>{departments.length}</strong>
-                    <small>{divisions.length} division{divisions.length === 1 ? '' : 's'}</small>
-                  </div>
-                </div>
-
-                {loaded && staff.filter((s) => s.role === 'Staff').length === 0 && (
-                  <div className="ad-card ad-onboard">
-                    <div>
-                      <h2>Build your team</h2>
-                      <p>Add your first staff member. You can create their department and division in the same step, and they'll get an email to set up their account.</p>
-                    </div>
-                    <button type="button" className="ad-btn ad-btn-primary" onClick={() => openWizard()}>
-                      <Icon name="userPlus" size={15} />
-                      Add staff member
-                    </button>
-                  </div>
-                )}
-
-                <div className="ad-grid-2">
-                  <section className="ad-card">
-                    <header className="ad-card-head">
-                      <h2>Recent visit requests</h2>
-                      <button type="button" className="ad-link-btn" onClick={() => goTo('visitors')}>View all <Icon name="arrowRight" size={14} /></button>
-                    </header>
-                    <div className="ad-list">
-                      {appointments.slice(0, 5).map((a) => renderVisitRow(a, true))}
-                      {!appointments.length && <div className="ad-empty-line">No visit requests yet.</div>}
-                    </div>
-                  </section>
-                  <section className="ad-card">
-                    <header className="ad-card-head">
-                      <h2>Team</h2>
-                      <button type="button" className="ad-link-btn" onClick={() => goTo('team')}>Manage <Icon name="arrowRight" size={14} /></button>
-                    </header>
-                    <div className="ad-list">
-                      {[...staff].sort((x, y) => y.id - x.id).slice(0, 5).map((s) => renderPersonRow(s, true))}
-                    </div>
-                    <button type="button" className="ad-add-row" onClick={() => openWizard()}>
-                      <Icon name="plus" size={15} />
-                      Add staff member
-                    </button>
-                  </section>
-                </div>
-              </>
-            )}
-
-            {view === 'visitors' && (
-              <>
-                <div className="ad-page-head">
-                  <div>
-                    <h1>Visitors</h1>
-                    <p>Every visit request across your organisation.</p>
-                  </div>
-                  <button type="button" className="ad-btn ad-btn-ghost" onClick={exportVisits}>
-                    <Icon name="download" size={15} />
-                    Export CSV
-                  </button>
-                </div>
-                <section className="ad-card">
-                  <div className="ad-toolbar">
-                    <div className="ad-segmented ad-segmented-fill" role="tablist" aria-label="Visit status">
-                      {VISIT_FILTERS.map((filter) => (
-                        <button type="button" key={filter.id} role="tab" aria-selected={visitorStatus === filter.id} className={visitorStatus === filter.id ? 'active' : ''} onClick={() => setVisitorStatus(filter.id)}>
-                          {filter.label}
-                          <span>{appointments.filter((a) => matchesVisitFilter(a, filter.id)).length}</span>
-                        </button>
-                      ))}
-                    </div>
-                    <label className="ad-search">
-                      <Icon name="search" size={15} />
-                      <input value={visitorSearch} onChange={(e) => setVisitorSearch(e.target.value)} placeholder="Search visitors or staff" />
-                    </label>
-                    <ViewToggle value={layout} onChange={setLayout} />
-                  </div>
-                  <div className={layout === 'grid' ? 'ad-list ad-cards' : 'ad-list ad-list-table ad-cols-visits'}>
-                    {filteredVisits.map((a) => renderVisitRow(a))}
-                    {!filteredVisits.length && <div className="ad-empty-line">No visit requests match.</div>}
-                  </div>
-                </section>
-              </>
-            )}
-
-            {view === 'gate' && <GateBoard appointments={appointments} onChanged={loadData} notify={notify} />}
-
-            {view === 'hours' && <OfficeHoursBoard notify={notify} />}
-
-            {view === 'team' && (
-              <>
-                <div className="ad-page-head">
-                  <div>
-                    <h1>Team</h1>
-                    <p>{staff.length} {staff.length === 1 ? 'person' : 'people'} across {departments.length} department{departments.length === 1 ? '' : 's'}</p>
-                  </div>
-                  <button type="button" className="ad-btn ad-btn-primary" onClick={() => openWizard(peopleDept || null)}>
-                    <Icon name="userPlus" size={15} />
-                    Add staff member
-                  </button>
-                </div>
-
-                <section className="ad-card">
-                    <div className="ad-toolbar">
-                      <label className="ad-search">
-                        <Icon name="search" size={15} />
-                        <input value={peopleSearch} onChange={(e) => setPeopleSearch(e.target.value)} placeholder="Search by name, email or department" />
-                      </label>
-                      <select className="ad-select" value={peopleDept} onChange={(e) => setPeopleDept(e.target.value)} aria-label="Filter by department">
-                        <option value="">All departments</option>
-                        {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                      </select>
-                      <ViewToggle value={layout} onChange={setLayout} />
-                    </div>
-                    <div className={layout === 'grid' ? 'ad-list ad-cards' : 'ad-list ad-list-table ad-cols-people'}>
-                      {filteredPeople.map((s) => renderPersonRow(s))}
-                      {!filteredPeople.length && <div className="ad-empty-line">No one matches that search.</div>}
-                    </div>
-                  </section>
-              </>
-            )}
-
-            {view === 'departments' && (
-              <>
-                <div className="ad-page-head">
-                  <div>
-                    <h1>Departments</h1>
-                    <p>{departments.length} department{departments.length === 1 ? '' : 's'} and {divisions.length} division{divisions.length === 1 ? '' : 's'}. Visitors choose from these when they book.</p>
-                  </div>
-                </div>
-                <DepartmentsBoard
-                  departments={departments}
-                  divisions={divisions}
-                  staff={staff}
-                  onChange={loadData}
-                  notify={notify}
-                  confirm={openConfirm}
-                  onAddStaff={(deptId) => openWizard(deptId)}
-                />
-              </>
-            )}
-
-            {view === 'settings' && (
-              <>
-                <div className="ad-page-head">
-                  <div>
-                    <h1>Settings</h1>
-                    <p>Your account and the school&apos;s setup.</p>
-                  </div>
-                </div>
-                <div className="ad-settings">
-                  <section className="ad-card">
-                    <header className="ad-card-head">
-                      <h2>Your account</h2>
-                    </header>
-                    <div className="sd-account-head">
-                      <span className="sd-profile-avatar sd-account-avatar">{getInitials(user?.full_name || 'Admin')}</span>
-                      <div>
-                        <strong>{user?.full_name || 'Administrator'}</strong>
-                        <span>{user?.email}</span>
-                      </div>
-                    </div>
-                    <dl className="sd-account-list">
-                      <div>
-                        <dt>Role</dt>
-                        <dd>Administrator</dd>
-                      </div>
-                    </dl>
-                  </section>
-
-                  <section className="ad-card">
-                    <header className="ad-card-head">
-                      <h2>School setup</h2>
-                    </header>
-                    <dl className="sd-account-list">
-                      <div>
-                        <dt>Departments</dt>
-                        <dd>{departments.length} departments · {divisions.length} divisions</dd>
-                      </div>
-                      <div>
-                        <dt>Staff</dt>
-                        <dd>{stats.active} active{stats.invited ? ` · ${stats.invited} invited` : ''}</dd>
-                      </div>
-                    </dl>
-                    <div className="ad-settings-actions">
-                      <button type="button" className="ad-btn ad-btn-ghost" onClick={() => goTo('team')}>
-                        <Icon name="team" size={15} />
-                        Manage team
-                      </button>
-                      <button type="button" className="ad-btn ad-btn-ghost" onClick={() => goTo('departments')}>
-                        <Icon name="building" size={15} />
-                        Manage departments
-                      </button>
-                    </div>
-                  </section>
-
-                  <section className="ad-card">
-                    <header className="ad-card-head">
-                      <h2>Visit records</h2>
-                    </header>
-                    <dl className="sd-account-list">
-                      <div>
-                        <dt>Visit requests</dt>
-                        <dd>{appointments.length} in total</dd>
-                      </div>
-                      <div>
-                        <dt>Console refresh</dt>
-                        <dd>Every 15 seconds</dd>
-                      </div>
-                    </dl>
-                    <div className="ad-settings-actions">
-                      <button type="button" className="ad-btn ad-btn-ghost" onClick={exportVisits}>
-                        <Icon name="download" size={15} />
-                        Export all visits (CSV)
-                      </button>
-                    </div>
-                  </section>
-                </div>
-              </>
-            )}
-
-          </main>
-
-          <nav className="app-tabbar" aria-label="Main">
-            {TAB_ITEMS.map((id) => {
-              const item = NAV_ITEMS.find((navItem) => navItem.id === id);
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  className={`app-tab ${view === id ? 'is-active' : ''}`}
-                  aria-current={view === id ? 'page' : undefined}
-                  onClick={() => goTo(id)}
-                >
-                  <span className="app-tab-icon">
-                    <Icon name={item.icon} size={22} />
-                    {id === 'visitors' && stats.pending > 0 && <span className="app-tab-badge">{stats.pending}</span>}
-                  </span>
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
-            <button type="button" className={`app-tab ${navOpen ? 'is-active' : ''}`} onClick={() => setNavOpen(true)}>
-              <span className="app-tab-icon">
-                <Icon name="more" size={22} />
-              </span>
-              <span>More</span>
-            </button>
-          </nav>
-        </div>
-
-        {toast && <div className={`toast-admin ${toast.type === 'error' ? 'toast-error' : 'toast-success'}`}>{toast.msg}</div>}
-
-        <AddStaffWizard
-          open={wizard.open}
-          presetDepartmentId={wizard.presetDepartmentId}
-          onClose={closeWizard}
-          onCreated={loadData}
-          departments={departments}
-          divisions={divisions}
-          staff={staff}
-        />
-
-        <EditStaffModal
-          member={editingMember}
-          departments={departments}
-          divisions={divisions}
-          onClose={() => setEditingMember(null)}
-          onSaved={async () => {
-            notify('Changes saved');
-            setEditingMember(null);
-            await loadData();
+      <div
+        data-console="admin"
+        className="gp-root relative z-[1] grid min-h-screen grid-cols-[264px_minmax(0,1fr)] text-ink max-[1023px]:grid-cols-[minmax(0,1fr)] max-[760px]:pb-[calc(62px+env(safe-area-inset-bottom)+16px)]"
+      >
+        <Sidebar
+          view={view}
+          isOpen={navOpen}
+          onClose={closeNav}
+          counts={{
+            pending: stats.pending,
+            team: staff.length,
+            departments: departments.length,
+          }}
+          onNavigate={goTo}
+          onAddStaff={() => {
+            setNavOpen(false);
+            dialogs.openWizard();
           }}
         />
+        <div
+          className={
+            navOpen
+              ? "hidden max-[1023px]:fixed max-[1023px]:inset-0 max-[1023px]:z-[899] max-[1023px]:block max-[1023px]:bg-[rgba(26,23,20,0.42)]"
+              : "hidden"
+          }
+          aria-hidden="true"
+        />
 
-        {reassign && (
-          <ModalDialog className="ad-modal" aria-labelledby="reassign-title" onClose={() => setReassign(null)}>
-              <header className="ad-modal-head">
-                <div>
-                  <div className="ad-eyebrow">Reassign visit</div>
-                  <h2 id="reassign-title">{reassign.visitor_name}</h2>
-                </div>
-                <button type="button" className="ad-icon-btn" onClick={() => setReassign(null)} aria-label="Close"><Icon name="x" size={18} /></button>
-              </header>
-              <div className="ad-modal-body ad-form">
-                <p className="ad-lead">
-                  Currently with {reassign.staff_name || 'nobody'}. Choose who should handle it instead. They&apos;ll get an
-                  alert, the visit goes back to pending, and {reassign.visitor_name} gets an SMS with the new name.
-                </p>
-                <label className="ad-field">
-                  <span>Staff member</span>
-                  <select value={reassignTo} onChange={(e) => setReassignTo(e.target.value)}>
-                    <option value="">Choose staff</option>
-                    {staff.filter((s) => s.is_active && s.department && s.division && s.id !== reassign.staff_member).map((s) => (
-                      <option key={s.id} value={s.id}>{s.full_name} · {s.department_name || 'No department'}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <footer className="ad-modal-foot">
-                <button type="button" className="ad-btn ad-btn-ghost" onClick={() => setReassign(null)}>Cancel</button>
-                <button type="button" className="ad-btn ad-btn-primary" onClick={submitReassign} disabled={!reassignTo}>Reassign</button>
-              </footer>
-          </ModalDialog>
-        )}
+        <div className="flex min-w-0 flex-col">
+          <Topbar
+            title={PAGE_TITLES[view]}
+            user={user}
+            appointments={appointments}
+            onOpenNav={() => setNavOpen(true)}
+            onOpenNotification={() => showVisits("all")}
+            onRefresh={refresh}
+            onSettings={() => goTo("settings")}
+            onLogout={handleLogout}
+          />
 
-        {inviteLink && (
-          <ModalDialog className="ad-modal" aria-labelledby="invite-link-title" onClose={() => setInviteLink(null)}>
-              <header className="ad-modal-head">
-                <div>
-                  <div className="ad-eyebrow">Email not delivered</div>
-                  <h2 id="invite-link-title">Share this link with {firstName(inviteLink.member.full_name)}</h2>
-                </div>
-                <button type="button" className="ad-icon-btn" onClick={() => setInviteLink(null)} aria-label="Close"><Icon name="x" size={18} /></button>
-              </header>
-              <div className="ad-modal-body ad-form">
-                <p className="ad-lead">Email isn't configured, so send this link another way. It lets them set a password and expires in {inviteLink.hours} hours.</p>
-                <div className="ad-copy-field">
-                  <input readOnly value={inviteLink.url} onFocus={(e) => e.target.select()} aria-label="Password link" />
-                  <button
-                    type="button"
-                    className="ad-btn ad-btn-ghost"
-                    onClick={() => navigator.clipboard?.writeText(inviteLink.url).then(() => notify('Link copied'))}
-                  >
-                    <Icon name="copy" size={14} />
-                    Copy
-                  </button>
-                </div>
-              </div>
-              <footer className="ad-modal-foot">
-                <button type="button" className="ad-btn ad-btn-primary" onClick={() => setInviteLink(null)}>Done</button>
-              </footer>
-          </ModalDialog>
-        )}
+          <main className="mx-auto flex w-full max-w-[1240px] flex-col gap-[22px] px-8 pt-[30px] pb-14 max-[1023px]:px-4 max-[1023px]:pt-[22px] max-[1023px]:pb-12">
+            <DashboardContent
+              view={view}
+              user={user}
+              data={data}
+              stats={stats}
+              filters={filters}
+              notify={notify}
+              actions={actions}
+              dialogs={dialogs}
+              onNavigate={goTo}
+              onReviewPending={() => showVisits("pending")}
+              onExport={exportVisits}
+            />
+          </main>
+
+          <TabBar
+            view={view}
+            pending={stats.pending}
+            navOpen={navOpen}
+            onNavigate={goTo}
+            onOpenNav={() => setNavOpen(true)}
+          />
+        </div>
+
+        <AdminToast toast={toast} />
+        <DashboardDialogs
+          dialogs={dialogs}
+          data={data}
+          actions={actions}
+          notify={notify}
+        />
       </div>
 
-      <ConfirmModal
-        isOpen={confirmDialog.isOpen}
-        title={confirmDialog.title || 'Please confirm'}
-        message={confirmDialog.message || 'Are you sure?'}
-        confirmText={confirmDialog.confirmText || 'Confirm'}
-        tone={confirmDialog.tone || 'default'}
-        onConfirm={runConfirm}
-        onCancel={closeConfirm}
+      <div
+        className="pointer-events-none fixed inset-0 z-0"
+        style={DOT_PATTERN}
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none fixed -top-[200px] -left-[200px] z-0 size-[700px] bg-[radial-gradient(circle,rgba(201,146,42,0.1)_0%,transparent_70%)] motion-safe:animate-[driftA_18s_ease-in-out_infinite_alternate]"
+        aria-hidden="true"
+      />
+
+      <DashboardConfirm
+        dialog={dialogs.confirmDialog}
+        onConfirm={dialogs.runConfirm}
+        onCancel={dialogs.closeConfirm}
       />
     </>
   );

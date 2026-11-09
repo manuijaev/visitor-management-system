@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import api from "../../services/api";
-import ModalDialog from "../ModalDialog";
-import Icon from "./Icon";
+import Button from "../ui/Button";
+import Dialog from "../ui/Dialog";
+import ModalFoot from "./dashboard/ModalFoot";
+import ModalHead from "./dashboard/ModalHead";
+import Field from "./Field";
+import { ERROR, FIELD_HINT, INPUT } from "./styles";
 import { formatApiError } from "./utils";
 
 export default function EditStaffModal({
@@ -67,57 +71,62 @@ export default function EditStaffModal({
   };
 
   return (
-    <ModalDialog
-      className="ad-modal"
-      aria-labelledby="edit-staff-title"
+    <Dialog
+      look="modal"
+      className="gp-root"
       onClose={onClose}
       dismissible={!saving}
     >
-      <form className="ad-modal-form" onSubmit={save}>
-        <header className="ad-modal-head">
-          <div>
-            <div className="ad-eyebrow">Edit staff</div>
-            <h2 id="edit-staff-title">{member.full_name}</h2>
-          </div>
-          <button
-            type="button"
-            className="ad-icon-btn"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            <Icon name="x" size={18} />
-          </button>
-        </header>
-        <div className="ad-modal-body ad-form ad-form-grid">
-          <label className="ad-field">
-            <span>Full name</span>
-            <input value={form.full_name} onChange={update("full_name")} />
-          </label>
-          <label className="ad-field">
-            <span>Work email</span>
-            <input type="email" value={form.email} onChange={update("email")} />
-          </label>
-          <label className="ad-field">
-            <span>
-              Phone <em>optional</em>
-            </span>
+      <form className="contents" onSubmit={save}>
+        <ModalHead
+          eyebrow="Edit staff"
+          title={member.full_name}
+          onClose={onClose}
+        />
+        <div className="grid grid-cols-2 flex-col gap-x-4 gap-y-3.5 px-7 pt-3.5 pb-1.5 max-[760px]:grid-cols-1">
+          <Field label="Full name">
             <input
+              className={INPUT}
+              value={form.full_name}
+              onChange={update("full_name")}
+            />
+          </Field>
+          <Field label="Work email">
+            <input
+              className={INPUT}
+              type="email"
+              value={form.email}
+              onChange={update("email")}
+            />
+          </Field>
+          <Field
+            label={
+              <>
+                Phone <em className={FIELD_HINT}>optional</em>
+              </>
+            }
+          >
+            <input
+              className={INPUT}
               type="tel"
               value={form.phone}
               onChange={update("phone")}
               placeholder="+254 700 000 000"
             />
-          </label>
-          <label className="ad-field">
-            <span>Access</span>
-            <select value={form.role} onChange={update("role")}>
+          </Field>
+          <Field label="Access">
+            <select
+              className={INPUT}
+              value={form.role}
+              onChange={update("role")}
+            >
               <option value="Staff">Staff</option>
               <option value="Admin">Admin</option>
             </select>
-          </label>
-          <label className="ad-field">
-            <span>Department</span>
+          </Field>
+          <Field label="Department">
             <select
+              className={INPUT}
               value={form.department}
               onChange={(e) =>
                 setForm((prev) => ({
@@ -134,10 +143,10 @@ export default function EditStaffModal({
                 </option>
               ))}
             </select>
-          </label>
-          <label className="ad-field">
-            <span>Division</span>
+          </Field>
+          <Field label="Division">
             <select
+              className={INPUT}
               value={form.division}
               onChange={update("division")}
               disabled={!form.department}
@@ -153,27 +162,18 @@ export default function EditStaffModal({
                 </option>
               ))}
             </select>
-          </label>
-          {error && <p className="ad-error ad-span-2">{error}</p>}
+          </Field>
+          {error && <p className={`${ERROR} col-span-full`}>{error}</p>}
         </div>
-        <footer className="ad-modal-foot">
-          <button
-            type="button"
-            className="ad-btn ad-btn-ghost"
-            onClick={onClose}
-            disabled={saving}
-          >
+        <ModalFoot>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancel
-          </button>
-          <button
-            type="submit"
-            className="ad-btn ad-btn-primary"
-            disabled={saving}
-          >
+          </Button>
+          <Button type="submit" variant="solid" disabled={saving}>
             {saving ? "Saving..." : "Save changes"}
-          </button>
-        </footer>
+          </Button>
+        </ModalFoot>
       </form>
-    </ModalDialog>
+    </Dialog>
   );
 }
