@@ -19,7 +19,7 @@ describe("AppShell", () => {
     expect(screen.getByText("Screen content")).toBeTruthy();
     const tabs = screen
       .getAllByRole("link")
-      .filter((link) => link.closest(".gp-tabbar"));
+      .filter((link) => link.closest("nav"));
     expect(tabs.map((tab) => tab.textContent)).toEqual([
       "Book",
       "My visits",

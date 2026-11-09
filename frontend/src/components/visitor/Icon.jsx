@@ -70,10 +70,10 @@ const ICON_PATHS = {
   ),
 };
 
-export default function Icon({ name, className = "" }) {
+export default function Icon({ name, className = "size-5" }) {
   return (
     <svg
-      className={`gp-icon ${className}`}
+      className={`flex-none ${className}`}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
