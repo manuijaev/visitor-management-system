@@ -17,6 +17,12 @@ const HOW_STEPS = [
   { icon: 'message', title: 'Get a text back', text: 'They are alerted straight away, and you get an SMS as soon as they reply.' },
 ];
 
+function savedVisitsNote(count) {
+  if (count <= 0) return '';
+  const noun = count === 1 ? 'visit' : 'visits';
+  return ` · ${count} ${noun} saved`;
+}
+
 export default function HelpPage() {
   const navigate = useNavigate();
   const [details, setDetails] = useState(loadVisitorDetails);
@@ -77,7 +83,7 @@ export default function HelpPage() {
                 <strong>Forget me on this phone</strong>
                 <small>
                   {details ? `Saved as ${details.name}` : 'No saved details'}
-                  {visitCount > 0 ? ` · ${visitCount} visit${visitCount === 1 ? '' : 's'} saved` : ''}
+                  {savedVisitsNote(visitCount)}
                 </small>
               </span>
             </button>

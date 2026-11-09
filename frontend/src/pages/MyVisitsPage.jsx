@@ -6,7 +6,6 @@ import Icon from '../components/visitor/Icon';
 import { loadSavedVisits } from '../services/visitorDevice';
 
 const TZ = 'Africa/Nairobi';
-/** Only recent and upcoming visits are refreshed, to stay well inside the lookup rate limit. */
 const REFRESH_LIMIT = 6;
 const RECENT_MS = 2 * 24 * 60 * 60 * 1000;
 
@@ -40,6 +39,11 @@ const formatWhen = (value) =>
   }).format(new Date(value));
 
 const isRecent = (visit) => new Date(visit.arrival).getTime() > Date.now() - RECENT_MS;
+
+function pendingLabel(visit) {
+  if (visit.checking) return 'Checking…';
+  return isRecent(visit) ? 'View' : 'Past';
+}
 
 export default function MyVisitsPage() {
   const navigate = useNavigate();
@@ -117,7 +121,7 @@ export default function MyVisitsPage() {
                       {STATUS_LABEL[visit.status] || visit.status}
                     </span>
                   ) : (
-                    <span className="gp-visit-status is-muted">{visit.checking ? 'Checking…' : isRecent(visit) ? 'View' : 'Past'}</span>
+                    <span className="gp-visit-status is-muted">{pendingLabel(visit)}</span>
                   )}
                   <Icon name="chevronRight" className="gp-visit-chevron" />
                 </button>

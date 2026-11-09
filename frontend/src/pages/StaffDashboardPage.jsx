@@ -218,7 +218,7 @@ export default function StaffDashboardPage() {
       const saved = localStorage.getItem('staff_notifications');
       const list = saved ? JSON.parse(saved) : [];
       // Older versions also saved pop-up messages ("Refreshed!"); keep only visit alerts.
-      return Array.isArray(list) ? list.filter((item) => item && item.type === 'appointment') : [];
+      return Array.isArray(list) ? list.filter((item) => item?.type === 'appointment') : [];
     } catch {
       return [];
     }

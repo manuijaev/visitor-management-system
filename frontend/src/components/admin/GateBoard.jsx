@@ -1,17 +1,26 @@
-import { useState } from 'react';
-import api from '../../services/api';
-import Icon from './Icon';
-import { eatDateKey, formatApiError, formatClockTime, getInitials } from './utils';
+import { useState } from "react";
+import api from "../../services/api";
+import Icon from "./Icon";
+import {
+  eatDateKey,
+  formatApiError,
+  formatClockTime,
+  getInitials,
+} from "./utils";
 
-const CLOSED_STATUSES = ['Declined', 'Cancelled', 'Expired'];
+const CLOSED_STATUSES = new Set(["Declined", "Cancelled", "Expired"]);
 
 const matches = (visit, query) =>
   !query ||
-  [visit.visitor_name, visit.visitor_phone, visit.staff_name, visit.department_name]
-    .some((value) => value?.toLowerCase().includes(query));
+  [
+    visit.visitor_name,
+    visit.visitor_phone,
+    visit.staff_name,
+    visit.department_name,
+  ].some((value) => value?.toLowerCase().includes(query));
 
 export default function GateBoard({ appointments, onChanged, notify }) {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [busyId, setBusyId] = useState(null);
   const [tab, setTab] = useState(null);
 
@@ -25,11 +34,18 @@ export default function GateBoard({ appointments, onChanged, notify }) {
   const expected = visible
     .filter(
       (visit) =>
-        !visit.checked_in_at && !CLOSED_STATUSES.includes(visit.status) && eatDateKey(visit.appointment_date) === today
+        !visit.checked_in_at &&
+        !CLOSED_STATUSES.has(visit.status) &&
+        eatDateKey(visit.appointment_date) === today,
     )
-    .sort((a, b) => new Date(a.appointment_date) - new Date(b.appointment_date));
+    .sort(
+      (a, b) => new Date(a.appointment_date) - new Date(b.appointment_date),
+    );
   const leftToday = visible
-    .filter((visit) => visit.checked_out_at && eatDateKey(visit.checked_out_at) === today)
+    .filter(
+      (visit) =>
+        visit.checked_out_at && eatDateKey(visit.checked_out_at) === today,
+    )
     .sort((a, b) => new Date(b.checked_out_at) - new Date(a.checked_out_at));
 
   const act = async (visit, action) => {
@@ -37,13 +53,13 @@ export default function GateBoard({ appointments, onChanged, notify }) {
     try {
       await api.post(`/appointments/${visit.id}/${action}/`);
       notify(
-        action === 'check-in'
-          ? `${visit.visitor_name} has arrived. ${visit.staff_name || 'Their host'} has been told.`
-          : `${visit.visitor_name} has left.`
+        action === "check-in"
+          ? `${visit.visitor_name} has arrived. ${visit.staff_name || "Their host"} has been told.`
+          : `${visit.visitor_name} has left.`,
       );
       await onChanged();
     } catch (err) {
-      notify(formatApiError(err), 'error');
+      notify(formatApiError(err), "error");
     } finally {
       setBusyId(null);
     }
@@ -51,12 +67,14 @@ export default function GateBoard({ appointments, onChanged, notify }) {
 
   const renderRow = (visit, { time, action, label, tone }) => (
     <div key={visit.id} className="ad-gate-row">
-      <span className="ad-avatar ad-avatar-gold">{getInitials(visit.visitor_name)}</span>
+      <span className="ad-avatar ad-avatar-gold">
+        {getInitials(visit.visitor_name)}
+      </span>
       <div className="ad-gate-text">
         <strong>{visit.visitor_name}</strong>
         <span>
-          Seeing {visit.staff_name || 'unassigned'}
-          {visit.department_name ? ` · ${visit.department_name}` : ''}
+          Seeing {visit.staff_name || "unassigned"}
+          {visit.department_name ? ` · ${visit.department_name}` : ""}
         </span>
       </div>
       <span className="ad-gate-time">{time}</span>
@@ -67,7 +85,7 @@ export default function GateBoard({ appointments, onChanged, notify }) {
           disabled={busyId === visit.id}
           onClick={() => act(visit, action)}
         >
-          {busyId === visit.id ? 'Saving…' : label}
+          {busyId === visit.id ? "Saving…" : label}
         </button>
       )}
     </div>
@@ -75,25 +93,40 @@ export default function GateBoard({ appointments, onChanged, notify }) {
 
   const lists = {
     expected: {
-      label: 'Expected',
+      label: "Expected",
       visits: expected,
-      empty: 'No more visitors expected today.',
-      row: (visit) => renderRow(visit, { time: formatClockTime(visit.appointment_date), action: 'check-in', label: 'Mark arrived', tone: 'ad-btn-primary' }),
+      empty: "No more visitors expected today.",
+      row: (visit) =>
+        renderRow(visit, {
+          time: formatClockTime(visit.appointment_date),
+          action: "check-in",
+          label: "Mark arrived",
+          tone: "ad-btn-primary",
+        }),
     },
     onsite: {
-      label: 'Here now',
+      label: "Here now",
       visits: onSite,
-      empty: 'No visitors are here right now.',
-      row: (visit) => renderRow(visit, { time: `Arrived ${formatClockTime(visit.checked_in_at)}`, action: 'check-out', label: 'Mark left', tone: 'ad-btn-ghost' }),
+      empty: "No visitors are here right now.",
+      row: (visit) =>
+        renderRow(visit, {
+          time: `Arrived ${formatClockTime(visit.checked_in_at)}`,
+          action: "check-out",
+          label: "Mark left",
+          tone: "ad-btn-ghost",
+        }),
     },
     left: {
-      label: 'Left',
+      label: "Left",
       visits: leftToday,
-      empty: 'Nobody has left yet today.',
-      row: (visit) => renderRow(visit, { time: `${formatClockTime(visit.checked_in_at)} – ${formatClockTime(visit.checked_out_at)}` }),
+      empty: "Nobody has left yet today.",
+      row: (visit) =>
+        renderRow(visit, {
+          time: `${formatClockTime(visit.checked_in_at)} – ${formatClockTime(visit.checked_out_at)}`,
+        }),
     },
   };
-  const activeTab = tab || (onSite.length ? 'onsite' : 'expected');
+  const activeTab = tab || (onSite.length ? "onsite" : "expected");
   const current = lists[activeTab];
 
   return (
@@ -101,22 +134,47 @@ export default function GateBoard({ appointments, onChanged, notify }) {
       <div className="ad-page-head">
         <div>
           <h1>Arrivals</h1>
-          <p>Today&apos;s visitors. Mark them as arrived when they reach reception (their host gets a text) and as left when they go.</p>
+          <p>
+            Today&apos;s visitors. Mark them as arrived when they reach
+            reception (their host gets a text) and as left when they go.
+          </p>
         </div>
       </div>
 
       <div className="ad-stats ad-stats-3">
-        <button type="button" className="ad-stat ad-stat-button" onClick={() => setTab('expected')}>
+        <button
+          type="button"
+          className="ad-stat ad-stat-button"
+          onClick={() => setTab("expected")}
+        >
           <span>Expected today</span>
-          <strong className={expected.length ? 'gold' : ''}>{expected.length}</strong>
-          <small>{expected[0] ? `Next at ${formatClockTime(expected[0].appointment_date)}` : 'Nobody else due'}</small>
+          <strong className={expected.length ? "gold" : ""}>
+            {expected.length}
+          </strong>
+          <small>
+            {expected[0]
+              ? `Next at ${formatClockTime(expected[0].appointment_date)}`
+              : "Nobody else due"}
+          </small>
         </button>
-        <button type="button" className="ad-stat ad-stat-button" onClick={() => setTab('onsite')}>
+        <button
+          type="button"
+          className="ad-stat ad-stat-button"
+          onClick={() => setTab("onsite")}
+        >
           <span>Here now</span>
           <strong>{onSite.length}</strong>
-          <small>{onSite.length ? `Since ${formatClockTime(onSite[0].checked_in_at)}` : 'Nobody here yet'}</small>
+          <small>
+            {onSite.length
+              ? `Since ${formatClockTime(onSite[0].checked_in_at)}`
+              : "Nobody here yet"}
+          </small>
         </button>
-        <button type="button" className="ad-stat ad-stat-button" onClick={() => setTab('left')}>
+        <button
+          type="button"
+          className="ad-stat ad-stat-button"
+          onClick={() => setTab("left")}
+        >
           <span>Left today</span>
           <strong>{leftToday.length}</strong>
           <small>Visits finished</small>
@@ -125,14 +183,18 @@ export default function GateBoard({ appointments, onChanged, notify }) {
 
       <section className="ad-card">
         <div className="ad-toolbar">
-          <div className="ad-segmented ad-segmented-fill ad-segmented-3" role="tablist" aria-label="Arrivals list">
+          <div
+            className="ad-segmented ad-segmented-fill ad-segmented-3"
+            role="tablist"
+            aria-label="Arrivals list"
+          >
             {Object.entries(lists).map(([id, list]) => (
               <button
                 type="button"
                 key={id}
                 role="tab"
                 aria-selected={activeTab === id}
-                className={activeTab === id ? 'active' : ''}
+                className={activeTab === id ? "active" : ""}
                 onClick={() => setTab(id)}
               >
                 {list.label}
@@ -142,12 +204,18 @@ export default function GateBoard({ appointments, onChanged, notify }) {
           </div>
           <label className="ad-search">
             <Icon name="search" size={15} />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find a visitor or host" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Find a visitor or host"
+            />
           </label>
         </div>
         <div className="ad-gate-list">
           {current.visits.map(current.row)}
-          {!current.visits.length && <div className="ad-empty-line">{current.empty}</div>}
+          {!current.visits.length && (
+            <div className="ad-empty-line">{current.empty}</div>
+          )}
         </div>
       </section>
     </>

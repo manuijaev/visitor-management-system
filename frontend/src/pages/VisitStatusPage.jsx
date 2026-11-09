@@ -1,49 +1,75 @@
-import { useEffect, useState } from 'react';
-import { useLocation, useSearchParams } from 'react-router-dom';
-import api from '../services/api';
-import AppShell from '../components/visitor/AppShell';
-import ConfirmModal from '../components/ConfirmModal';
+import { useEffect, useState } from "react";
+import { useLocation, useSearchParams } from "react-router-dom";
+import api from "../services/api";
+import AppShell from "../components/visitor/AppShell";
+import ConfirmModal from "../components/ConfirmModal";
 
-const TZ = 'Africa/Nairobi';
+const TZ = "Africa/Nairobi";
 
 const STATUS_COPY = {
-  Pending: { tone: 'wait', title: 'Waiting for a reply', text: (host) => `${host} hasn't responded yet. We'll text you when they do.` },
-  Accepted: { tone: 'ok', title: 'Visit confirmed', text: (host) => `${host} is expecting you.` },
-  Rescheduled: { tone: 'wait', title: 'New time proposed', text: (host) => `${host} moved your visit to the time below.` },
-  Declined: { tone: 'stop', title: 'Visit declined', text: (host) => `${host} can't make this visit.` },
-  Cancelled: { tone: 'stop', title: 'Visit cancelled', text: () => 'This visit has been cancelled.' },
+  Pending: {
+    tone: "wait",
+    title: "Waiting for a reply",
+    text: (host) =>
+      `${host} hasn't responded yet. We'll text you when they do.`,
+  },
+  Accepted: {
+    tone: "ok",
+    title: "Visit confirmed",
+    text: (host) => `${host} is expecting you.`,
+  },
+  Rescheduled: {
+    tone: "wait",
+    title: "New time proposed",
+    text: (host) => `${host} moved your visit to the time below.`,
+  },
+  Declined: {
+    tone: "stop",
+    title: "Visit declined",
+    text: (host) => `${host} can't make this visit.`,
+  },
+  Cancelled: {
+    tone: "stop",
+    title: "Visit cancelled",
+    text: () => "This visit has been cancelled.",
+  },
   Expired: {
-    tone: 'stop',
-    title: 'Request closed',
-    text: (host) => `${host} couldn't reply in time, so this request was closed. Please book a new visit.`,
+    tone: "stop",
+    title: "Request closed",
+    text: (host) =>
+      `${host} couldn't reply in time, so this request was closed. Please book a new visit.`,
   },
 };
 
 const formatWhen = (value) =>
-  new Intl.DateTimeFormat('en-GB', {
+  new Intl.DateTimeFormat("en-GB", {
     timeZone: TZ,
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    hour: 'numeric',
-    minute: '2-digit',
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "numeric",
+    minute: "2-digit",
     hour12: true,
   }).format(new Date(value));
 
 const errorMessage = (error) => {
-  if (error?.response?.status === 429) return 'Too many attempts. Please wait a while and try again.';
-  if (!error?.response) return "We couldn't reach the server. Check your connection and try again.";
-  return error.response.data?.detail || 'Something went wrong. Please try again.';
+  if (error?.response?.status === 429)
+    return "Too many attempts. Please wait a while and try again.";
+  if (!error?.response)
+    return "We couldn't reach the server. Check your connection and try again.";
+  return (
+    error.response.data?.detail || "Something went wrong. Please try again."
+  );
 };
 
 export default function VisitStatusPage() {
   const [params] = useSearchParams();
-  const [reference, setReference] = useState(params.get('ref') || '');
+  const [reference, setReference] = useState(params.get("ref") || "");
   const { state } = useLocation();
-  const [phone, setPhone] = useState(state?.phone || '');
+  const [phone, setPhone] = useState(state?.phone || "");
   const [visit, setVisit] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
@@ -53,9 +79,9 @@ export default function VisitStatusPage() {
     event?.preventDefault();
     if (!credentials.reference || !credentials.phone || loading) return;
     setLoading(true);
-    setError('');
+    setError("");
     try {
-      const { data } = await api.post('/visits/lookup/', credentials);
+      const { data } = await api.post("/visits/lookup/", credentials);
       setVisit(data);
     } catch (err) {
       setVisit(null);
@@ -66,14 +92,14 @@ export default function VisitStatusPage() {
   };
 
   useEffect(() => {
-    if (state?.phone && params.get('ref')) lookUp();
+    if (state?.phone && params.get("ref")) void lookUp();
   }, []);
 
   const cancelVisit = async () => {
     setCancelling(true);
-    setError('');
+    setError("");
     try {
-      const { data } = await api.post('/visits/cancel/', credentials);
+      const { data } = await api.post("/visits/cancel/", credentials);
       setVisit(data);
     } catch (err) {
       setError(errorMessage(err));
@@ -84,17 +110,21 @@ export default function VisitStatusPage() {
   };
 
   const copy = visit ? STATUS_COPY[visit.status] || STATUS_COPY.Pending : null;
-  const host = visit?.staff_name || 'Your host';
+  const host = visit?.staff_name || "Your host";
 
   return (
-    <AppShell title="Check a visit" back={{ to: '/visits', label: 'Back to my visits' }}>
+    <AppShell
+      title="Check a visit"
+      back={{ to: "/visits", label: "Back to my visits" }}
+    >
       <section className="gp-flow gp-lookup">
         {!visit ? (
           <form className="gp-lookup-body" onSubmit={lookUp}>
             <p className="gp-eyebrow">Check your visit</p>
             <h1>Where&apos;s my visit?</h1>
             <p className="gp-lookup-intro">
-              Enter the reference from your visit pass and the phone number you booked with.
+              Enter the reference from your visit pass and the phone number you
+              booked with.
             </p>
             <div className="gp-fields">
               <label className="gp-field gp-field--full">
@@ -131,7 +161,7 @@ export default function VisitStatusPage() {
               className="gp-btn gp-btn--dark gp-btn--grow gp-lookup-submit"
               disabled={!credentials.reference || !credentials.phone || loading}
             >
-              {loading ? 'Checking…' : 'Check my visit'}
+              {loading ? "Checking…" : "Check my visit"}
             </button>
           </form>
         ) : (
@@ -175,7 +205,11 @@ export default function VisitStatusPage() {
 
             <div className="gp-lookup-actions">
               {visit.can_cancel && (
-                <button type="button" className="gp-btn gp-btn--ghost" onClick={() => setConfirmingCancel(true)}>
+                <button
+                  type="button"
+                  className="gp-btn gp-btn--ghost"
+                  onClick={() => setConfirmingCancel(true)}
+                >
                   Cancel visit
                 </button>
               )}
@@ -184,7 +218,7 @@ export default function VisitStatusPage() {
                 className="gp-btn gp-btn--dark"
                 onClick={() => {
                   setVisit(null);
-                  setError('');
+                  setError("");
                 }}
               >
                 Check another visit
@@ -197,7 +231,11 @@ export default function VisitStatusPage() {
       <ConfirmModal
         isOpen={confirmingCancel}
         title="Cancel this visit?"
-        message={visit ? `${host} will be told you're no longer coming. This can't be undone.` : ''}
+        message={
+          visit
+            ? `${host} will be told you're no longer coming. This can't be undone.`
+            : ""
+        }
         confirmText="Yes, cancel"
         cancelText="Keep visit"
         loadingText="Cancelling"
