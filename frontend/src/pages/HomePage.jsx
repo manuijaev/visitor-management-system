@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { isValidEmail } from "../services/validation";
 import api from '../services/api';
 import Icon from '../components/visitor/Icon';
 import AppShell from '../components/visitor/AppShell';
@@ -33,7 +34,6 @@ const VISIT_MODES = [
 const ETA_CHOICES = [10, 15, 30, 45, 60];
 const PURPOSES = ['Parent–teacher meeting', 'Admissions enquiry', 'Fees / bursar', 'Student pickup', 'Counselling', 'Other'];
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const isValidPhone = (value) => /^\+?\d{9,15}$/.test((value || '').replace(/[\s()-]/g, ''));
 
 function eatParts(date) {
@@ -166,7 +166,7 @@ function describeError(error) {
     const text = Array.isArray(first) ? first[0] : first;
     if (typeof text === 'string') {
       if (!field || field === 'detail' || field === 'non_field_errors') return text;
-      const label = field.replace(/_/g, ' ');
+      const label = field.replaceAll('_', ' ');
       return `${label.charAt(0).toUpperCase()}${label.slice(1)}: ${text}`;
     }
   }
@@ -334,7 +334,7 @@ export default function HomePage() {
 
   const nameOk = visitor.name.trim().length >= 2;
   const phoneOk = isValidPhone(visitor.phone);
-  const emailOk = !visitor.email.trim() || EMAIL_RE.test(visitor.email.trim());
+  const emailOk = !visitor.email.trim() || isValidEmail(visitor.email);
   const whenOk = mode === 'now' || mode === 'onway' || (mode === 'later' && Boolean(slotStillOpen));
   const blockFor = (member, visitMode = mode) =>
     hostBlockReason(member, visitMode, visitMode === 'later' ? dayKey : null) ||
@@ -346,7 +346,7 @@ export default function HomePage() {
 
   const scrollFlowIntoView = () => {
     const card = flowRef.current;
-    if (card && card.getBoundingClientRect().top < 0) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (card?.getBoundingClientRect().top < 0) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const goToStep = (target) => {
@@ -1025,11 +1025,13 @@ export default function HomePage() {
             )}
           </section>
 
-      {toast && (
-        <div className="gp-toast" role="status" aria-live="polite">
-          {toast}
-        </div>
-      )}
+      <output className="gp-toast-region">
+        {toast && (
+          <span key={toast} className="gp-toast">
+            {toast}
+          </span>
+        )}
+      </output>
     </AppShell>
   );
 }

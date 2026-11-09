@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import ModalDialog from '../components/ModalDialog';
 import ConfirmModal from '../components/ConfirmModal';
 import Icon from '../components/admin/Icon';
 import AddStaffWizard from '../components/admin/AddStaffWizard';
@@ -329,7 +330,7 @@ export default function AdminDashboardPage() {
       ['ID', 'Visitor', 'Visitor email', 'Staff', 'Department', 'Status', 'Visit date'],
       ...appointments.map((a) => [a.id, a.visitor_name, a.visitor_email, a.staff_name, a.department_name, a.status, a.appointment_date]),
     ];
-    const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? '').replaceAll('"', '""')}"`).join(',')).join('\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
     const link = document.createElement('a');
     link.href = url;
@@ -902,12 +903,11 @@ export default function AdminDashboardPage() {
         />
 
         {reassign && (
-          <div className="ad-modal-overlay" onClick={() => setReassign(null)}>
-            <div className="ad-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+          <ModalDialog className="ad-modal" aria-labelledby="reassign-title" onClose={() => setReassign(null)}>
               <header className="ad-modal-head">
                 <div>
                   <div className="ad-eyebrow">Reassign visit</div>
-                  <h2>{reassign.visitor_name}</h2>
+                  <h2 id="reassign-title">{reassign.visitor_name}</h2>
                 </div>
                 <button type="button" className="ad-icon-btn" onClick={() => setReassign(null)} aria-label="Close"><Icon name="x" size={18} /></button>
               </header>
@@ -930,17 +930,15 @@ export default function AdminDashboardPage() {
                 <button type="button" className="ad-btn ad-btn-ghost" onClick={() => setReassign(null)}>Cancel</button>
                 <button type="button" className="ad-btn ad-btn-primary" onClick={submitReassign} disabled={!reassignTo}>Reassign</button>
               </footer>
-            </div>
-          </div>
+          </ModalDialog>
         )}
 
         {inviteLink && (
-          <div className="ad-modal-overlay" onClick={() => setInviteLink(null)}>
-            <div className="ad-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+          <ModalDialog className="ad-modal" aria-labelledby="invite-link-title" onClose={() => setInviteLink(null)}>
               <header className="ad-modal-head">
                 <div>
                   <div className="ad-eyebrow">Email not delivered</div>
-                  <h2>Share this link with {firstName(inviteLink.member.full_name)}</h2>
+                  <h2 id="invite-link-title">Share this link with {firstName(inviteLink.member.full_name)}</h2>
                 </div>
                 <button type="button" className="ad-icon-btn" onClick={() => setInviteLink(null)} aria-label="Close"><Icon name="x" size={18} /></button>
               </header>
@@ -961,8 +959,7 @@ export default function AdminDashboardPage() {
               <footer className="ad-modal-foot">
                 <button type="button" className="ad-btn ad-btn-primary" onClick={() => setInviteLink(null)}>Done</button>
               </footer>
-            </div>
-          </div>
+          </ModalDialog>
         )}
       </div>
 

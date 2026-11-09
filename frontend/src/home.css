@@ -57,7 +57,6 @@ body.home-background #root {
   font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
-  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.12s ease;
 }
 
 .gp-btn:active:not(:disabled) {
@@ -124,7 +123,6 @@ body.home-background #root {
   flex: none;
   width: 38px;
   height: 38px;
-  transition: transform 0.25s ease;
 }
 
 .gp-brand:hover .gp-brand-mark {
@@ -229,16 +227,11 @@ body.home-background #root {
   height: 7px;
   border-radius: 50%;
   background: currentColor;
-  animation: gpBlink 2s ease-in-out infinite;
 }
 
 .gp-office.is-closed {
   background: var(--surface2);
   color: var(--ink-light);
-}
-
-.gp-office.is-closed::before {
-  animation: none;
 }
 
 .gp-stepper {
@@ -282,7 +275,6 @@ body.home-background #root {
   background: var(--gold);
   transform: scaleX(0);
   transform-origin: left;
-  transition: transform 0.35s ease;
 }
 
 .gp-stepper .is-current .gp-stepper-bar::after,
@@ -319,7 +311,6 @@ body.home-background #root {
 
 .gp-flow-body {
   padding: 22px var(--gp-pad) 8px;
-  animation: gpStepIn 0.35s ease both;
 }
 
 .gp-flow-foot {
@@ -351,7 +342,6 @@ body.home-background #root {
   border-radius: 20px;
   background: var(--surface);
   text-align: left;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .gp-mode:hover:not(:disabled) {
@@ -377,7 +367,6 @@ body.home-background #root {
   place-items: center;
   background: var(--surface2);
   color: var(--ink);
-  transition: background 0.2s ease, color 0.2s ease;
 }
 
 .gp-mode.is-on .gp-mode-icon {
@@ -412,7 +401,6 @@ body.home-background #root {
   color: #fff;
   opacity: 0;
   transform: scale(0.6);
-  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 .gp-mode-check .gp-icon {
@@ -430,7 +418,6 @@ body.home-background #root {
   margin-top: 20px;
   padding-top: 18px;
   border-top: 1px dashed var(--border2);
-  animation: gpStepIn 0.3s ease both;
 }
 
 .gp-sub-label {
@@ -487,7 +474,6 @@ body.home-background #root {
   font-weight: 500;
   color: var(--ink-mid);
   scroll-snap-align: start;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .gp-chip:hover {
@@ -524,7 +510,6 @@ body.home-background #root {
   border-radius: 18px;
   background: var(--surface);
   scroll-snap-align: start;
-  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .gp-day:hover:not(.is-on) {
@@ -597,7 +582,6 @@ body.home-background #root {
   font-size: 13.5px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .gp-slot:hover:not(:disabled):not(.is-on) {
@@ -629,7 +613,6 @@ body.home-background #root {
   color: var(--gold-dark);
   font-size: 14px;
   font-weight: 600;
-  animation: gpStepIn 0.25s ease both;
 }
 
 .gp-note {
@@ -681,7 +664,6 @@ body.home-background #root {
   color: var(--ink);
   font-size: 16px;
   font-family: inherit;
-  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .gp-input::placeholder {
@@ -734,7 +716,6 @@ textarea.gp-input {
   border-radius: 18px;
   background: var(--surface);
   text-align: left;
-  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .gp-host:hover:not(:disabled) {
@@ -842,7 +823,6 @@ textarea.gp-input {
   border-radius: 18px;
   background: linear-gradient(90deg, var(--surface2) 0%, var(--bg) 50%, var(--surface2) 100%);
   background-size: 200% 100%;
-  animation: gpShimmer 1.2s linear infinite;
 }
 
 .gp-fields {
@@ -957,7 +937,6 @@ textarea.gp-input {
   font-size: 13px;
   font-weight: 600;
   color: var(--gold-dark);
-  transition: background 0.15s ease;
 }
 
 .gp-review-edit:hover {
@@ -992,7 +971,6 @@ textarea.gp-input {
 .gp-pass {
   padding: 34px var(--gp-pad) 28px;
   text-align: center;
-  animation: gpStepIn 0.4s ease both;
 }
 
 .gp-pass-check {
@@ -1004,7 +982,6 @@ textarea.gp-input {
   place-items: center;
   background: var(--green-light);
   color: var(--green);
-  animation: gpPop 0.55s cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
 
 .gp-pass-check .gp-icon {
@@ -1107,7 +1084,6 @@ textarea.gp-input {
   height: 8px;
   border-radius: 50%;
   background: var(--gold);
-  animation: gpPulse 1.6s ease-out infinite;
 }
 
 .gp-ticket-ref {
@@ -1147,7 +1123,6 @@ textarea.gp-input {
   font-size: 14px;
   box-shadow: var(--shadow-lg);
   transform: translateX(-50%);
-  animation: gpToast 0.3s ease both;
 }
 
 @keyframes gpStepIn {
@@ -1261,15 +1236,6 @@ textarea.gp-input {
   .gp-status {
     font-size: 0;
     gap: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .gp-root *,
-  .gp-root *::before,
-  .gp-root *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
   }
 }
 
@@ -1458,7 +1424,6 @@ textarea.gp-input {
   font-size: 11.5px;
   font-weight: 600;
   text-decoration: none;
-  transition: color 0.15s ease;
 }
 
 .gp-tab .gp-icon {
@@ -1587,7 +1552,6 @@ textarea.gp-input {
   color: var(--ink);
   text-align: left;
   text-decoration: none;
-  transition: border-color 0.15s ease, transform 0.15s ease;
 }
 
 :where(.gp-root) .gp-visit-card,
@@ -1631,8 +1595,8 @@ textarea.gp-input {
 
 .gp-visit-ref {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11.5px !important;
-  color: var(--ink-faint) !important;
+  font-size: 11.5px;
+  color: var(--ink-faint);
 }
 
 .gp-visit-status {
@@ -1736,5 +1700,104 @@ textarea.gp-input {
 
   .gp-app-main {
     padding-top: 28px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .gp-btn {
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.12s ease;
+  }
+
+  .gp-brand-mark {
+    transition: transform 0.25s ease;
+  }
+
+  .gp-office::before {
+    animation: gpBlink 2s ease-in-out infinite;
+  }
+
+  .gp-office.is-closed::before {
+    animation: none;
+  }
+
+  .gp-stepper-bar::after {
+    transition: transform 0.35s ease;
+  }
+
+  .gp-flow-body {
+    animation: gpStepIn 0.35s ease both;
+  }
+
+  .gp-mode {
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  }
+
+  .gp-mode-icon {
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+
+  .gp-mode-check {
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+
+  .gp-sub {
+    animation: gpStepIn 0.3s ease both;
+  }
+
+  .gp-chip {
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+
+  .gp-day {
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+
+  .gp-slot {
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+
+  .gp-picked {
+    animation: gpStepIn 0.25s ease both;
+  }
+
+  .gp-input {
+    transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .gp-host {
+    transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .gp-skeleton {
+    animation: gpShimmer 1.2s linear infinite;
+  }
+
+  .gp-review-edit {
+    transition: background 0.15s ease;
+  }
+
+  .gp-pass {
+    animation: gpStepIn 0.4s ease both;
+  }
+
+  .gp-pass-check {
+    animation: gpPop 0.55s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  }
+
+  .gp-pulse {
+    animation: gpPulse 1.6s ease-out infinite;
+  }
+
+  .gp-toast {
+    animation: gpToast 0.3s ease both;
+  }
+
+  .gp-tab {
+    transition: color 0.15s ease;
+  }
+
+  .gp-visit-card,
+  .gp-setting {
+    transition: border-color 0.15s ease, transform 0.15s ease;
   }
 }
