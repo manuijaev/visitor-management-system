@@ -18,15 +18,12 @@
     <meta name="apple-mobile-web-app-title" content="Gatepass" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <script>
-      // Staff and admins install their own app (/staff); visitors install the booking app (/).
       if (/^\/(staff|admin)(\/|$)/.test(location.pathname)) {
         document.querySelector('link[rel="manifest"]').href = '/staff-manifest.json';
         document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute('content', 'Gatepass Staff');
       }
     </script>
     <title>Gatepass · Visitor Management System</title>
-    <!-- Logo and boot splash styles are inlined so they work before the JS/CSS bundle arrives.
-         LogoMark.jsx and LogoLoader.jsx reuse these classes. -->
     <style>
       .vms-logo { display: block; width: 100%; height: 100%; overflow: visible; }
       .vms-logo-tile { fill: #1a1714; }
@@ -71,7 +68,6 @@
         transition: opacity 0.35s ease, visibility 0.35s ease;
       }
       .boot.is-done { opacity: 0; visibility: hidden; }
-      /* Fade in after a beat so fast loads never flash the splash. */
       .boot-inner {
         display: flex;
         flex-direction: column;
@@ -131,15 +127,30 @@
         from { transform: translateX(-100%); }
         to { transform: translateX(250%); }
       }
+      .boot-status {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
       @media (prefers-reduced-motion: reduce) {
-        .vms-logo.is-animated *,
-        .boot-bar::after { animation: none !important; }
+        .boot,
+        .boot *,
+        .boot *::after {
+          animation: none !important;
+          transition: none !important;
+        }
+        .boot-inner,
+        .boot.is-stalled .boot-stall { opacity: 1; }
       }
     </style>
   </head>
   <body>
     <div id="root"></div>
-    <div id="boot" class="boot" role="status" aria-label="Loading Gatepass">
+    <div id="boot" class="boot">
+      <output id="boot-status" class="boot-status">Loading Gatepass</output>
       <div class="boot-inner">
         <svg class="vms-logo is-animated boot-mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
           <rect class="vms-logo-tile" width="64" height="64" rx="18" />
@@ -164,10 +175,13 @@
         // If the app bundle never boots (failed download, stale cache), offer a way out instead of an endless splash.
         var boot = document.getElementById('boot');
         window.setTimeout(function () {
-          if (document.getElementById('boot') && !boot.classList.contains('is-done')) boot.classList.add('is-stalled');
+          if (document.getElementById('boot') && !boot.classList.contains('is-done')) {
+            boot.classList.add('is-stalled');
+            document.getElementById('boot-status').textContent = 'Gatepass is taking longer than usual to load.';
+          }
         }, 12000);
         boot.addEventListener('click', function (event) {
-          var action = event.target.getAttribute('data-boot-action');
+          var action = event.target.dataset.bootAction;
           if (action === 'reload') window.location.reload();
           if (action === 'login') {
             ['access_token', 'refresh_token', 'user'].forEach(function (key) { localStorage.removeItem(key); });
