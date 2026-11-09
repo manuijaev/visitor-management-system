@@ -22,8 +22,11 @@ from notifications.sms_service import (
 )
 from users.models import UserDeviceToken
 
-from .models import Appointment
+from departments.permissions import IsAdminRole
+
+from .models import Appointment, OfficeHours
 from .serializers import (
+    OfficeHoursSerializer,
     AppointmentCreateSerializer,
     AppointmentListSerializer,
     AppointmentReassignSerializer,
@@ -542,3 +545,16 @@ class AppointmentCheckOutView(_GateActionView):
         appointment.checked_out_at = timezone.now()
         appointment.save(update_fields=['checked_out_at'])
         return self.respond(appointment)
+
+
+class OfficeHoursView(generics.RetrieveUpdateAPIView):
+    """Anyone can read the visiting hours; only admins can change them."""
+    serializer_class = OfficeHoursSerializer
+
+    def get_permissions(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return [permissions.AllowAny()]
+        return [IsAdminRole()]
+
+    def get_object(self):
+        return OfficeHours.load()

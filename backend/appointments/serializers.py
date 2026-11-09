@@ -5,7 +5,24 @@ from rest_framework import serializers
 
 from notifications.sms_service import normalize_phone
 
-from .models import Appointment
+from .models import Appointment, OfficeHours
+
+
+DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+
+def _clock(value):
+    return value.strftime('%I:%M %p').lstrip('0')
+
+
+def describe_hours(hours):
+    """Readable visiting hours, e.g. "Mon–Fri, 8:00 AM to 5:00 PM"."""
+    days = hours.weekdays
+    if days and days == list(range(days[0], days[-1] + 1)) and len(days) > 2:
+        day_text = f'{DAY_NAMES[days[0]]}–{DAY_NAMES[days[-1]]}'
+    else:
+        day_text = ', '.join(DAY_NAMES[day] for day in days)
+    return f'{day_text}, {_clock(hours.opens_at)} to {_clock(hours.closes_at)}'
 
 
 class AppointmentCreateSerializer(serializers.ModelSerializer):
@@ -42,6 +59,12 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
         if staff and visit_time and staff.unavailable_days.filter(date=timezone.localtime(visit_time).date()).exists():
             name = (staff.full_name or 'This staff member').split()[0]
             raise serializers.ValidationError({'appointment_date': f'{name} is not available on that day. Please pick another day.'})
+        if is_scheduled and visit_time:
+            hours = OfficeHours.load()
+            if not hours.is_open_at(visit_time):
+                raise serializers.ValidationError(
+                    {'appointment_date': f'The school is closed then. Visiting hours are {describe_hours(hours)}.'}
+                )
         if is_scheduled and staff and visit_time and Appointment.active_for_staff_near(staff, visit_time).exists():
             name = (staff.full_name or 'This staff member').split()[0]
             raise serializers.ValidationError(
@@ -209,3 +232,30 @@ class VisitStatusSerializer(serializers.ModelSerializer):
 
     def get_can_cancel(self, obj) -> bool:
         return obj.status in CANCELLABLE_STATUSES and obj.appointment_date > timezone.now()
+
+
+class OfficeHoursSerializer(serializers.ModelSerializer):
+    open_days = serializers.ListField(
+        child=serializers.IntegerField(min_value=0, max_value=6), allow_empty=False, source='weekdays'
+    )
+    summary = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OfficeHours
+        fields = ['opens_at', 'closes_at', 'open_days', 'summary']
+
+    def get_summary(self, hours):
+        return describe_hours(hours)
+
+    def validate(self, attrs):
+        opens_at = attrs.get('opens_at', getattr(self.instance, 'opens_at', None))
+        closes_at = attrs.get('closes_at', getattr(self.instance, 'closes_at', None))
+        if opens_at and closes_at and closes_at <= opens_at:
+            raise serializers.ValidationError({'closes_at': 'Closing time must be after opening time.'})
+        return attrs
+
+    def update(self, instance, validated_data):
+        days = validated_data.pop('weekdays', None)
+        if days is not None:
+            instance.open_days = ','.join(str(day) for day in sorted(set(days)))
+        return super().update(instance, validated_data)
