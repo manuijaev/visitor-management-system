@@ -32,31 +32,6 @@
       .vms-logo-arch { stroke: #e8b96a; }
       .vms-logo-sill { stroke: #c9922a; }
       .vms-logo-dot { fill: #e8b96a; }
-      .vms-logo.is-animated .vms-logo-arch {
-        stroke-dasharray: 1 1;
-        animation: vmsArch 2.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
-      }
-      .vms-logo.is-animated .vms-logo-sill,
-      .vms-logo.is-animated .vms-logo-dot { transform-box: fill-box; transform-origin: center; }
-      .vms-logo.is-animated .vms-logo-sill { animation: vmsSill 2.6s cubic-bezier(0.65, 0, 0.35, 1) infinite; }
-      .vms-logo.is-animated .vms-logo-dot { animation: vmsDot 2.6s cubic-bezier(0.34, 1.56, 0.64, 1) infinite; }
-      @keyframes vmsArch {
-        0% { stroke-dashoffset: 1; }
-        38%, 74% { stroke-dashoffset: 0; }
-        100% { stroke-dashoffset: -1; }
-      }
-      @keyframes vmsSill {
-        0%, 8% { transform: scaleX(0); }
-        34%, 78% { transform: scaleX(1); }
-        96%, 100% { transform: scaleX(0); }
-      }
-      @keyframes vmsDot {
-        0%, 30% { opacity: 0; transform: translateY(12px) scale(0.6); }
-        48% { opacity: 1; transform: translateY(0) scale(1.25); }
-        58%, 76% { opacity: 1; transform: translateY(0) scale(1); }
-        92%, 100% { opacity: 0; transform: translateY(0) scale(0.4); }
-      }
-
       .boot {
         position: fixed;
         inset: 0;
@@ -65,15 +40,12 @@
         place-items: center;
         background: radial-gradient(circle at 50% 40%, #fdf3e3 0%, #f9f7f4 46%);
         color: #1a1714;
-        transition: opacity 0.35s ease, visibility 0.35s ease;
       }
       .boot.is-done { opacity: 0; visibility: hidden; }
       .boot-inner {
         display: flex;
         flex-direction: column;
         align-items: center;
-        opacity: 0;
-        animation: bootIn 0.45s ease 0.18s forwards;
       }
       .boot-mark { width: 84px; height: 84px; filter: drop-shadow(0 20px 32px rgba(26, 23, 20, 0.28)); }
       .boot-word {
@@ -104,10 +76,9 @@
         width: 40%;
         border-radius: inherit;
         background: #c9922a;
-        animation: bootBar 1.3s ease-in-out infinite;
       }
       .boot-stall { display: none; margin-top: 26px; text-align: center; font: 400 14px/1.5 'Outfit', system-ui, sans-serif; color: #6b645c; }
-      .boot.is-stalled .boot-stall { display: block; animation: bootIn 0.3s ease forwards; }
+      .boot.is-stalled .boot-stall { display: block; }
       .boot-stall p { margin: 0 0 14px; }
       .boot-stall-actions { display: flex; gap: 10px; justify-content: center; }
       .boot-stall button {
@@ -122,11 +93,6 @@
         cursor: pointer;
       }
       .boot-stall button[data-boot-action='reload'] { border-color: #1a1714; background: #1a1714; color: #f9f7f4; }
-      @keyframes bootIn { to { opacity: 1; } }
-      @keyframes bootBar {
-        from { transform: translateX(-100%); }
-        to { transform: translateX(250%); }
-      }
       .boot-status {
         position: absolute;
         width: 1px;
@@ -135,15 +101,40 @@
         clip-path: inset(50%);
         white-space: nowrap;
       }
-      @media (prefers-reduced-motion: reduce) {
-        .boot,
-        .boot *,
-        .boot *::after {
-          animation: none !important;
-          transition: none !important;
+      @media (prefers-reduced-motion: no-preference) {
+        .vms-logo.is-animated .vms-logo-arch {
+          stroke-dasharray: 1 1;
+          animation: vmsArch 2.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
         }
-        .boot-inner,
-        .boot.is-stalled .boot-stall { opacity: 1; }
+        .vms-logo.is-animated .vms-logo-sill,
+        .vms-logo.is-animated .vms-logo-dot { transform-box: fill-box; transform-origin: center; }
+        .vms-logo.is-animated .vms-logo-sill { animation: vmsSill 2.6s cubic-bezier(0.65, 0, 0.35, 1) infinite; }
+        .vms-logo.is-animated .vms-logo-dot { animation: vmsDot 2.6s cubic-bezier(0.34, 1.56, 0.64, 1) infinite; }
+        @keyframes vmsArch {
+          0% { stroke-dashoffset: 1; }
+          38%, 74% { stroke-dashoffset: 0; }
+          100% { stroke-dashoffset: -1; }
+        }
+        @keyframes vmsSill {
+          0%, 8% { transform: scaleX(0); }
+          34%, 78% { transform: scaleX(1); }
+          96%, 100% { transform: scaleX(0); }
+        }
+        @keyframes vmsDot {
+          0%, 30% { opacity: 0; transform: translateY(12px) scale(0.6); }
+          48% { opacity: 1; transform: translateY(0) scale(1.25); }
+          58%, 76% { opacity: 1; transform: translateY(0) scale(1); }
+          92%, 100% { opacity: 0; transform: translateY(0) scale(0.4); }
+        }
+        .boot { transition: opacity 0.35s ease, visibility 0.35s ease; }
+        .boot-inner { opacity: 0; animation: bootIn 0.45s ease 0.18s forwards; }
+        .boot-bar::after { animation: bootBar 1.3s ease-in-out infinite; }
+        .boot.is-stalled .boot-stall { animation: bootIn 0.3s ease forwards; }
+        @keyframes bootIn { to { opacity: 1; } }
+        @keyframes bootBar {
+          from { transform: translateX(-100%); }
+          to { transform: translateX(250%); }
+        }
       }
     </style>
   </head>
@@ -172,7 +163,6 @@
     </div>
     <script>
       (function () {
-        // If the app bundle never boots (failed download, stale cache), offer a way out instead of an endless splash.
         var boot = document.getElementById('boot');
         window.setTimeout(function () {
           if (document.getElementById('boot') && !boot.classList.contains('is-done')) {
