@@ -1,7 +1,17 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import api from '../services/api';
-import { listenForForegroundMessages, requestFcmToken } from '../services/firebase';
-import { useAuth } from './AuthContext';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import api from "../services/api";
+import {
+  listenForForegroundMessages,
+  requestFcmToken,
+} from "../services/firebase";
+import { useAuth } from "./AuthContext";
 
 const NotificationContext = createContext(null);
 
@@ -13,17 +23,17 @@ export function NotificationProvider({ children }) {
     try {
       const token = await requestFcmToken();
       if (!token) return null;
-      await api.put('/staff/me/fcm-token/', { fcm_token: token });
+      await api.put("/staff/me/fcm-token/", { fcm_token: token });
       setFcmToken(token);
       return token;
     } catch (err) {
-      console.error('FCM registration failed:', err?.message || err);
+      console.error("FCM registration failed:", err?.message || err);
       return null;
     }
   }, []);
 
   useEffect(() => {
-    const tokenKey = 'fcm_token_last_user_id';
+    const tokenKey = "fcm_token_last_user_id";
     if (!user?.id) return;
     const lastUser = localStorage.getItem(tokenKey);
     if (lastUser === String(user.id) && fcmToken) return;
@@ -39,14 +49,18 @@ export function NotificationProvider({ children }) {
 
   const subscribeToForegroundMessages = useCallback(
     async (onNotification) => listenForForegroundMessages(onNotification),
-    []
+    [],
   );
 
   const value = useMemo(
     () => ({ registerDevice, subscribeToForegroundMessages }),
-    [registerDevice, subscribeToForegroundMessages]
+    [registerDevice, subscribeToForegroundMessages],
   );
-  return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;
+  return (
+    <NotificationContext.Provider value={value}>
+      {children}
+    </NotificationContext.Provider>
+  );
 }
 
 export function useNotification() {

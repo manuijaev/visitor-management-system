@@ -1,5 +1,5 @@
-import { afterEach, vi } from 'vitest';
-import { cleanup } from '@testing-library/react';
+import { afterEach, vi } from "vitest";
+import { cleanup } from "@testing-library/react";
 
 afterEach(() => {
   cleanup();
@@ -7,5 +7,4 @@ afterEach(() => {
   sessionStorage.clear();
 });
 
-// jsdom has no layout, so scrolling is a no-op.
 window.scrollTo = vi.fn();

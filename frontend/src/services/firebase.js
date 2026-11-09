@@ -1,5 +1,10 @@
-import { initializeApp } from 'firebase/app';
-import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging';
+import { initializeApp } from "firebase/app";
+import {
+  getMessaging,
+  getToken,
+  isSupported,
+  onMessage,
+} from "firebase/messaging";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -16,9 +21,10 @@ let cachedVapidKey = null;
 
 async function getVapidKey() {
   if (cachedVapidKey) return cachedVapidKey;
-  
+
   try {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+    const baseUrl =
+      import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
     const response = await fetch(`${baseUrl}/vapid-public-key/`);
     if (response.ok) {
       const data = await response.json();
@@ -28,16 +34,16 @@ async function getVapidKey() {
       }
     }
   } catch (e) {
-    console.warn('Failed to fetch VAPID key from backend:', e);
+    console.warn("Failed to fetch VAPID key from backend:", e);
   }
-  
+
   cachedVapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
   return cachedVapidKey;
 }
 
 async function getMessagingInstance() {
   const supported = await isSupported();
-  if (!supported || !('Notification' in window)) return null;
+  if (!supported || !("Notification" in window)) return null;
   if (!messagingInstance) {
     messagingInstance = getMessaging(app);
   }
@@ -49,16 +55,16 @@ export async function requestFcmToken() {
   if (!messaging) return null;
 
   const permission = await Notification.requestPermission();
-  if (permission !== 'granted') return null;
+  if (permission !== "granted") return null;
 
   const vapidKey = await getVapidKey();
   if (!vapidKey) {
-    throw new Error('Missing VAPID key');
+    throw new Error("Missing VAPID key");
   }
 
   let registration = await navigator.serviceWorker.getRegistration();
   if (!registration) {
-    registration = await navigator.serviceWorker.register('/sw.js');
+    registration = await navigator.serviceWorker.register("/sw.js");
   }
 
   return getToken(messaging, {
@@ -69,7 +75,7 @@ export async function requestFcmToken() {
 
 export async function listenForForegroundMessages(onNotification) {
   const messaging = await getMessagingInstance();
-  if (!messaging || typeof onNotification !== 'function') return () => {};
+  if (!messaging || typeof onNotification !== "function") return () => {};
   return onMessage(messaging, (payload) => {
     onNotification(payload);
   });
