@@ -4,6 +4,8 @@ from django.db import models
 from django.utils import timezone
 
 VISIT_LENGTH = timedelta(minutes=30)
+# How long after the visit time an unanswered request waits before it expires.
+EXPIRY_GRACE = timedelta(hours=1)
 
 
 class Appointment(models.Model):
@@ -13,8 +15,9 @@ class Appointment(models.Model):
         RESCHEDULED = 'Rescheduled', 'Rescheduled'
         DECLINED = 'Declined', 'Declined'
         CANCELLED = 'Cancelled', 'Cancelled'
+        EXPIRED = 'Expired', 'Expired'
 
-    CLOSED_STATUSES = (Status.DECLINED, Status.CANCELLED)
+    CLOSED_STATUSES = (Status.DECLINED, Status.CANCELLED, Status.EXPIRED)
 
     visitor_name = models.CharField(max_length=120)
     visitor_phone = models.CharField(max_length=20, blank=True, null=True)
@@ -48,6 +51,12 @@ class Appointment(models.Model):
 
     def __str__(self):
         return f'{self.visitor_name} -> {self.staff_member.full_name} ({self.status})'
+
+    @classmethod
+    def stale_requests(cls, now=None):
+        """Pending requests nobody answered within EXPIRY_GRACE of the visit time."""
+        now = now or timezone.now()
+        return cls.objects.filter(status=cls.Status.PENDING, appointment_date__lt=now - EXPIRY_GRACE)
 
     @classmethod
     def active_for_staff_near(cls, staff, when):

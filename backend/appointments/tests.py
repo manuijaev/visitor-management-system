@@ -993,3 +993,108 @@ class RescheduleClashTests(TestCase):
         StaffUnavailableDay.objects.create(user=self.staff, date=new_time.date())
 
         self._assert_rejected(self._reschedule(new_time), 'You marked that day as a day off')
+
+
+@mock.patch('appointments.views.send_visitor_expired_sms', return_value=True)
+class ExpireStaleRequestsTests(TestCase):
+    def setUp(self):
+        self.department = Department.objects.create(name='Academics')
+        self.division = Division.objects.create(name='Grade 5', department=self.department)
+        self.staff = User.objects.create_user(
+            email='jane@example.com', full_name='Jane Wanjiru', password='StaffPass123!',
+            department=self.department, division=self.division,
+        )
+        self.client = APIClient()
+
+    def _visit(self, hours_from_now, status='Pending', phone='0722333444'):
+        return Appointment.objects.create(
+            visitor_name='Amina Hassan', visitor_phone=phone, department=self.department, division=self.division,
+            staff_member=self.staff, appointment_date=timezone.now() + timedelta(hours=hours_from_now), status=status,
+        )
+
+    def test_command_expires_unanswered_requests_and_texts_visitor(self, expired_sms):
+        stale = self._visit(-2)
+
+        call_command('expire_stale_requests', stdout=mock.Mock())
+
+        stale.refresh_from_db()
+        self.assertEqual(stale.status, 'Expired')
+        phone, name, host, _when = expired_sms.call_args.args
+        self.assertEqual((phone, name, host), ('0722333444', 'Amina Hassan', 'Jane Wanjiru'))
+
+    def test_waits_an_hour_after_the_visit_time(self, expired_sms):
+        upcoming, just_passed = self._visit(3), self._visit(-0.5)
+
+        call_command('expire_stale_requests', stdout=mock.Mock())
+
+        for visit in (upcoming, just_passed):
+            visit.refresh_from_db()
+            self.assertEqual(visit.status, 'Pending')
+        expired_sms.assert_not_called()
+
+    def test_answered_visits_are_left_alone(self, expired_sms):
+        visits = [self._visit(-5, status=s) for s in ('Accepted', 'Declined', 'Rescheduled', 'Cancelled')]
+
+        call_command('expire_stale_requests', stdout=mock.Mock())
+
+        self.assertEqual([Appointment.objects.get(pk=v.pk).status for v in visits],
+                         ['Accepted', 'Declined', 'Rescheduled', 'Cancelled'])
+        expired_sms.assert_not_called()
+
+    def test_visitor_is_texted_only_once(self, expired_sms):
+        self._visit(-2)
+
+        call_command('expire_stale_requests', stdout=mock.Mock())
+        call_command('expire_stale_requests', stdout=mock.Mock())
+
+        self.assertEqual(expired_sms.call_count, 1)
+
+    def test_no_text_without_a_phone_number(self, expired_sms):
+        visit = self._visit(-2, phone='')
+
+        call_command('expire_stale_requests', stdout=mock.Mock())
+
+        self.assertEqual(Appointment.objects.get(pk=visit.pk).status, 'Expired')
+        expired_sms.assert_not_called()
+
+    def test_loading_the_dashboard_expires_stale_requests(self, _sms):
+        stale = self._visit(-2)
+        self.client.force_authenticate(self.staff)
+
+        response = self.client.get('/api/appointments/my/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]['status'] if isinstance(response.data, list) else response.data['results'][0]['status'], 'Expired')
+        stale.refresh_from_db()
+        self.assertEqual(stale.status, 'Expired')
+
+    def test_visitor_status_page_shows_expired(self, _sms):
+        stale = self._visit(-2)
+
+        response = self.client.post('/api/visits/lookup/', {'reference': stale.reference, 'phone': '0722333444'}, format='json')
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['status'], 'Expired')
+        self.assertFalse(response.data['can_cancel'])
+
+    def test_expired_visit_frees_the_slot(self, _sms):
+        when = timezone.now() + timedelta(days=1)
+        Appointment.objects.create(
+            visitor_name='Brian Otieno', visitor_phone='0711222333', department=self.department,
+            division=self.division, staff_member=self.staff, appointment_date=when, status='Expired',
+        )
+
+        self.assertFalse(Appointment.active_for_staff_near(self.staff, when).exists())
+
+
+class ExpiredSmsTextTests(TestCase):
+    @mock.patch('notifications.sms_service.send_sms', return_value=True)
+    def test_fits_in_one_sms(self, send_sms):
+        from notifications.sms_service import send_visitor_expired_sms
+
+        send_visitor_expired_sms('0722333444', 'Amina Hassan', 'Jane Wanjiru', 'Wed 12 Nov, 10:30 AM')
+
+        text = send_sms.call_args.args[1]
+        self.assertLessEqual(len(text), 160)
+        self.assertTrue(text.endswith('- Gatepass'))
+        self.assertIn('Jane Wanjiru', text)

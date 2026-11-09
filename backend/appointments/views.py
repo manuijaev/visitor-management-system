@@ -14,6 +14,7 @@ from notifications.emailjs_service import (
     send_emailjs,
 )
 from notifications.sms_service import (
+    send_visitor_expired_sms,
     send_staff_arrival_sms,
     send_staff_sms,
     send_visitor_reassigned_sms,
@@ -337,9 +338,41 @@ class AppointmentCreateView(generics.CreateAPIView):
             logger.exception('Failed to send visitor confirmation SMS for appointment_id=%s', appointment.id)
 
 
+def expire_stale_requests(now=None):
+    """
+    Close pending requests nobody answered within an hour of the visit time, and text each visitor once.
+    Runs from the hourly `expire_stale_requests` command and whenever visit lists are loaded.
+    Returns how many visits were expired.
+    """
+    expired = 0
+    for appointment in Appointment.stale_requests(now).select_related('staff_member'):
+        claimed = Appointment.objects.filter(pk=appointment.pk, status=Appointment.Status.PENDING).update(
+            status=Appointment.Status.EXPIRED,
+        )
+        if not claimed:
+            continue
+        expired += 1
+        if not appointment.visitor_phone:
+            continue
+        try:
+            send_visitor_expired_sms(
+                appointment.visitor_phone,
+                appointment.visitor_name,
+                appointment.staff_member.full_name or 'your host',
+                _format_local_time(appointment.appointment_date),
+            )
+        except Exception:
+            logger.exception('Failed to send expiry SMS for appointment_id=%s', appointment.id)
+    return expired
+
+
 class MyAppointmentsView(generics.ListAPIView):
     serializer_class = AppointmentListSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def list(self, request, *args, **kwargs):
+        expire_stale_requests()
+        return super().list(request, *args, **kwargs)
 
     def get_queryset(self):
         user = self.request.user
@@ -452,6 +485,7 @@ class VisitLookupView(APIView):
     throttle_scope = 'visit-lookup'
 
     def post(self, request):
+        expire_stale_requests()
         lookup = VisitLookupSerializer(data=request.data)
         if not lookup.is_valid():
             return Response({'detail': VisitLookupSerializer.NOT_FOUND}, status=status.HTTP_404_NOT_FOUND)

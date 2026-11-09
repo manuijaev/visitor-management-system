@@ -12690,3 +12690,9 @@ tr:hover .row-actions {
     min-width: 0;
   }
 }
+
+.sd-badge-expired,
+.sd-list-simple-status-expired {
+  background: var(--surface2);
+  color: var(--muted);
+}

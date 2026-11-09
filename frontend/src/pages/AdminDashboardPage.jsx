@@ -32,8 +32,8 @@ const NAV_ITEMS = [
 /** The views on the phone tab bar; the rest stay under More. */
 const TAB_ITEMS = ['overview', 'visitors', 'gate'];
 
-const VISIT_STATUSES = ['All', 'Pending', 'Accepted', 'Declined', 'Rescheduled', 'Cancelled'];
-const STATUS_TONE = { Pending: 'gold', Accepted: 'green', Approved: 'green', Declined: 'red', Rejected: 'red', Rescheduled: 'purple', Cancelled: 'muted' };
+const VISIT_STATUSES = ['All', 'Pending', 'Accepted', 'Declined', 'Rescheduled', 'Cancelled', 'Expired'];
+const STATUS_TONE = { Pending: 'gold', Accepted: 'green', Approved: 'green', Declined: 'red', Rejected: 'red', Rescheduled: 'purple', Cancelled: 'muted', Expired: 'muted' };
 const OVERDUE_MS = 30 * 60 * 1000;
 
 const asList = (data) => (Array.isArray(data) ? data : []);

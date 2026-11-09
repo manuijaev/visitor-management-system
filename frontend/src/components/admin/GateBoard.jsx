@@ -3,7 +3,7 @@ import api from '../../services/api';
 import Icon from './Icon';
 import { EAT_TIMEZONE, formatApiError, getInitials } from './utils';
 
-const CLOSED_STATUSES = ['Declined', 'Cancelled'];
+const CLOSED_STATUSES = ['Declined', 'Cancelled', 'Expired'];
 
 const schoolDay = (value) =>
   value

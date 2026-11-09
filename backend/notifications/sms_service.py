@@ -214,3 +214,12 @@ def send_staff_sms(phone_number, staff_name, message):
     print(f"Staff SMS CALLED — phone: {phone_number}, staff: {staff_name}")
 
     return send_sms(phone_number, _fit(f"Hi {_first_name(staff_name)}, {message} - Gatepass"))
+
+
+def send_visitor_expired_sms(phone_number, visitor_name, staff_name, visit_time):
+    """Tell the visitor their request ran out of time without a reply."""
+    message = (
+        f"Hi {_first_name(visitor_name)}, your request to see {staff_name} on {visit_time} got no reply in time "
+        f"and has been closed. Please book again. - Gatepass"
+    )
+    return send_sms(phone_number, _fit(message))
