@@ -1,0 +1,11 @@
+@media (prefers-reduced-motion: no-preference) {
+  input,
+  select,
+  textarea {
+    transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  button:not(:where(.gp-root *)) {
+    transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
+  }
+}

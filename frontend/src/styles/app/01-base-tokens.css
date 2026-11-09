@@ -1,0 +1,169 @@
+:root {
+  --bg: #f9f7f4;
+  --bg-soft: #f3f0ec;
+  --bg-secondary: #f3f0ec;
+  --surface: #ffffff;
+  --surface2: #f3f0ec;
+  --surface-hover: #faf8f5;
+  --line: #e8e2d9;
+  --border: #e8e2d9;
+  --border2: #d4cdc3;
+  --border-color: #e8e2d9;
+  --ink: #1a1714;
+  --ink-mid: #3d3832;
+  --ink-light: #6b6560;
+  --ink-faint: #726d69;
+  --text: #1a1714;
+  --text-primary: #1a1714;
+  --text-dim: #3d3832;
+  --text-secondary: #3d3832;
+  --text-faint: #6b6560;
+  --text-muted: #726d69;
+  --muted: #6b6560;
+  --gold: #c9922a;
+  --gold-light: #fdf3e3;
+  --gold-mid: #e8b96a;
+  --gold-dark: #8a6018;
+  --gold-strong: #986e1f;
+  --amber: #c9922a;
+  --amber-dim: #ecd3a4;
+  --amber-light: #fdf3e3;
+  --amber-glow: rgba(201, 146, 42, 0.18);
+  --primary-color: #c9922a;
+  --teal: #1a7a72;
+  --teal-light: #e6f4f2;
+  --cyan: #1a7a72;
+  --cyan-dim: #b9dcd8;
+  --green: #1e7e4a;
+  --green-light: #e8f5ee;
+  --green-dim: #b7e4cb;
+  --red: #c0392b;
+  --red-light: #fdecea;
+  --red-dim: #f1c0ba;
+  --purple: #6f5a92;
+  --purple-dim: #d9cfe8;
+  --button: #1a1714;
+  --button-hover: #000000;
+  --button-text: #ffffff;
+  --danger: #c0392b;
+  --danger-hover: #a93226;
+  --nav-bg: rgba(26, 23, 20, 0.9);
+  --chrome-bg: #1a1714;
+  --chrome-hover: #282522;
+  --chrome-active: #372e20;
+  --chrome-line: rgba(255, 255, 255, 0.08);
+  --chrome-text: #f3f0ec;
+  --chrome-muted: #a39d96;
+  --shadow-sm: 0 2px 8px rgba(26, 23, 20, 0.07);
+  --shadow-md: 0 8px 32px rgba(26, 23, 20, 0.1);
+  --shadow-lg: 0 20px 60px rgba(26, 23, 20, 0.14);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  width: 100%;
+  max-width: 100%;
+  /* clip, not hidden: hidden turns these into scroll containers, which breaks sticky sidebars and top bars. */
+  overflow-x: clip;
+  overscroll-behavior-x: none;
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+body {
+  margin: 0;
+  font-family: 'Outfit', 'Segoe UI', Tahoma, sans-serif;
+  color: var(--text);
+  touch-action: pan-y;
+  background: var(--bg);
+}
+
+body.home-background {
+  --bg: #f9f7f4;
+  --surface: #ffffff;
+  --surface2: #f3f0ec;
+  --border: #e8e2d9;
+  --border2: #d4cdc3;
+  --ink: #1a1714;
+  --ink-mid: #3d3832;
+  --ink-light: #6b6560;
+  --ink-faint: #726d69;
+  --gold: #c9922a;
+  --gold-light: #fdf3e3;
+  --gold-mid: #e8b96a;
+  --gold-dark: #8a6018;
+  --teal: #1a7a72;
+  --teal-light: #e6f4f2;
+  --teal-mid: #4aada4;
+  --red: #c0392b;
+  --red-light: #fdecea;
+  --red-mid: #e74c3c;
+  --red-dark: #922b21;
+  --green: #1e7e4a;
+  --green-light: #e8f5ee;
+  --green-mid: #3da86a;
+  --green-dark: #156534;
+  --shadow-sm: 0 2px 8px rgba(26, 23, 20, 0.07);
+  --shadow-md: 0 8px 32px rgba(26, 23, 20, 0.1);
+  --shadow-lg: 0 20px 60px rgba(26, 23, 20, 0.14);
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Outfit', sans-serif;
+  font-size: 15px;
+  min-height: 100vh;
+  overflow-x: clip;
+}
+
+body.home-background::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23a39d96' fill-opacity='0.06'%3E%3Ccircle cx='30' cy='30' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+}
+
+body.auth-background {
+  background: var(--bg);
+}
+
+body.auth-background::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url('/images/smoke-1920.jpg');
+  background-size: cover;
+  background-position: center bottom;
+  filter: grayscale(1) blur(2px);
+  transform: scale(1.03);
+  z-index: -2;
+}
+
+body.auth-background::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 85% 15%, rgba(201, 146, 42, 0.1), transparent 40%),
+    linear-gradient(180deg, rgba(249, 247, 244, 0.97) 0%, rgba(249, 247, 244, 0.93) 60%, rgba(243, 240, 236, 0.86) 100%);
+  z-index: -1;
+}
+
+h1 {
+  margin: 0 0 8px;
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 700;
+  font-size: clamp(2rem, 3vw, 2.4rem);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
