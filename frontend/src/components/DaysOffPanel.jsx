@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../services/api";
+import Panel, { EmptyNote } from "./staff/Panel";
+import Button from "./ui/Button";
 
 const pad2 = (value) => String(value).padStart(2, "0");
 const todayKey = () => {
@@ -75,57 +77,50 @@ export default function DaysOffPanel({ icon }) {
 
   const dayList =
     days.length === 0 ? (
-      <div className="sd-empty">No days off planned.</div>
+      <EmptyNote>No days off planned.</EmptyNote>
     ) : (
-      <ul className="sd-days-off-list">
+      <ul className="m-0 list-none border-t border-line p-0">
         {days.map((day) => (
-          <li key={day}>
+          <li
+            key={day}
+            className="flex items-center justify-between gap-3 border-b border-line px-5 py-3 text-[14px] text-ink last:border-b-0"
+          >
             <span>{formatDay(day)}</span>
-            <button
-              type="button"
-              className="sd-btn sd-btn-view"
-              onClick={() => removeDay(day)}
-            >
+            <Button variant="subtle" onClick={() => removeDay(day)}>
               Remove
-            </button>
+            </Button>
           </li>
         ))}
       </ul>
     );
 
   return (
-    <div className="sd-panel sd-days-off">
-      <div className="sd-panel-header">
-        <h3>{icon} Days off</h3>
-      </div>
-      <p className="sd-days-off-intro">
+    <Panel icon={icon} title="Days off">
+      <p className="m-0 px-5 pt-4 pb-0 text-[13px] text-ink-faint">
         Visitors can&apos;t book you on these days.
       </p>
 
-      <form className="sd-days-off-form" onSubmit={addDay}>
+      <form className="flex flex-wrap gap-2.5 px-5 pt-3 pb-4" onSubmit={addDay}>
         <input
           type="date"
+          className="flex-[1_1_180px] rounded-lg border border-line bg-surface p-2.5 text-[13px] text-ink focus:border-gold focus:outline-none"
           min={todayKey()}
           value={newDay}
           onChange={(event) => setNewDay(event.target.value)}
           aria-label="Day off"
         />
-        <button
-          type="submit"
-          className="sd-btn sd-btn-accept"
-          disabled={!newDay || saving}
-        >
+        <Button type="submit" variant="accept" disabled={!newDay || saving}>
           {saving ? "Saving…" : "Add day off"}
-        </button>
+        </Button>
       </form>
 
       {error && (
-        <p className="sd-days-off-error" role="alert">
+        <p className="m-0 px-5 pb-3 text-[13px] text-(--red-dark)" role="alert">
           {error}
         </p>
       )}
 
-      {loading ? <div className="sd-empty">Loading…</div> : dayList}
-    </div>
+      {loading ? <EmptyNote>Loading…</EmptyNote> : dayList}
+    </Panel>
   );
 }
