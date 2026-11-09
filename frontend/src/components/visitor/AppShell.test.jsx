@@ -33,4 +33,16 @@ describe('AppShell', () => {
 
     expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull();
   });
+
+  it('shows a back button only when the screen asks for one', () => {
+    renderAt('/visit', { back: { to: '/visits', label: 'Back to my visits' } });
+
+    expect(screen.getByRole('link', { name: 'Back to my visits' }).getAttribute('href')).toBe('/visits');
+  });
+
+  it('has no back button by default', () => {
+    renderAt('/visits');
+
+    expect(screen.queryByRole('link', { name: /back/i })).toBeNull();
+  });
 });

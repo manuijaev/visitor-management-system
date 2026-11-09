@@ -88,7 +88,7 @@ export default function VisitStatusPage() {
   const host = visit?.staff_name || 'Your host';
 
   return (
-    <AppShell title="Check a visit">
+    <AppShell title="Check a visit" back={{ to: '/visits', label: 'Back to my visits' }}>
       <section className="gp-flow gp-lookup">
         {!visit ? (
           <form className="gp-lookup-body" onSubmit={lookUp}>

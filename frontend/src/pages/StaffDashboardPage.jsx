@@ -5,9 +5,11 @@ import { useAppointments } from '../context/AppointmentContext';
 import { useNotification } from '../context/NotificationContext';
 import ConfirmModal from '../components/ConfirmModal';
 import DaysOffPanel from '../components/DaysOffPanel';
+import NotificationsMenu from '../components/NotificationsMenu';
+import ViewToggle from '../components/ViewToggle';
 import { sendVisitorResponseEmail } from '../services/emailjs';
 import api from '../services/api';
-import { eatDateKey } from '../components/admin/utils';
+import { eatDateKey, formatClockTime, formatTopbarDateTime, matchesVisitFilter, orderVisitsForReview, VISIT_FILTERS } from '../components/admin/utils';
 
 const studentLabel = (visit) =>
   [visit?.student_name?.trim(), visit?.student_class?.trim() && `(${visit.student_class.trim()})`].filter(Boolean).join(' ');
@@ -29,19 +31,17 @@ function rescheduleTimeError(value, appointment) {
 }
 
 const formatRescheduleTime = (value) =>
-  new Date(value).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  new Date(value).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true });
 
 /** Screen names shown in the phone top bar. */
 const TAB_TITLES = {
   dashboard: 'Home',
   appointments: 'Requests',
   schedule: 'Schedule',
-  pending: 'Pending',
-  accepted: 'Accepted',
-  declined: 'Declined',
-  history: 'History',
   settings: 'Settings',
 };
+
+const REQUEST_FILTERS = VISIT_FILTERS;
 
 const ICONS = {
   dashboard: (
@@ -198,7 +198,7 @@ export default function StaffDashboardPage() {
   const { user, logout, updateUser } = useAuth();
   const { appointments, loadMyAppointments, updateAppointment, deleteAppointment, deleteAppointmentsBulk } = useAppointments();
   const { subscribeToForegroundMessages } = useNotification();
-  
+
   const [activeTab, setActiveTab] = useState('dashboard');
   const [viewMode, setViewMode] = useState('grid');
   const [searchQuery, setSearchQuery] = useState('');
@@ -217,7 +217,6 @@ export default function StaffDashboardPage() {
   const [previewItem, setPreviewItem] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [dateFilter, setDateFilter] = useState('all');
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [isCurrentlyAvailable, setIsCurrentlyAvailable] = useState(user?.is_available ?? true);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [overdueDismissedKey, setOverdueDismissedKey] = useState('');
@@ -225,7 +224,9 @@ export default function StaffDashboardPage() {
   const [notifications, setNotifications] = useState(() => {
     try {
       const saved = localStorage.getItem('staff_notifications');
-      return saved ? JSON.parse(saved) : [];
+      const list = saved ? JSON.parse(saved) : [];
+      // Older versions also saved pop-up messages ("Refreshed!"); keep only visit alerts.
+      return Array.isArray(list) ? list.filter((item) => item && item.type === 'appointment') : [];
     } catch {
       return [];
     }
@@ -246,14 +247,14 @@ export default function StaffDashboardPage() {
   // Subscribe to foreground push notifications
   useEffect(() => {
     let unsubscribe = null;
-    
+
     const setupSubscription = async () => {
       unsubscribe = await subscribeToForegroundMessages((payload) => {
         // Handle incoming push notification
         const { notification, data } = payload;
         const title = notification?.title || 'Visitor waiting';
         const body = notification?.body || 'You have a visitor waiting for you';
-        
+
         // Create notification object
         const newNotification = {
           id: Date.now(),
@@ -263,29 +264,52 @@ export default function StaffDashboardPage() {
           timestamp: new Date().toISOString(),
           data: data
         };
-        
+
         // Add to notifications list
         setNotifications(prev => [newNotification, ...prev].slice(0, 50));
-        
+
         // Show toast notification
         setToast(body);
         setTimeout(() => setToast(''), 5000);
       });
     };
-    
+
     if (subscribeToForegroundMessages) {
       setupSubscription();
     }
-    
+
     return () => {
       if (unsubscribe && typeof unsubscribe === 'function') {
         unsubscribe();
       }
     };
   }, [subscribeToForegroundMessages]);
-  
-  const longPressTimerRef = useRef(null);
-  const notificationRef = useRef(null);
+
+  const profileRef = useRef(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [requestFilter, setRequestFilter] = useState('all');
+
+  const openRequests = (filter = 'all') => {
+    setRequestFilter(filter);
+    setActiveTab('appointments');
+    setSidebarOpen(false);
+  };
+
+  useEffect(() => {
+    if (!profileOpen) return undefined;
+    const closeOnOutsideClick = (event) => {
+      if (profileRef.current && !profileRef.current.contains(event.target)) setProfileOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setProfileOpen(false);
+    };
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [profileOpen]);
 
   const today = eatDateKey();
 
@@ -310,30 +334,14 @@ export default function StaffDashboardPage() {
     return () => clearInterval(intervalId);
   }, [loadMyAppointments]);
 
-// Update time every second for clock display
+// Update the clock every 15 seconds; it shows minutes only.
   useEffect(() => {
     const timerId = setInterval(() => {
       setCurrentTime(new Date());
-    }, 1000);
+    }, 15000);
     return () => clearInterval(timerId);
   }, []);
 
-  // Close notification dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
-        setNotificationsOpen(false);
-      }
-    };
-
-    if (notificationsOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [notificationsOpen]);
 
   const getInitials = (name) => {
     if (!name) return '??';
@@ -347,24 +355,7 @@ export default function StaffDashboardPage() {
 
   const formatTime = (dateStr) => {
     const date = new Date(dateStr);
-    return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
-  };
-
-  const getDateLabel = () => {
-    const date = new Date();
-    return date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  };
-
-  const getTimeLabel = () => {
-    return currentTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) + ' EAT';
-  };
-
-  const getWeekNumber = () => {
-    const now = new Date();
-    const start = new Date(now.getFullYear(), 0, 1);
-    const diff = now - start;
-    const oneWeek = 604800000;
-    return Math.ceil(diff / oneWeek);
+    return formatClockTime(date);
   };
 
   const getRelativeTimeLabel = (timestamp) => {
@@ -389,14 +380,10 @@ export default function StaffDashboardPage() {
     return `${diffSeconds} second${diffSeconds === 1 ? '' : 's'} ago`;
   };
 
-  const filteredAppointments = appointments.filter(a => {
-    // Filter by status for specific tabs
-    if (activeTab === 'pending' && a.status !== 'Pending') return false;
-    if (activeTab === 'accepted' && a.status !== 'Accepted') return false;
-    if (activeTab === 'declined' && a.status !== 'Declined') return false;
-    if (activeTab === 'history' && ['Pending', 'Accepted'].includes(a.status)) return false;
-    
-    if (dateFilter === 'today' && !eatDateKey(a.appointment_date) === today) return false;
+  const filteredAppointments = orderVisitsForReview(appointments.filter(a => {
+    if (!matchesVisitFilter(a, requestFilter)) return false;
+
+    if (dateFilter === 'today' && eatDateKey(a.appointment_date) !== today) return false;
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
@@ -407,7 +394,7 @@ export default function StaffDashboardPage() {
       );
     }
     return true;
-  });
+  }));
 
   const stats = {
     pending: appointments.filter(a => a.status === 'Pending').length,
@@ -416,10 +403,14 @@ export default function StaffDashboardPage() {
     rescheduled: appointments.filter(a => a.status === 'Rescheduled').length,
     today: appointments.filter(a => eatDateKey(a.appointment_date) === today).length,
     total: appointments.length,
-    acceptRate: appointments.length > 0 
-      ? Math.round((appointments.filter(a => a.status === 'Accepted').length / appointments.length) * 100) 
-      : 0,
+    upcoming: appointments.filter(a => ['Accepted', 'Rescheduled'].includes(a.status) && new Date(a.appointment_date) > new Date()).length,
   };
+
+  /** Confirmed visits still to come, soonest first. */
+  const upcomingVisits = appointments
+    .filter(a => ['Accepted', 'Rescheduled'].includes(a.status) && new Date(a.appointment_date) > new Date())
+    .sort((a, b) => new Date(a.appointment_date) - new Date(b.appointment_date))
+    .slice(0, 3);
 
   const overdueAppointments = appointments
     .filter(a => a.status === 'Pending')
@@ -517,6 +508,8 @@ export default function StaffDashboardPage() {
     setIsSendingResponse(true);
     try {
       await updateStatus(appointmentId, status);
+      closeResponseArea(appointmentId);
+      setResponseNote((prev) => ({ ...prev, [appointmentId]: '' }));
       setTimeout(() => {
         setPendingStatusUpdate(null);
       }, 220);
@@ -532,19 +525,6 @@ export default function StaffDashboardPage() {
     } finally {
       setIsSendingResponse(false);
     }
-  };
-
-  const toggleSelected = (id) => {
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
-  };
-
-  const requestDeleteSelected = () => {
-    if (!selectedIds.length) return;
-    setPendingDelete({ type: 'bulk', ids: selectedIds });
-  };
-
-  const requestDeleteSingle = (id) => {
-    setPendingDelete({ type: 'single', ids: [id] });
   };
 
   const confirmDelete = async () => {
@@ -584,16 +564,9 @@ export default function StaffDashboardPage() {
     setPreviewItem(null);
   };
 
+  /** A short pop-up message. Only visit alerts go into the notifications list. */
   const showToast = (msg) => {
     setToast(msg);
-    // Add to notifications
-    const newNotification = {
-      id: Date.now(),
-      message: msg,
-      time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
-      read: false
-    };
-    setNotifications(prev => [newNotification, ...prev].slice(0, 20));
     setTimeout(() => setToast(''), 4000);
   };
 
@@ -627,7 +600,7 @@ export default function StaffDashboardPage() {
       showToast('No visit requests to export');
       return;
     }
-    
+
     const headers = ['ID', 'Visitor Name', 'Visitor Email', 'Student', 'Date/Time Sent', 'Date/Time', 'Status', 'Visitor Message', 'Staff Response'];
     const csvContent = [
       headers.join(','),
@@ -643,65 +616,13 @@ export default function StaffDashboardPage() {
         `"${apt.response_note || ''}"`
       ].join(','))
     ].join('\n');
-    
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `visit_requests_${eatDateKey()}.csv`;
     link.click();
     showToast('Visit requests exported to CSV');
-  };
-
-  const handleExportStats = () => {
-    const statsData = [
-      { Metric: 'Total visit requests', Value: appointments.length },
-      { Metric: 'Pending', Value: appointments.filter(a => a.status === 'Pending').length },
-      { Metric: 'Accepted', Value: appointments.filter(a => a.status === 'Accepted').length },
-      { Metric: 'Declined', Value: appointments.filter(a => a.status === 'Declined').length },
-      { Metric: 'Rescheduled', Value: appointments.filter(a => a.status === 'Rescheduled').length },
-      { Metric: 'Today\'s visit requests', Value: appointments.filter(a => eatDateKey(a.appointment_date) === today).length },
-      { Metric: 'Acceptance Rate', Value: appointments.length > 0 ? Math.round((appointments.filter(a => a.status === 'Accepted').length / appointments.length) * 100) + '%' : '0%' },
-    ];
-    
-    const headers = ['Metric', 'Value'];
-    const csvContent = [
-      headers.join(','),
-      ...statsData.map(row => `${row.Metric},${row.Value}`)
-    ].join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `daily_statistics_${eatDateKey()}.csv`;
-    link.click();
-    showToast('Daily statistics exported');
-  };
-
-  const handleExportStaff = () => {
-    if (!user) {
-      showToast('No user data available');
-      return;
-    }
-    
-    const staffData = [{
-      Name: user.full_name || '',
-      Email: user.email || '',
-      Department: user.department_name || '',
-      Role: user.role || 'Staff',
-    }];
-    
-    const headers = ['Name', 'Email', 'Department', 'Role'];
-    const csvContent = [
-      headers.join(','),
-      ...staffData.map(row => `${row.Name},${row.Email},${row.Department},${row.Role}`)
-    ].join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `staff_profile_${eatDateKey()}.csv`;
-    link.click();
-    showToast('Staff profile exported');
   };
 
   const getOverdueHours = (dateStr) => {
@@ -738,67 +659,27 @@ export default function StaffDashboardPage() {
           </div>
         </div>
 
-        <div className="sd-user-card">
-          <div className="sd-user-avatar">{getInitials(user?.full_name)}</div>
-          <div className="sd-user-info">
-            <div className="sd-user-name">{user?.full_name || 'Staff Member'}</div>
-            <div className="sd-user-dept">
-              {user?.department_name || 'No Department'}
-              {user?.division_name && ` / ${user.division_name}`}
-            </div>
-          </div>
-        </div>
-
         <nav className="sd-nav">
           <div className="sd-nav-section">MAIN</div>
           <button className={`sd-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => { setActiveTab('dashboard'); setSidebarOpen(false); }}>
-            {ICONS.dashboard}<span>Dashboard</span>
+            {ICONS.dashboard}<span>Home</span>
           </button>
-          <button className={`sd-nav-item ${activeTab === 'appointments' ? 'active' : ''}`} onClick={() => { setActiveTab('appointments'); setSidebarOpen(false); }}>
-            {ICONS.calendar}<span>Visitor queue</span>
-            <span className="sd-nav-badge">{stats.pending}</span>
+          <button className={`sd-nav-item ${activeTab === 'appointments' ? 'active' : ''}`} onClick={() => openRequests(stats.pending > 0 ? 'pending' : 'all')}>
+            {ICONS.calendar}<span>Requests</span>
+            {stats.pending > 0 && <span className="sd-nav-badge">{stats.pending}</span>}
           </button>
           <button className={`sd-nav-item ${activeTab === 'schedule' ? 'active' : ''}`} onClick={() => { setActiveTab('schedule'); setSidebarOpen(false); }}>
             {ICONS.clock}<span>Schedule</span>
           </button>
 
-          <div className="sd-nav-section">MANAGE</div>
-          <button className={`sd-nav-item ${activeTab === 'pending' ? 'active' : ''}`} onClick={() => { setActiveTab('pending'); setSidebarOpen(false); }}>
-            {ICONS.activity}<span>Pending</span>
-            <span className="sd-nav-badge red">{stats.pending}</span>
-          </button>
-          <button className={`sd-nav-item ${activeTab === 'accepted' ? 'active' : ''}`} onClick={() => { setActiveTab('accepted'); setSidebarOpen(false); }}>
-            {ICONS.check}<span>Accepted</span>
-          </button>
-          <button className={`sd-nav-item ${activeTab === 'declined' ? 'active' : ''}`} onClick={() => { setActiveTab('declined'); setSidebarOpen(false); }}>
-            {ICONS.x}<span>Declined</span>
-          </button>
-          <button className={`sd-nav-item ${activeTab === 'history' ? 'active' : ''}`} onClick={() => { setActiveTab('history'); setSidebarOpen(false); }}>
-            {ICONS.refresh}<span>History</span>
-          </button>
-
-          <div className="sd-nav-section">ACTIONS</div>
+          <div className="sd-nav-section">MORE</div>
           <button className="sd-nav-item" onClick={() => { handleExportCSV(); setSidebarOpen(false); }}>
-            {ICONS.download}<span>Export visitor queue</span>
+            {ICONS.download}<span>Export requests</span>
           </button>
-          <button className="sd-nav-item" onClick={() => { setActiveTab('settings'); setSidebarOpen(false); }}>
+          <button className={`sd-nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => { setActiveTab('settings'); setSidebarOpen(false); }}>
             {ICONS.settings}<span>Settings</span>
           </button>
         </nav>
-
-        <div className="sd-sidebar-logout">
-          <button
-            className="sd-logout-btn"
-            onClick={() => {
-              setSidebarOpen(false);
-              handleLogout();
-            }}
-            aria-label="Sign out"
-          >
-            {ICONS.logout}
-            <span>Sign Out</span>
-          </button>
-        </div>
       </aside>
 
       {/* Main Content */}
@@ -812,9 +693,9 @@ export default function StaffDashboardPage() {
             <span className="sd-topbar-title">{TAB_TITLES[activeTab] || 'Dashboard'}</span>
             <div className="sd-search-box">
               {ICONS.search}
-              <input 
-                type="text" 
-                placeholder="Search visitor requests..." 
+              <input
+                type="text"
+                placeholder="Search visitor requests..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -822,82 +703,73 @@ export default function StaffDashboardPage() {
           </div>
           <div className="sd-topbar-right">
             <div className="sd-date-display">
-              {getDateLabel()} - {getTimeLabel()}
+              {formatTopbarDateTime(currentTime)}
             </div>
             <button
+              type="button"
+              role="switch"
+              aria-checked={isCurrentlyAvailable}
               className={`sd-availability-toggle ${isCurrentlyAvailable ? 'online' : 'offline'}`}
               onClick={handleAvailabilityToggle}
               disabled={availabilityLoading}
-              aria-live="polite"
+              title={isCurrentlyAvailable ? 'Tap to mark yourself away' : 'Tap to mark yourself available'}
             >
-              <span className="sd-availability-icon" aria-hidden="true">
-                {isCurrentlyAvailable ? ICONS.check : ICONS.alertCircle}
+              <span className="sd-switch" aria-hidden="true">
+                <span className="sd-switch-knob" />
               </span>
-              <span className="sd-availability-dot" aria-hidden="true"></span>
               <span className="sd-availability-text">
-                {isCurrentlyAvailable ? 'Available' : 'Unavailable'}
+                {isCurrentlyAvailable ? 'Available' : 'Away'}
               </span>
             </button>
-            <div className="sd-notification-wrapper" ref={notificationRef}>
-              <button className="sd-icon-btn" onClick={() => setNotificationsOpen(!notificationsOpen)}>
-                {ICONS.bell}
-                {notifications.filter(n => !n.read).length > 0 && (
-                  <span className="sd-notification-badge">{notifications.filter(n => !n.read).length}</span>
-                )}
+            <NotificationsMenu
+              items={notifications.map((n) => ({
+                id: n.id,
+                text: n.message,
+                time: n.time || formatClockTime(n.timestamp),
+                unread: !n.read,
+              }))}
+              onOpenItem={(item) => setNotifications((prev) => prev.map((n) => (n.id === item.id ? { ...n, read: true } : n)))}
+              onDismiss={(id) => setNotifications((prev) => prev.filter((n) => n.id !== id))}
+              action={{ label: 'Clear all', onClick: () => setNotifications([]) }}
+            />
+            <button className="sd-icon-btn" onClick={() => loadMyAppointments().then(() => showToast('Refreshed!'))}>{ICONS.refresh}</button>
+            <div className="sd-profile" ref={profileRef}>
+              <button
+                type="button"
+                className="sd-avatar"
+                onClick={() => setProfileOpen((open) => !open)}
+                aria-haspopup="menu"
+                aria-expanded={profileOpen}
+                aria-label={`Account: ${user?.full_name || 'Staff member'}`}
+              >
+                {getInitials(user?.full_name)}
               </button>
-              {notificationsOpen && (
-                <div className="sd-notification-dropdown">
-                  <div className="sd-notification-header">
-                    <div className="sd-notification-header-left">
-                      <h4>Notifications</h4>
-                      {notifications.length > 0 && (
-                        <span className="sd-notification-count">{notifications.filter(n => !n.read).length} unread</span>
-                      )}
-                    </div>
-                    {notifications.length > 0 && (
-                      <button onClick={() => { setNotifications([]); setNotificationsOpen(false); }} className="sd-clear-all-btn">Clear all</button>
-                    )}
+              {profileOpen && (
+                <div className="sd-profile-menu" role="menu">
+                  <div className="sd-profile-head">
+                    <span className="sd-profile-avatar">{getInitials(user?.full_name)}</span>
+                    <span>
+                      <strong>{user?.full_name || 'Staff member'}</strong>
+                      <small>
+                        {user?.department_name || 'No department'}
+                        {user?.division_name && ` / ${user.division_name}`}
+                      </small>
+                      {user?.email && <small>{user.email}</small>}
+                    </span>
                   </div>
-                  <div className="sd-notification-list">
-                    {notifications.length === 0 ? (
-                      <div className="sd-notification-empty">
-                        <div className="sd-notification-empty-icon">{ICONS.bell}</div>
-                        <p>No notifications yet</p>
-                      </div>
-                    ) : (
-                      notifications.slice(0, 10).map(n => (
-                        <div key={n.id} className={`sd-notification-item ${!n.read ? 'unread' : ''}`} onClick={() => {
-                          setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, read: true } : item));
-                          setNotificationsOpen(false);
-                        }}>
-                          <div className="sd-notification-dot"></div>
-                          <div className="sd-notification-content">
-                            <p>{n.message}</p>
-                            <span>{n.time}</span>
-                          </div>
-                          <button 
-                            className="sd-notification-clear" 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setNotifications(prev => prev.filter(item => item.id !== n.id));
-                            }}
-                            title="Clear this notification"
-                          >
-                            {ICONS.x}
-                          </button>
-                        </div>
-                      ))
-                    )}
-                  </div>
+                  <button type="button" role="menuitem" className="sd-profile-item" onClick={() => { setProfileOpen(false); setActiveTab('settings'); }}>
+                    Settings
+                  </button>
+                  <button type="button" role="menuitem" className="sd-profile-item is-danger" onClick={handleLogout}>
+                    Sign out
+                  </button>
                 </div>
               )}
             </div>
-            <button className="sd-icon-btn" onClick={() => loadMyAppointments().then(() => showToast('Refreshed!'))}>{ICONS.refresh}</button>
-            <div className="sd-avatar">{getInitials(user?.full_name)}</div>
           </div>
         </header>
 
-        {showOverdueAnnouncement && (
+        {showOverdueAnnouncement && activeTab === 'dashboard' && (
           <div
             className="sd-overdue-announcement"
             role="button"
@@ -906,13 +778,13 @@ export default function StaffDashboardPage() {
             onKeyDown={handleOverdueAnnouncementKeyDown}
           >
             <div>
-              <p className="sd-overdue-announcement-title">⚠️ {overdueAppointments.length} pending requests overdue</p>
+              <p className="sd-overdue-announcement-title">⚠️ {overdueAppointments.length} {overdueAppointments.length === 1 ? 'request needs' : 'requests need'} a reply</p>
               <p className="sd-overdue-announcement-detail">
-                Tap to open {overdueAppointments[0]?.visitor_name || 'the oldest request'} and see what needs attention.
+                {overdueAppointments.length === 1 ? `${overdueAppointments[0]?.visitor_name || 'A visitor'} is waiting for your reply.` : `${overdueAppointments[0]?.visitor_name || 'A visitor'} has waited longest.`} Tap to reply.
               </p>
             </div>
             <div className="sd-overdue-meta">
-              <span>Sent {getRelativeTimeLabel(overdueAppointments[0]?.created_at || overdueAppointments[0]?.appointment_date)}</span>
+              <span>Asked {getRelativeTimeLabel(overdueAppointments[0]?.created_at || overdueAppointments[0]?.appointment_date)}</span>
               <span className="sd-overdue-cta">Open now →</span>
             </div>
           </div>
@@ -953,33 +825,47 @@ export default function StaffDashboardPage() {
                 </div>
                 <div className="sd-stat-card">
                   <div className="sd-stat-icon" style={{ background: 'var(--gold-light)', color: 'var(--gold-dark)' }}>
-                    {ICONS.activity}
+                    {ICONS.check}
                   </div>
                   <div className="sd-stat-info">
-                    <div className="sd-stat-value">{stats.acceptRate}%</div>
-                    <div className="sd-stat-label">Accept Rate</div>
+                    <div className="sd-stat-value">{stats.upcoming}</div>
+                    <div className="sd-stat-label">Coming up</div>
                   </div>
                 </div>
               </div>
 
-              {/* Quick Actions */}
+              {/* Up next: confirmed visits still to come */}
               <div className="sd-section">
-                <div className="sd-section-header">
-                  <h3>Quick Actions</h3>
-                </div>
-                <div className="sd-actions-grid">
-                  <button className="sd-action-card" onClick={() => setActiveTab('appointments')}>
-                    <div className="sd-action-icon sd-action-icon-teal">{ICONS.calendar}</div>
-                    <span>View visitor queue</span>
-                  </button>
-                  <button className="sd-action-card" onClick={() => setActiveTab('pending')}>
-                    <div className="sd-action-icon sd-action-icon-gold">{ICONS.activity}</div>
-                    <span>Review Pending</span>
-                  </button>
-                  <button className="sd-action-card" onClick={handleExportCSV}>
-                    <div className="sd-action-icon sd-action-icon-green">{ICONS.download}</div>
-                    <span>Export Data</span>
-                  </button>
+                <div className="sd-panel">
+                  <div className="sd-panel-header">
+                    <h3>{ICONS.calendar} Up next</h3>
+                    {stats.pending > 0 && (
+                      <button type="button" className="sd-link-btn" onClick={() => openRequests('pending')}>
+                        {stats.pending} waiting for your reply →
+                      </button>
+                    )}
+                  </div>
+                  <div className="sd-list">
+                    {upcomingVisits.length === 0 ? (
+                      <div className="sd-empty">No confirmed visits coming up.</div>
+                    ) : (
+                      upcomingVisits.map((apt) => (
+                        <div key={apt.id} className="sd-list-item" onClick={() => openPreview(apt)}>
+                          <div className="sd-list-avatar" style={{ background: 'var(--green-light)', color: 'var(--green-dark)' }}>
+                            {getInitials(apt.visitor_name)}
+                          </div>
+                          <div className="sd-list-info">
+                            <div className="sd-list-name">{apt.visitor_name}</div>
+                            <div className="sd-list-meta">
+                              {formatDate(apt.appointment_date)} · {formatTime(apt.appointment_date)}
+                              {studentLabel(apt) && <span className="sd-list-sub">Student: {studentLabel(apt)}</span>}
+                            </div>
+                          </div>
+                          <span className={`sd-badge sd-badge-${apt.status?.toLowerCase()}`}>{apt.status}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -995,10 +881,10 @@ export default function StaffDashboardPage() {
                     ) : (
                       recentAppointments.map(apt => (
                         <div key={apt.id} className="sd-list-item" onClick={() => openPreview(apt)}>
-                          <div className="sd-list-avatar" style={{ 
-                            background: apt.status === 'Pending' ? 'var(--gold-light)' : 
+                          <div className="sd-list-avatar" style={{
+                            background: apt.status === 'Pending' ? 'var(--gold-light)' :
                                        apt.status === 'Accepted' ? 'var(--green-light)' : 'var(--red-light)',
-                            color: apt.status === 'Pending' ? 'var(--gold-dark)' : 
+                            color: apt.status === 'Pending' ? 'var(--gold-dark)' :
                                    apt.status === 'Accepted' ? 'var(--green-dark)' : 'var(--red-dark)'
                           }}>
                             {getInitials(apt.visitor_name)}
@@ -1020,19 +906,48 @@ export default function StaffDashboardPage() {
             </>
           )}
 
-          {(activeTab === 'appointments' || activeTab === 'pending' || activeTab === 'accepted' || activeTab === 'declined' || activeTab === 'history') && (
+          {activeTab === 'appointments' && (
             <>
               {/* Filter Bar */}
               <div className="sd-filter-bar">
-                <div className="sd-filter-tabs">
-                  <button className={`sd-filter-tab ${dateFilter === 'all' ? 'active' : ''}`} onClick={() => setDateFilter('all')}>All</button>
-                  <button className={`sd-filter-tab ${dateFilter === 'today' ? 'active' : ''}`} onClick={() => setDateFilter('today')}>Today</button>
+                <div className="sd-mobile-search">
+                  {ICONS.search}
+                  <input
+                    type="search"
+                    placeholder="Search visitor or student"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    aria-label="Search visitor requests"
+                  />
                 </div>
+                <div className="sd-filter-tabs" role="tablist" aria-label="Request status">
+                  {REQUEST_FILTERS.map((filter) => {
+                    const count = filter.statuses ? appointments.filter((a) => filter.statuses.includes(a.status)).length : appointments.length;
+                    return (
+                      <button
+                        key={filter.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={requestFilter === filter.id}
+                        className={`sd-filter-tab ${requestFilter === filter.id ? 'active' : ''}`}
+                        onClick={() => setRequestFilter(filter.id)}
+                      >
+                        {filter.label}
+                        <span className="sd-filter-count">{count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <label className="sd-today-toggle">
+                  <input
+                    type="checkbox"
+                    checked={dateFilter === 'today'}
+                    onChange={(e) => setDateFilter(e.target.checked ? 'today' : 'all')}
+                  />
+                  <span>Today only</span>
+                </label>
                 <div className="sd-filter-actions">
-                  <div className="sd-view-toggle">
-                    <button className={viewMode === 'grid' ? 'active' : ''} onClick={() => setViewMode('grid')}>{ICONS.grid}</button>
-                    <button className={viewMode === 'list' ? 'active' : ''} onClick={() => setViewMode('list')}>{ICONS.list}</button>
-                  </div>
+                  <ViewToggle value={viewMode} onChange={setViewMode} />
                   <button className="sd-export-btn" onClick={handleExportCSV}>
                     {ICONS.download} Export
                   </button>
@@ -1052,11 +967,11 @@ export default function StaffDashboardPage() {
                     {filteredAppointments.map(apt => {
                       const overdueHours = apt.status === 'Pending' ? getOverdueHours(apt.appointment_date) : 0;
                       const isUrgent = overdueHours > 24;
-                      
+
                       return (
                         <div key={apt.id} className={`sd-appt-card ${isUrgent ? 'urgent' : ''}`}>
                           <div className="sd-appt-header">
-                            <div className="sd-appt-avatar" style={{ 
+                            <div className="sd-appt-avatar" style={{
                               background: isUrgent ? 'var(--red-light)' : apt.status === 'Accepted' ? 'var(--green-light)' : apt.status === 'Declined' ? 'var(--red-light)' : 'var(--gold-light)',
                               color: isUrgent ? 'var(--red-dark)' : apt.status === 'Accepted' ? 'var(--green-dark)' : apt.status === 'Declined' ? 'var(--red-dark)' : 'var(--gold-dark)'
                             }}>
@@ -1070,11 +985,11 @@ export default function StaffDashboardPage() {
                               </div>
                             </div>
                           </div>
-                          
+
                           <div className="sd-appt-body">
                             <h4 className="sd-appt-name">{apt.visitor_name}</h4>
                             <p className="sd-appt-email">{apt.visitor_email || apt.visitor_phone}</p>
-                            
+
                             <div className="sd-appt-details">
                               <div className="sd-appt-detail">
                                 {ICONS.calendar}
@@ -1097,7 +1012,7 @@ export default function StaffDashboardPage() {
                                 </div>
                               )}
                             </div>
-                            
+
                             {apt.message && (
                               <p className="sd-appt-message">"{apt.message}"</p>
                             )}
@@ -1115,7 +1030,7 @@ export default function StaffDashboardPage() {
                             </div>
                           )}
 
-                          {responseAreaOpen[apt.id] && (
+                          {apt.status === 'Pending' && responseAreaOpen[apt.id] && (
                             <div className="sd-response-area">
                               {responseAction[apt.id] === 'Rescheduled' && (
                                 <label className="sd-reschedule-field">
@@ -1128,14 +1043,14 @@ export default function StaffDashboardPage() {
                                   />
                                 </label>
                               )}
-                              <textarea 
+                              <textarea
                                 placeholder="Add a response note (optional)..."
                                 value={responseNote[apt.id] || ''}
                                 onChange={(e) => setResponseNote(prev => ({ ...prev, [apt.id]: e.target.value }))}
                                 rows="2"
                               />
                               <div className="sd-response-actions">
-                                <button 
+                                <button
                                   className="sd-btn sd-btn-accept"
                                   disabled={responseAction[apt.id] === 'Rescheduled' && Boolean(rescheduleTimeError(rescheduleTo[apt.id], apt))}
                                   onClick={() => {
@@ -1155,7 +1070,6 @@ export default function StaffDashboardPage() {
                 ) : (
                   <div className="sd-appointments-list-view">
                     <div className="sd-list-toolbar">
-                      <button type="button" className="sd-list-back" onClick={() => setViewMode('grid')}>Return to grid</button>
                       <span className="sd-list-count">{filteredAppointments.length} requests</span>
                     </div>
                     <div className="sd-appointments-list">
@@ -1172,17 +1086,20 @@ export default function StaffDashboardPage() {
                             onClick={() => openPreview(apt)}
                           >
                             <div className="sd-appointments-list-main">
-                              <div>
-                                <div className="sd-appointments-list-name">{apt.visitor_name}</div>
-                                <div className="sd-appointments-list-time" title={sentTitle}>
-                                  Sent {sentLabel}
-                                </div>
-                              </div>
+                              <span className="sd-appointments-list-name">{apt.visitor_name}</span>
                               <span className={`sd-list-simple-status sd-list-simple-status-${statusKey}`}>{apt.status}</span>
                             </div>
+                            {apt.appointment_date && (
+                              <div className="sd-appointments-list-when">
+                                {ICONS.calendar}
+                                <span>{formatDate(apt.appointment_date)} · {formatTime(apt.appointment_date)}</span>
+                              </div>
+                            )}
                             <div className="sd-appointments-list-meta">
-                              <span>{studentLabel(apt) ? `Student: ${studentLabel(apt)}` : apt.department_name || 'General'}</span>
-                              <span>{apt.appointment_date ? new Date(apt.appointment_date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }) : ''}</span>
+                              {studentLabel(apt) ? `Student: ${studentLabel(apt)}` : apt.department_name || 'General visit'}
+                            </div>
+                            <div className="sd-appointments-list-time" title={sentTitle}>
+                              Sent {sentLabel}
                             </div>
                           </button>
                         );
@@ -1233,32 +1150,28 @@ export default function StaffDashboardPage() {
                   <h3>{ICONS.settings} Settings</h3>
                 </div>
                 <div className="sd-settings-content">
-                  <div className="sd-setting-item">
-                    <div className="sd-setting-info">
-                      <h4>Profile Information</h4>
-                      <p>Update your personal information</p>
-                    </div>
-                    <div className="sd-setting-value">
-                      <span>{user?.full_name}</span>
+                  <div className="sd-account-head">
+                    <span className="sd-profile-avatar sd-account-avatar">{getInitials(user?.full_name)}</span>
+                    <div>
+                      <strong>{user?.full_name || 'Staff member'}</strong>
                       <span>{user?.email}</span>
                     </div>
                   </div>
-                  <div className="sd-setting-item">
-                    <div className="sd-setting-info">
-                      <h4>Department</h4>
-                      <p>Your assigned department</p>
+                  <dl className="sd-account-list">
+                    <div>
+                      <dt>Department</dt>
+                      <dd>{user?.department_name || 'Not assigned'}</dd>
                     </div>
-                    <div className="sd-setting-value">
-                      <span>{user?.department_name || 'Not assigned'}</span>
+                    <div>
+                      <dt>Division</dt>
+                      <dd>{user?.division_name || 'Not assigned'}</dd>
                     </div>
-                  </div>
-                  <div className="sd-setting-item">
-                    <div className="sd-setting-info">
-                      <h4>Session</h4>
-                      <p>Auto-refresh appointments every 15 seconds</p>
+                    <div>
+                      <dt>Visitor requests</dt>
+                      <dd>Refresh automatically every 15 seconds</dd>
                     </div>
-                    <button className="sd-btn sd-btn-view" onClick={handleLogout}>Sign Out</button>
-                  </div>
+                  </dl>
+                  <p className="sd-account-note">To change your name, email or department, ask the school admin.</p>
                 </div>
               </div>
             </div>
@@ -1277,7 +1190,7 @@ export default function StaffDashboardPage() {
             type="button"
             className={`app-tab ${activeTab === tab.id ? 'is-active' : ''}`}
             aria-current={activeTab === tab.id ? 'page' : undefined}
-            onClick={() => { setActiveTab(tab.id); setSidebarOpen(false); }}
+            onClick={() => (tab.id === 'appointments' ? openRequests(stats.pending > 0 ? 'pending' : 'all') : (setActiveTab(tab.id), setSidebarOpen(false)))}
           >
             <span className="app-tab-icon">
               {tab.icon}
@@ -1301,17 +1214,17 @@ export default function StaffDashboardPage() {
               <button onClick={closePreview}>{ICONS.x}</button>
             </div>
             <div className="sd-modal-body">
-              <div className="sd-modal-avatar" style={{ 
-                background: previewItem.status === 'Pending' ? 'var(--gold-light)' : 
+              <div className="sd-modal-avatar" style={{
+                background: previewItem.status === 'Pending' ? 'var(--gold-light)' :
                            previewItem.status === 'Accepted' ? 'var(--green-light)' : 'var(--red-light)',
-                color: previewItem.status === 'Pending' ? 'var(--gold-dark)' : 
+                color: previewItem.status === 'Pending' ? 'var(--gold-dark)' :
                        previewItem.status === 'Accepted' ? 'var(--green-dark)' : 'var(--red-dark)'
               }}>
                 {getInitials(previewItem.visitor_name)}
               </div>
               <h4>{previewItem.visitor_name}</h4>
               <p className="sd-modal-email">{previewItem.visitor_email || previewItem.visitor_phone}</p>
-              
+
               <div className="sd-modal-details">
                 <div className="sd-modal-detail">
                   <span>Date</span>
@@ -1360,19 +1273,21 @@ export default function StaffDashboardPage() {
                 </div>
               )}
 
-              <div className="sd-modal-section">
-                <h5>Response note (optional)</h5>
-                <textarea
-                  className="sd-modal-response-input"
-                  placeholder="Add a brief response note (optional)..."
-                  value={responseNote[previewItem.id] || ''}
-                  onChange={(e) => setResponseNote((prev) => ({ ...prev, [previewItem.id]: e.target.value }))}
-                  rows="3"
-                />
-              </div>
+              {previewItem.status === 'Pending' && (
+                <div className="sd-modal-section">
+                  <h5>Response note (optional)</h5>
+                  <textarea
+                    className="sd-modal-response-input"
+                    placeholder="Add a brief response note (optional)..."
+                    value={responseNote[previewItem.id] || ''}
+                    onChange={(e) => setResponseNote((prev) => ({ ...prev, [previewItem.id]: e.target.value }))}
+                    rows="3"
+                  />
+                </div>
+              )}
             </div>
             <div className="sd-modal-footer">
-              <button type="button" className="sd-btn sd-btn-view" onClick={closePreview}>Return</button>
+              <button type="button" className="sd-btn sd-btn-view" onClick={closePreview}>Close</button>
               {previewItem.status === 'Pending' && (
                 <>
                   <button className="sd-btn sd-btn-accept" onClick={() => handlePreviewResponse('Accepted')}>Accept</button>

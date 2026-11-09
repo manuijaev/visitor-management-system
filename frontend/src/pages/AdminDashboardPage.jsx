@@ -9,30 +9,35 @@ import EditStaffModal from '../components/admin/EditStaffModal';
 import DepartmentsBoard from '../components/admin/DepartmentsBoard';
 import GateBoard from '../components/admin/GateBoard';
 import OfficeHoursBoard from '../components/admin/OfficeHoursBoard';
+import NotificationsMenu from '../components/NotificationsMenu';
+import ViewToggle from '../components/ViewToggle';
 import {
   EAT_TIMEZONE,
   eatDateKey,
   firstName,
   formatApiError,
+  formatTopbarDateTime,
   formatVisitDate,
   getInitials,
   getRelativeTimeLabel,
+  matchesVisitFilter,
+  orderVisitsForReview,
   staffStatus,
+  VISIT_FILTERS,
 } from '../components/admin/utils';
 
 const NAV_ITEMS = [
   { id: 'overview', label: 'Overview', icon: 'overview' },
   { id: 'visitors', label: 'Visitors', icon: 'visitors' },
-  { id: 'gate', label: 'Gate', icon: 'shield' },
+  { id: 'gate', label: 'Arrivals', icon: 'arrivals' },
   { id: 'hours', label: 'Visiting hours', icon: 'clock' },
   { id: 'team', label: 'Team', icon: 'team' },
-  { id: 'notifications', label: 'Notifications', icon: 'bell' },
+  { id: 'departments', label: 'Departments', icon: 'building' },
 ];
 
 /** The views on the phone tab bar; the rest stay under More. */
 const TAB_ITEMS = ['overview', 'visitors', 'gate'];
 
-const VISIT_STATUSES = ['All', 'Pending', 'Accepted', 'Declined', 'Rescheduled', 'Cancelled', 'Expired'];
 const STATUS_TONE = { Pending: 'gold', Accepted: 'green', Approved: 'green', Declined: 'red', Rejected: 'red', Rescheduled: 'purple', Cancelled: 'muted', Expired: 'muted' };
 const OVERDUE_MS = 30 * 60 * 1000;
 
@@ -141,7 +146,13 @@ export default function AdminDashboardPage() {
   const { logout, user } = useAuth();
 
   const [view, setView] = useState('overview');
-  const [teamTab, setTeamTab] = useState('people');
+  const [now, setNow] = useState(() => new Date());
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 15000);
+    return () => clearInterval(id);
+  }, []);
   const [navOpen, setNavOpen] = useState(false);
 
   const [departments, setDepartments] = useState([]);
@@ -161,8 +172,29 @@ export default function AdminDashboardPage() {
   const [peopleSearch, setPeopleSearch] = useState('');
   const [peopleDept, setPeopleDept] = useState('');
   const [visitorSearch, setVisitorSearch] = useState('');
-  const [visitorStatus, setVisitorStatus] = useState('All');
-  const [notifFilter, setNotifFilter] = useState('all');
+  const [visitorStatus, setVisitorStatus] = useState('all');
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef(null);
+
+  useEffect(() => {
+    if (!profileOpen) return undefined;
+    const closeOnOutsideClick = (event) => {
+      if (profileRef.current && !profileRef.current.contains(event.target)) setProfileOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setProfileOpen(false);
+    };
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [profileOpen]);
+  /** Cards suit phones; desktops start with the compact table. */
+  const [layout, setLayout] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia?.('(max-width: 768px)').matches ? 'grid' : 'list'
+  );
   const [readIds, setReadIds] = useState(() => new Set());
   const [dismissedIds, setDismissedIds] = useState(() => new Set());
 
@@ -324,7 +356,6 @@ export default function AdminDashboardPage() {
     [appointments, readIds, dismissedIds]
   );
   const unreadCount = notifications.filter((n) => n.unread).length;
-  const visibleNotifications = notifications.filter((n) => (notifFilter === 'unread' ? n.unread : notifFilter === 'urgent' ? n.urgent : true));
 
   const filteredPeople = staff.filter((s) => {
     if (peopleDept && String(s.department) !== peopleDept) return false;
@@ -333,14 +364,14 @@ export default function AdminDashboardPage() {
     return [s.full_name, s.email, s.department_name, s.division_name].some((v) => v?.toLowerCase().includes(q));
   });
 
-  const filteredVisits = appointments.filter((a) => {
-    if (visitorStatus !== 'All' && a.status !== visitorStatus) return false;
+  const filteredVisits = orderVisitsForReview(appointments.filter((a) => {
+    if (!matchesVisitFilter(a, visitorStatus)) return false;
     if (!visitorSearch) return true;
     const q = visitorSearch.toLowerCase();
     return [a.visitor_name, a.visitor_email, studentLabel(a), a.staff_name, a.department_name].some((v) => v?.toLowerCase().includes(q));
-  });
+  }));
 
-  const pageTitle = { overview: 'Overview', visitors: 'Visitors', gate: 'Gate', hours: 'Visiting hours', team: 'Team', notifications: 'Notifications' }[view];
+  const pageTitle = { overview: 'Overview', visitors: 'Visitors', gate: 'Arrivals', hours: 'Visiting hours', team: 'Team', departments: 'Departments', settings: 'Settings' }[view];
 
   const renderVisitRow = (a, compact = false) => (
     <div key={a.id} className={`ad-row ${compact ? 'ad-row-compact' : ''}`}>
@@ -476,7 +507,7 @@ export default function AdminDashboardPage() {
                 <span>{item.label}</span>
                 {item.id === 'visitors' && stats.pending > 0 && <span className="ad-nav-count">{stats.pending}</span>}
                 {item.id === 'team' && <span className="ad-nav-count muted">{staff.length}</span>}
-                {item.id === 'notifications' && unreadCount > 0 && <span className="ad-nav-count">{unreadCount}</span>}
+                {item.id === 'departments' && <span className="ad-nav-count muted">{departments.length}</span>}
               </button>
             ))}
           </nav>
@@ -486,19 +517,6 @@ export default function AdminDashboardPage() {
             Add staff member
           </button>
 
-          <div className="ad-sidebar-foot">
-            <div className="ad-me">
-              <span className="ad-avatar ad-avatar-gold">{getInitials(user?.full_name || 'Admin')}</span>
-              <div>
-                <strong>{user?.full_name || 'Administrator'}</strong>
-                <span>{user?.email}</span>
-              </div>
-            </div>
-            <button type="button" className="ad-nav-item ad-logout" onClick={handleLogout}>
-              <Icon name="logout" size={17} />
-              <span>Log out</span>
-            </button>
-          </div>
         </aside>
         <div className="ad-backdrop" onClick={() => setNavOpen(false)} />
 
@@ -509,14 +527,68 @@ export default function AdminDashboardPage() {
             </button>
             <div className="ad-topbar-title">{pageTitle}</div>
             <div className="ad-topbar-actions">
-              <button type="button" className="ad-icon-btn ad-bell" onClick={() => goTo('notifications')} aria-label={`Notifications, ${unreadCount} unread`}>
-                <Icon name="bell" size={17} />
-                {unreadCount > 0 && <span className="ad-bell-dot">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+              <span className="ad-clock">{formatTopbarDateTime(now)}</span>
+              <NotificationsMenu
+                items={notifications.map((n) => ({
+                  id: n.id,
+                  text: n.message ? `${n.title}. ${n.message}` : n.title,
+                  time: getRelativeTimeLabel(n.timestamp),
+                  unread: n.unread,
+                  urgent: n.urgent,
+                }))}
+                onOpenItem={(item) => {
+                  setReadIds((prev) => new Set(prev).add(item.id));
+                  setVisitorStatus('all');
+                  goTo('visitors');
+                }}
+                onDismiss={(id) => setDismissedIds((prev) => new Set(prev).add(id))}
+                action={unreadCount ? { label: 'Mark all read', onClick: () => setReadIds(new Set(notifications.map((n) => n.id))) } : null}
+              />
+              <button
+                type="button"
+                className="ad-icon-btn ad-refresh"
+                disabled={refreshing}
+                aria-label="Refresh"
+                title="Refresh"
+                onClick={async () => {
+                  setRefreshing(true);
+                  await loadData();
+                  setRefreshing(false);
+                  notify('Up to date.');
+                }}
+              >
+                <Icon name="refresh" size={16} />
               </button>
-              <button type="button" className="ad-btn ad-btn-primary ad-topbar-cta" onClick={() => openWizard()}>
-                <Icon name="plus" size={15} />
-                <span>Add staff</span>
-              </button>
+              <div className="sd-profile" ref={profileRef}>
+                <button
+                  type="button"
+                  className="ad-profile-btn"
+                  onClick={() => setProfileOpen((open) => !open)}
+                  aria-haspopup="menu"
+                  aria-expanded={profileOpen}
+                  aria-label={`Account: ${user?.full_name || 'Administrator'}`}
+                >
+                  {getInitials(user?.full_name || 'Admin')}
+                </button>
+                {profileOpen && (
+                  <div className="sd-profile-menu" role="menu">
+                    <div className="sd-profile-head">
+                      <span className="sd-profile-avatar">{getInitials(user?.full_name || 'Admin')}</span>
+                      <span>
+                        <strong>{user?.full_name || 'Administrator'}</strong>
+                        <small>Administrator</small>
+                        {user?.email && <small>{user.email}</small>}
+                      </span>
+                    </div>
+                    <button type="button" role="menuitem" className="sd-profile-item" onClick={() => { setProfileOpen(false); goTo('settings'); }}>
+                      Settings
+                    </button>
+                    <button type="button" role="menuitem" className="sd-profile-item is-danger" onClick={handleLogout}>
+                      Log out
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </header>
 
@@ -537,7 +609,7 @@ export default function AdminDashboardPage() {
                       <strong>{stats.pending} visit {stats.pending === 1 ? 'request is' : 'requests are'} awaiting a response</strong>
                       {stats.overdue > 0 && ` · ${stats.overdue} waiting longer than 30 minutes`}
                     </p>
-                    <button type="button" className="ad-btn ad-btn-ghost" onClick={() => { setVisitorStatus('Pending'); goTo('visitors'); }}>Review</button>
+                    <button type="button" className="ad-btn ad-btn-ghost" onClick={() => { setVisitorStatus('pending'); goTo('visitors'); }}>Review</button>
                   </div>
                 )}
 
@@ -619,11 +691,11 @@ export default function AdminDashboardPage() {
                 </div>
                 <section className="ad-card">
                   <div className="ad-toolbar">
-                    <div className="ad-segmented" role="tablist">
-                      {VISIT_STATUSES.map((s) => (
-                        <button type="button" key={s} role="tab" aria-selected={visitorStatus === s} className={visitorStatus === s ? 'active' : ''} onClick={() => setVisitorStatus(s)}>
-                          {s}
-                          {s === 'Pending' && stats.pending > 0 && <span>{stats.pending}</span>}
+                    <div className="ad-segmented ad-segmented-fill" role="tablist" aria-label="Visit status">
+                      {VISIT_FILTERS.map((filter) => (
+                        <button type="button" key={filter.id} role="tab" aria-selected={visitorStatus === filter.id} className={visitorStatus === filter.id ? 'active' : ''} onClick={() => setVisitorStatus(filter.id)}>
+                          {filter.label}
+                          <span>{appointments.filter((a) => matchesVisitFilter(a, filter.id)).length}</span>
                         </button>
                       ))}
                     </div>
@@ -631,8 +703,9 @@ export default function AdminDashboardPage() {
                       <Icon name="search" size={15} />
                       <input value={visitorSearch} onChange={(e) => setVisitorSearch(e.target.value)} placeholder="Search visitors or staff" />
                     </label>
+                    <ViewToggle value={layout} onChange={setLayout} />
                   </div>
-                  <div className="ad-list ad-list-table ad-cols-visits">
+                  <div className={layout === 'grid' ? 'ad-list ad-cards' : 'ad-list ad-list-table ad-cols-visits'}>
                     {filteredVisits.map((a) => renderVisitRow(a))}
                     {!filteredVisits.length && <div className="ad-empty-line">No visit requests match.</div>}
                   </div>
@@ -651,18 +724,13 @@ export default function AdminDashboardPage() {
                     <h1>Team</h1>
                     <p>{staff.length} {staff.length === 1 ? 'person' : 'people'} across {departments.length} department{departments.length === 1 ? '' : 's'}</p>
                   </div>
-                  <div className="ad-segmented ad-segmented-lg" role="tablist">
-                    <button type="button" role="tab" aria-selected={teamTab === 'people'} className={teamTab === 'people' ? 'active' : ''} onClick={() => setTeamTab('people')}>
-                      <Icon name="team" size={15} /> People
-                    </button>
-                    <button type="button" role="tab" aria-selected={teamTab === 'departments'} className={teamTab === 'departments' ? 'active' : ''} onClick={() => setTeamTab('departments')}>
-                      <Icon name="building" size={15} /> Departments
-                    </button>
-                  </div>
+                  <button type="button" className="ad-btn ad-btn-primary" onClick={() => openWizard(peopleDept || null)}>
+                    <Icon name="userPlus" size={15} />
+                    Add staff member
+                  </button>
                 </div>
 
-                {teamTab === 'people' ? (
-                  <section className="ad-card">
+                <section className="ad-card">
                     <div className="ad-toolbar">
                       <label className="ad-search">
                         <Icon name="search" size={15} />
@@ -672,83 +740,115 @@ export default function AdminDashboardPage() {
                         <option value="">All departments</option>
                         {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                       </select>
+                      <ViewToggle value={layout} onChange={setLayout} />
                     </div>
-                    <div className="ad-list ad-list-table ad-cols-people">
+                    <div className={layout === 'grid' ? 'ad-list ad-cards' : 'ad-list ad-list-table ad-cols-people'}>
                       {filteredPeople.map((s) => renderPersonRow(s))}
                       {!filteredPeople.length && <div className="ad-empty-line">No one matches that search.</div>}
                     </div>
-                    <button type="button" className="ad-add-row" onClick={() => openWizard(peopleDept || null)}>
-                      <Icon name="plus" size={15} />
-                      Add staff member
-                    </button>
                   </section>
-                ) : (
-                  <DepartmentsBoard
-                    departments={departments}
-                    divisions={divisions}
-                    staff={staff}
-                    onChange={loadData}
-                    notify={notify}
-                    confirm={openConfirm}
-                    onAddStaff={(deptId) => openWizard(deptId)}
-                  />
-                )}
               </>
             )}
 
-            {view === 'notifications' && (
+            {view === 'departments' && (
               <>
                 <div className="ad-page-head">
                   <div>
-                    <h1>Notifications</h1>
-                    <p>{unreadCount} unread</p>
+                    <h1>Departments</h1>
+                    <p>{departments.length} department{departments.length === 1 ? '' : 's'} and {divisions.length} division{divisions.length === 1 ? '' : 's'}. Visitors choose from these when they book.</p>
                   </div>
-                  <button type="button" className="ad-btn ad-btn-ghost" onClick={() => setReadIds(new Set(notifications.map((n) => n.id)))} disabled={!unreadCount}>
-                    <Icon name="check" size={15} />
-                    Mark all read
-                  </button>
                 </div>
-                <section className="ad-card">
-                  <div className="ad-toolbar">
-                    <div className="ad-segmented" role="tablist">
-                      {[
-                        { id: 'all', label: 'All', count: notifications.length },
-                        { id: 'unread', label: 'Unread', count: unreadCount },
-                        { id: 'urgent', label: 'Urgent', count: notifications.filter((n) => n.urgent).length },
-                      ].map((tab) => (
-                        <button type="button" key={tab.id} role="tab" aria-selected={notifFilter === tab.id} className={notifFilter === tab.id ? 'active' : ''} onClick={() => setNotifFilter(tab.id)}>
-                          {tab.label}
-                          {tab.count > 0 && <span>{tab.count}</span>}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="ad-list">
-                    {visibleNotifications.map((n) => (
-                      <div key={n.id} className={`ad-notif ${n.unread ? 'unread' : ''}`}>
-                        <span className={`ad-notif-icon ad-pill-${n.tone}`}><Icon name={n.icon} size={15} /></span>
-                        <button
-                          type="button"
-                          className="ad-notif-body"
-                          onClick={() => {
-                            setReadIds((prev) => new Set(prev).add(n.id));
-                            goTo('visitors');
-                          }}
-                        >
-                          <strong>{n.title}</strong>
-                          {n.message && <span>{n.message}</span>}
-                          <small>{getRelativeTimeLabel(n.timestamp)}</small>
-                        </button>
-                        <button type="button" className="ad-icon-btn ad-icon-btn-sm" aria-label="Dismiss" onClick={() => setDismissedIds((prev) => new Set(prev).add(n.id))}>
-                          <Icon name="x" size={14} />
-                        </button>
-                      </div>
-                    ))}
-                    {!visibleNotifications.length && <div className="ad-empty-line">You're all caught up.</div>}
-                  </div>
-                </section>
+                <DepartmentsBoard
+                  departments={departments}
+                  divisions={divisions}
+                  staff={staff}
+                  onChange={loadData}
+                  notify={notify}
+                  confirm={openConfirm}
+                  onAddStaff={(deptId) => openWizard(deptId)}
+                />
               </>
             )}
+
+            {view === 'settings' && (
+              <>
+                <div className="ad-page-head">
+                  <div>
+                    <h1>Settings</h1>
+                    <p>Your account and the school&apos;s setup.</p>
+                  </div>
+                </div>
+                <div className="ad-settings">
+                  <section className="ad-card">
+                    <header className="ad-card-head">
+                      <h2>Your account</h2>
+                    </header>
+                    <div className="sd-account-head">
+                      <span className="sd-profile-avatar sd-account-avatar">{getInitials(user?.full_name || 'Admin')}</span>
+                      <div>
+                        <strong>{user?.full_name || 'Administrator'}</strong>
+                        <span>{user?.email}</span>
+                      </div>
+                    </div>
+                    <dl className="sd-account-list">
+                      <div>
+                        <dt>Role</dt>
+                        <dd>Administrator</dd>
+                      </div>
+                    </dl>
+                  </section>
+
+                  <section className="ad-card">
+                    <header className="ad-card-head">
+                      <h2>School setup</h2>
+                    </header>
+                    <dl className="sd-account-list">
+                      <div>
+                        <dt>Departments</dt>
+                        <dd>{departments.length} departments · {divisions.length} divisions</dd>
+                      </div>
+                      <div>
+                        <dt>Staff</dt>
+                        <dd>{stats.active} active{stats.invited ? ` · ${stats.invited} invited` : ''}</dd>
+                      </div>
+                    </dl>
+                    <div className="ad-settings-actions">
+                      <button type="button" className="ad-btn ad-btn-ghost" onClick={() => goTo('team')}>
+                        <Icon name="team" size={15} />
+                        Manage team
+                      </button>
+                      <button type="button" className="ad-btn ad-btn-ghost" onClick={() => goTo('departments')}>
+                        <Icon name="building" size={15} />
+                        Manage departments
+                      </button>
+                    </div>
+                  </section>
+
+                  <section className="ad-card">
+                    <header className="ad-card-head">
+                      <h2>Visit records</h2>
+                    </header>
+                    <dl className="sd-account-list">
+                      <div>
+                        <dt>Visit requests</dt>
+                        <dd>{appointments.length} in total</dd>
+                      </div>
+                      <div>
+                        <dt>Console refresh</dt>
+                        <dd>Every 15 seconds</dd>
+                      </div>
+                    </dl>
+                    <div className="ad-settings-actions">
+                      <button type="button" className="ad-btn ad-btn-ghost" onClick={exportVisits}>
+                        <Icon name="download" size={15} />
+                        Export all visits (CSV)
+                      </button>
+                    </div>
+                  </section>
+                </div>
+              </>
+            )}
+
           </main>
 
           <nav className="app-tabbar" aria-label="Main">

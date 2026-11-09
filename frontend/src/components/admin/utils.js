@@ -69,7 +69,60 @@ export function formatVisitDate(value) {
     timeZone: EAT_TIMEZONE,
     day: 'numeric',
     month: 'short',
-    hour: '2-digit',
+    hour: 'numeric',
     minute: '2-digit',
+    hour12: true,
   });
+}
+
+/** The top-bar clock, e.g. "Sunday, 8 November 2026 - 11:39 pm EAT". */
+export function formatTopbarDateTime(value = new Date()) {
+  const date = new Date(value).toLocaleDateString('en-GB', {
+    timeZone: EAT_TIMEZONE,
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+  return `${date} - ${formatClockTime(value)} EAT`;
+}
+
+/** A time of day in Nairobi on the 12-hour clock, e.g. "2:00 pm". */
+export function formatClockTime(value = new Date()) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString('en-GB', { timeZone: EAT_TIMEZONE, hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
+/**
+ * Orders visits for a staff member's review: pending requests first (soonest visit first),
+ * then upcoming visits soonest first, then past ones newest first.
+ */
+export function orderVisitsForReview(visits, now = Date.now()) {
+  const rank = (visit) => {
+    if (visit.status === 'Pending') return 0;
+    return new Date(visit.appointment_date).getTime() >= now ? 1 : 2;
+  };
+  return [...visits].sort((a, b) => {
+    const byRank = rank(a) - rank(b);
+    if (byRank !== 0) return byRank;
+    const aTime = new Date(a.appointment_date).getTime();
+    const bTime = new Date(b.appointment_date).getTime();
+    return rank(a) === 2 ? bTime - aTime : aTime - bTime;
+  });
+}
+
+/** Status tabs for visit lists. Rescheduled visits count as accepted; cancelled and closed ones sit with declined. */
+export const VISIT_FILTERS = [
+  { id: 'pending', label: 'Pending', statuses: ['Pending'] },
+  { id: 'accepted', label: 'Accepted', statuses: ['Accepted', 'Rescheduled'] },
+  { id: 'declined', label: 'Declined', statuses: ['Declined', 'Cancelled', 'Expired'] },
+  { id: 'all', label: 'All', statuses: null },
+];
+
+/** Whether a visit belongs under the given status tab id. */
+export function matchesVisitFilter(visit, filterId) {
+  const statuses = VISIT_FILTERS.find((filter) => filter.id === filterId)?.statuses;
+  return !statuses || statuses.includes(visit.status);
 }

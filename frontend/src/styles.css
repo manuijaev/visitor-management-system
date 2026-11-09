@@ -69,7 +69,8 @@ body,
   min-height: 100%;
   width: 100%;
   max-width: 100%;
-  overflow-x: hidden;
+  /* clip, not hidden: hidden turns these into scroll containers, which breaks sticky sidebars and top bars. */
+  overflow-x: clip;
   overscroll-behavior-x: none;
 }
 
@@ -119,7 +120,7 @@ body.home-background {
   font-family: 'Outfit', sans-serif;
   font-size: 15px;
   min-height: 100vh;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body.home-background::before {
@@ -9595,20 +9596,22 @@ tr:hover .row-actions {
 }
 
 .sd-appointments-list-card {
+  width: 100%;
   border-radius: 16px;
-  border: 1px solid rgba(15, 23, 26, 0.08);
+  border: 1px solid var(--border);
   background: var(--surface);
-  padding: 14px 18px;
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 6px;
-  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  text-align: left;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
   cursor: pointer;
 }
 
 .sd-appointments-list-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 20px 40px rgba(5, 7, 20, 0.22);
+  box-shadow: var(--shadow-sm);
   border-color: rgba(201, 146, 42, 0.5);
 }
 
@@ -9621,32 +9624,53 @@ tr:hover .row-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 12px;
 }
 
 .sd-appointments-list-name {
-  font-size: 16px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
   font-weight: 600;
   color: var(--ink);
 }
 
-.sd-appointments-list-time {
-  font-size: 12px;
-  color: var(--ink-mid);
+.sd-appointments-list-main .sd-list-simple-status {
+  flex: none;
+  padding: 3px 9px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.sd-appointments-list-when {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.sd-appointments-list-when svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--ink-light);
 }
 
 .sd-appointments-list-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 12px;
-  color: var(--ink-light);
-  letter-spacing: 0.04em;
-  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink-mid);
+  line-height: 1.4;
 }
 
-.sd-appointments-list-meta span:first-child {
-  text-transform: capitalize;
+.sd-appointments-list-time {
+  font-size: 12px;
+  color: var(--ink-faint);
+  font-weight: 400;
 }
 
 /* Empty State */
@@ -10252,9 +10276,12 @@ tr:hover .row-actions {
   }
   
   .sd-appt-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
+    gap: 12px;
+  }
+
+  .sd-view-toggle button {
+    width: 40px;
+    height: 40px;
   }
   
   .sd-appt-body h4 {
@@ -10780,24 +10807,6 @@ tr:hover .row-actions {
 .ad-nav-count.muted {
   background: rgba(255, 255, 255, 0.08);
   color: var(--chrome-muted);
-}
-
-.ad-sidebar-cta {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: var(--gold);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 600;
-  transition: background 0.15s ease;
-}
-
-.ad-sidebar-cta:hover {
-  background: var(--gold-dark);
 }
 
 .ad-sidebar-foot {
@@ -12622,6 +12631,866 @@ tr:hover .row-actions {
 
   body:has(.app-tabbar) .pwa-card {
     bottom: calc(62px + 12px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Staff app on phones: let the screen shrink to the phone instead of growing to fit the top bar. */
+@media (max-width: 760px) {
+  .sd-main {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .sd-topbar {
+    gap: 8px;
+  }
+
+  .sd-topbar-left {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .sd-topbar-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sd-topbar-right {
+    flex: none;
+  }
+
+  .sd-availability-toggle {
+    padding: 0 12px;
+  }
+
+  .sd-availability-toggle .sd-availability-text {
+    letter-spacing: 0.04em;
+  }
+}
+
+/* Notifications dropdown (all screen sizes): buttons keep their own size so the message gets the width. */
+.sd-notification-header {
+  gap: 12px;
+}
+
+.sd-notification-count {
+  white-space: nowrap;
+}
+
+.sd-notification-header .sd-clear-all-btn {
+  width: auto;
+  flex: none;
+  margin-left: auto;
+}
+
+.sd-notification-content {
+  min-width: 0;
+}
+
+.sd-notification-item .sd-notification-clear {
+  width: 32px;
+  height: 32px;
+  flex: none;
+}
+
+/* No hover on touch screens, so the clear button is always shown. */
+@media (hover: none) {
+  .sd-notification-item .sd-notification-clear {
+    opacity: 1;
+  }
+}
+
+/* Phones: activity rows. */
+@media (max-width: 760px) {
+
+  /* Recent activity: the status sits under the name so the name gets the full width. */
+  .sd-list .sd-list-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 12px;
+    row-gap: 6px;
+    align-items: start;
+  }
+
+  .sd-list .sd-list-item > .sd-badge {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+/* Small phones: the screen refreshes itself, so drop the refresh button. */
+@media (max-width: 400px) {
+  .sd-topbar-right > .sd-icon-btn {
+    display: none;
+  }
+}
+
+/* ---------- Availability switch ---------- */
+.sd-availability-toggle {
+  gap: 8px;
+  padding: 0 14px 0 6px;
+  box-shadow: 0 1px 2px rgba(26, 23, 20, 0.08);
+}
+
+.sd-availability-toggle:hover:not(:disabled) {
+  box-shadow: 0 3px 10px rgba(26, 23, 20, 0.12);
+  transform: translateY(-1px);
+}
+
+.sd-availability-toggle:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+
+.sd-switch {
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--green, #2e7d4f);
+  transition: background 0.2s ease;
+}
+
+.sd-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 16px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: left 0.2s ease;
+}
+
+.sd-availability-toggle.offline .sd-switch {
+  background: var(--ink-faint, #a39d96);
+}
+
+.sd-availability-toggle.offline .sd-switch-knob {
+  left: 2px;
+}
+
+/* ---------- Profile menu (avatar) ---------- */
+.sd-profile {
+  position: relative;
+}
+
+button.sd-avatar {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  flex: none;
+}
+
+button.sd-avatar:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+
+.sd-profile-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 120;
+  width: 260px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+}
+
+.sd-profile-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 10px 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sd-profile-avatar {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--gold);
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.sd-profile-head > span:last-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sd-profile-head strong {
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.sd-profile-head small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--ink-light);
+}
+
+.sd-profile-item {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  text-align: left;
+  font-size: 14px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.sd-profile-item:hover {
+  background: var(--surface2);
+}
+
+.sd-profile-item.is-danger {
+  color: var(--red);
+}
+
+.sd-profile-item,
+.sd-profile-item:hover {
+  box-shadow: none;
+  transform: none;
+}
+
+/* Sidebar counts are small pills at the end of the row, not stretched bars. */
+.sd-nav-item .sd-nav-badge {
+  flex: none;
+  width: auto;
+  min-width: 22px;
+  margin-left: auto;
+  padding: 0 7px;
+  letter-spacing: 0;
+}
+
+/* ---------- Staff settings: account summary ---------- */
+.sd-settings-view .sd-panel {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.sd-account-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 0 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sd-account-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  font-size: 16px;
+}
+
+.sd-account-head > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sd-account-head strong {
+  font-size: 17px;
+  color: var(--ink);
+}
+
+.sd-account-head span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  color: var(--ink-light);
+}
+
+.sd-account-list {
+  margin: 0;
+}
+
+.sd-account-list > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.sd-account-list dt {
+  font-size: 14px;
+  color: var(--ink-light);
+}
+
+.sd-account-list dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  text-align: right;
+}
+
+.sd-account-note {
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: var(--ink-faint);
+}
+
+@media (max-width: 480px) {
+  .sd-account-list > div {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .sd-account-list dd {
+    text-align: left;
+  }
+}
+
+.sd-account-head .sd-account-avatar {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* ---------- Requests screen: status tabs, today toggle, phone search ---------- */
+.sd-filter-bar {
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.sd-filter-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  flex: none;
+  white-space: nowrap;
+}
+
+.sd-filter-count {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(26, 23, 20, 0.07);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.sd-filter-tab.active .sd-filter-count {
+  background: rgba(201, 146, 42, 0.25);
+}
+
+.sd-today-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-mid);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sd-today-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--gold);
+}
+
+.sd-mobile-search {
+  display: none;
+}
+
+/* Home: panel header with a link on the right. */
+.sd-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sd-link-btn {
+  width: auto;
+  padding: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gold-dark);
+  cursor: pointer;
+}
+
+.sd-link-btn:hover {
+  text-decoration: underline;
+  transform: none;
+  box-shadow: none;
+}
+
+.sd-notification-backdrop {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .sd-mobile-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: 42px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface2);
+    color: var(--ink-light);
+  }
+
+  .sd-mobile-search svg {
+    width: 16px;
+    height: 16px;
+    flex: none;
+  }
+
+  .sd-mobile-search input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: transparent;
+    font-size: 15px;
+    color: var(--ink);
+    outline: none;
+  }
+
+  .sd-filter-tabs {
+    width: 100%;
+  }
+
+  .sd-filter-tab {
+    padding: 9px 12px;
+  }
+
+  /* Dim the page behind the notifications panel so it's clear it's open. */
+  .sd-notification-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 99998;
+    background: rgba(26, 23, 20, 0.35);
+  }
+}
+
+.sd-list-sub {
+  font-size: 12px;
+  color: var(--ink-mid);
+}
+
+/* Tabs switch instantly; a colour fade made the old tab look selected for a moment. */
+.app-tab,
+.app-tab .app-tab-icon {
+  transition: none;
+}
+
+/* The bell keeps its unread count on itself, even where its wrapper is static on phones. */
+.sd-notification-wrapper > .sd-icon-btn {
+  position: relative;
+}
+
+@media (max-width: 768px) {
+  /* All four status tabs fit across the screen. */
+  .sd-filter-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    overflow: visible;
+  }
+
+  .sd-filter-tab {
+    flex-direction: column;
+    gap: 2px;
+    padding: 7px 2px;
+    font-size: 12.5px;
+    justify-content: center;
+  }
+
+  .sd-filter-count {
+    padding: 0 6px;
+    font-size: 10.5px;
+  }
+}
+
+/* Admin top bar: account avatar opens the same profile menu as the staff app. */
+.ad-topbar-actions .ad-profile-btn {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 10px;
+  background: var(--gold);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ad-topbar-actions .ad-profile-btn:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+
+.ad-topbar-actions .sd-profile-item {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+@media (max-width: 768px) {
+  /* Visitors: the four status tabs share one row on phones. */
+  .ad-segmented-fill {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .ad-segmented-fill button {
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 7px 2px;
+    font-size: 12.5px;
+  }
+}
+
+/* ---------- Admin: Add staff in the sidebar ---------- */
+.ad-sidebar .ad-sidebar-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 12px;
+  background: var(--gold);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.ad-sidebar .ad-sidebar-cta:hover {
+  background: var(--gold-dark);
+}
+
+/* ---------- Admin: Gate uses the same stat cards and tabbed list as the rest ---------- */
+.ad-stats.ad-stats-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ad-stat.ad-stat-button {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ad-stat.ad-stat-button:hover {
+  border-color: rgba(201, 146, 42, 0.5);
+}
+
+.ad-gate-list {
+  margin-top: 8px;
+}
+
+/* ---------- Admin: Settings ---------- */
+.ad-settings {
+  display: grid;
+  gap: 16px;
+  max-width: 720px;
+}
+
+.ad-settings .sd-account-head {
+  padding-top: 0;
+}
+
+.ad-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+@media (max-width: 768px) {
+  .ad-segmented-fill.ad-segmented-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .ad-stats.ad-stats-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .ad-stats-3 .ad-stat {
+    padding: 12px;
+  }
+
+  .ad-stats-3 .ad-stat small {
+    display: none;
+  }
+}
+
+.ad-settings .ad-card {
+  padding-bottom: 20px;
+}
+
+.ad-settings .ad-card > :not(.ad-card-head) {
+  margin-left: 22px;
+  margin-right: 22px;
+}
+
+.ad-settings .sd-account-head {
+  padding-top: 10px;
+}
+
+.ad-settings .sd-account-list > div:last-child {
+  border-bottom: none;
+}
+
+/* Admin top bar: clock and refresh, as in the staff app. */
+.ad-clock {
+  margin-right: 6px;
+  font-size: 13px;
+  color: var(--ink-mid);
+  white-space: nowrap;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .ad-clock {
+    display: none;
+  }
+}
+
+@media (max-width: 400px) {
+  .ad-topbar-actions .ad-refresh {
+    display: none;
+  }
+}
+
+/* ---------- Admin on phones ---------- */
+.ad-settings > * {
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  /* Text links get a finger-sized tap area without changing how they look. */
+  .ad-link-btn {
+    min-height: 40px;
+    padding: 0 4px;
+  }
+
+  .ad-segmented button {
+    min-height: 38px;
+  }
+
+  .ad-settings-actions .ad-btn {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+}
+
+/* ---------- Admin: card view (same rows, laid out as cards) ---------- */
+.ad-toolbar {
+  flex-wrap: wrap;
+}
+
+.ad-list.ad-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  gap: 12px;
+  padding: 4px 16px 16px;
+}
+
+.ad-cards .ad-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 8px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.ad-cards .ad-row:hover {
+  border-color: rgba(201, 146, 42, 0.45);
+}
+
+.ad-cards .ad-row-main {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.ad-cards .ad-row-cell {
+  flex: 1 1 100%;
+  min-width: 0;
+  padding-left: 52px;
+}
+
+.ad-cards .ad-row-cell strong,
+.ad-cards .ad-row-cell span,
+.ad-cards .ad-row-text span {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.ad-cards .ad-pill {
+  margin-left: 0;
+}
+
+.ad-cards .ad-row-tools {
+  margin-left: auto;
+}
+
+/* Urgent notifications get a red dot. */
+.sd-notification-item.urgent .sd-notification-dot {
+  background: var(--red);
+}
+
+/* Departments: cards never ask for more room than the screen has. */
+.ad-dept-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+}
+
+@media (max-width: 768px) {
+  /* Overview banner: message on top, Review button full width underneath. */
+  .ad-banner {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    padding: 14px 16px;
+  }
+
+  .ad-banner p {
+    flex: 1 1 calc(100% - 40px);
+  }
+
+  .ad-banner .ad-btn {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+
+  /* List view on phones: one line per visit or person, details live in card view. */
+  .ad-list-table .ad-row-cell:not(.ad-row-date) {
+    display: none;
+  }
+
+  .ad-list-table .ad-row-cell.ad-row-date {
+    flex: 1 1 100%;
+    padding-left: 50px;
+  }
+
+  .ad-list-table .ad-row-text strong,
+  .ad-list-table .ad-row-text span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .ad-list-table .ad-row-tools {
+    margin-left: auto;
+  }
+
+  /* Arrivals: name gets the full width; time and button share the line below. */
+  .ad-gate-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'avatar text text'
+      'avatar time action';
+    align-items: center;
+    gap: 6px 12px;
+  }
+
+  .ad-gate-row > .ad-avatar {
+    grid-area: avatar;
+    align-self: start;
+  }
+
+  .ad-gate-row > .ad-gate-text {
+    grid-area: text;
+  }
+
+  .ad-gate-row > .ad-gate-time {
+    grid-area: time;
+  }
+
+  .ad-gate-row > .ad-btn {
+    grid-area: action;
+  }
+
+  .ad-gate-text span {
+    white-space: normal;
+  }
+
+  /* New department: name field above a full-width button. */
+  .ad-new-dept {
+    flex-wrap: wrap;
+    padding: 12px;
+  }
+
+  .ad-new-dept > svg {
+    display: none;
+  }
+
+  .ad-new-dept input {
+    flex: 1 1 100%;
+  }
+
+  .ad-new-dept .ad-btn {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+
+  .ad-toolbar .sd-view-toggle {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  /* A blurred top bar traps fixed children (the notifications backdrop) inside it, so phones get a solid bar. */
+  .ad-topbar {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--surface);
   }
 }
 
