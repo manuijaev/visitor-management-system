@@ -9,17 +9,25 @@ describe("ViewToggle", () => {
 
     expect(
       screen
-        .getByRole("button", { name: "List view" })
-        .getAttribute("aria-pressed"),
+        .getByRole("radio", { name: "List view" })
+        .getAttribute("aria-checked"),
     ).toBe("true");
     expect(
       screen
-        .getByRole("button", { name: "Card view" })
-        .getAttribute("aria-pressed"),
+        .getByRole("radio", { name: "Card view" })
+        .getAttribute("aria-checked"),
     ).toBe("false");
 
-    fireEvent.click(screen.getByRole("button", { name: "Card view" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Card view" }));
     expect(onChange).toHaveBeenCalledWith("grid");
+  });
+
+  it("ignores a click on the layout that is already selected", () => {
+    const onChange = vi.fn();
+    render(<ViewToggle value="list" onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole("radio", { name: "List view" }));
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it("is announced as a group named Layout", () => {

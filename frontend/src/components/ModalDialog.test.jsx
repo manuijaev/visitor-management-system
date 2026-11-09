@@ -3,28 +3,34 @@ import { describe, expect, it, vi } from "vitest";
 import ModalDialog from "./ModalDialog";
 
 describe("ModalDialog", () => {
-  it("renders an open native dialog", () => {
+  it("renders an open modal dialog named by its label", () => {
     render(
       <ModalDialog aria-label="Example" onClose={() => {}}>
         <p>Body</p>
       </ModalDialog>,
     );
     const dialog = screen.getByRole("dialog", { name: "Example" });
-    expect(dialog.tagName).toBe("DIALOG");
-    expect(dialog.hasAttribute("open")).toBe(true);
+    expect(dialog.getAttribute("data-state")).toBe("open");
+    expect(screen.getByText("Body")).toBeTruthy();
   });
 
-  it("closes on Escape (cancel) when dismissible", () => {
+  it("uses an existing heading when given aria-labelledby", () => {
+    render(
+      <ModalDialog aria-labelledby="modal-heading" onClose={() => {}}>
+        <h2 id="modal-heading">Edit staff</h2>
+      </ModalDialog>,
+    );
+    expect(screen.getByRole("dialog", { name: "Edit staff" })).toBeTruthy();
+  });
+
+  it("closes on Escape when dismissible", () => {
     const onClose = vi.fn();
     render(
       <ModalDialog aria-label="Example" onClose={onClose}>
         Body
       </ModalDialog>,
     );
-    fireEvent(
-      screen.getByRole("dialog"),
-      new Event("cancel", { cancelable: true }),
-    );
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
@@ -35,9 +41,19 @@ describe("ModalDialog", () => {
         Body
       </ModalDialog>,
     );
-    const cancel = new Event("cancel", { cancelable: true });
-    fireEvent(screen.getByRole("dialog"), cancel);
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     expect(onClose).not.toHaveBeenCalled();
-    expect(cancel.defaultPrevented).toBe(true);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("keeps the legacy class for dashboard modals", () => {
+    render(
+      <ModalDialog className="ad-modal" aria-label="Example" onClose={() => {}}>
+        Body
+      </ModalDialog>,
+    );
+    expect(screen.getByRole("dialog").classList.contains("ad-modal")).toBe(
+      true,
+    );
   });
 });

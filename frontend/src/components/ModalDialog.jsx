@@ -1,32 +1,33 @@
-import { useEffect, useRef } from "react";
+import Dialog, { DialogTitle } from "./ui/Dialog";
+
+const LOOKS = {
+  "modal-card": "card",
+  "sd-modal": "sheet",
+};
 
 export default function ModalDialog({
+  look,
   className,
   onClose,
   dismissible = true,
   children,
+  "aria-label": ariaLabel,
   ...rest
 }) {
-  const dialogRef = useRef(null);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog || dialog.open) return;
-    if (typeof dialog.showModal === "function") dialog.showModal();
-    else dialog.setAttribute("open", "");
-  }, []);
-
   return (
-    <dialog
-      ref={dialogRef}
-      className={className}
-      onCancel={(event) => {
-        event.preventDefault();
-        if (dismissible) onClose?.();
-      }}
+    <Dialog
+      look={look || LOOKS[className] || "bare"}
+      className={className === "modal-card" ? undefined : className}
+      onClose={onClose}
+      dismissible={dismissible}
       {...rest}
     >
       {children}
-    </dialog>
+      {ariaLabel ? (
+        <DialogTitle className="sr-only">{ariaLabel}</DialogTitle>
+      ) : (
+        <DialogTitle hidden />
+      )}
+    </Dialog>
   );
 }
