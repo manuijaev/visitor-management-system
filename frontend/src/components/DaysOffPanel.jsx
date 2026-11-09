@@ -14,10 +14,6 @@ const errorText = (error, fallback) => {
   return data?.date?.[0] || data?.date || data?.detail || fallback;
 };
 
-/**
- * Lets a staff member mark whole days they cannot take visits.
- * Visitors cannot book them on those days.
- */
 export default function DaysOffPanel({ icon }) {
   const [days, setDays] = useState([]);
   const [newDay, setNewDay] = useState('');

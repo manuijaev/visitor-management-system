@@ -41,10 +41,6 @@ const formatWhen = (value) =>
 
 const isRecent = (visit) => new Date(visit.arrival).getTime() > Date.now() - RECENT_MS;
 
-/**
- * The parent's visits booked from this phone. Statuses come from the visit lookup endpoint,
- * using the reference and phone number saved when they booked.
- */
 export default function MyVisitsPage() {
   const navigate = useNavigate();
   const [visits] = useState(loadSavedVisits);

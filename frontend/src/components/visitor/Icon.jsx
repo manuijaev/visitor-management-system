@@ -1,4 +1,3 @@
-/** Line icons for the visitor app. */
 const ICON_PATHS = {
   ticket: (
     <>

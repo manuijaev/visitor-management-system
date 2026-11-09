@@ -27,14 +27,12 @@ export default function AdminSignupPage() {
   }, []);
 
   useEffect(() => {
-    // Check if an admin already exists
     api.get('/staff/')
       .then(({ data }) => {
         const hasAdmin = data.some(s => s.role === 'Admin');
         setAdminExists(hasAdmin);
       })
       .catch(() => {
-        // If we can't check, assume no admin exists to allow registration
         setAdminExists(false);
       })
       .finally(() => setCheckingAdmin(false));

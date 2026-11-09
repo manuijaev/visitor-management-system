@@ -89,7 +89,7 @@ export async function promptInstall() {
   return outcome;
 }
 
-export function markInstalled() {
+function markInstalled() {
   writeLocal(INSTALLED_KEY, '1');
   notify();
 }

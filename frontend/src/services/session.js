@@ -1,5 +1,5 @@
 export const LOGIN_PATH = '/staff';
-export const SESSION_EXPIRED_MESSAGE = 'Your session expired. Please log in again.';
+const SESSION_EXPIRED_MESSAGE = 'Your session expired. Please log in again.';
 
 const EXPIRY_SKEW_SECONDS = 30;
 
@@ -20,7 +20,7 @@ export function isTokenExpired(token) {
   return exp - EXPIRY_SKEW_SECONDS <= Date.now() / 1000;
 }
 
-export const ROLES = ['Admin', 'Staff'];
+const ROLES = ['Admin', 'Staff'];
 
 export function isValidUser(user) {
   return Boolean(user && typeof user === 'object' && user.id != null && ROLES.includes(user.role));

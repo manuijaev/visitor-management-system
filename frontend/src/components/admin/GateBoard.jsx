@@ -1,35 +1,21 @@
 import { useState } from 'react';
 import api from '../../services/api';
 import Icon from './Icon';
-import { EAT_TIMEZONE, formatApiError, getInitials } from './utils';
+import { eatDateKey, formatApiError, formatClockTime, getInitials } from './utils';
 
 const CLOSED_STATUSES = ['Declined', 'Cancelled', 'Expired'];
-
-const schoolDay = (value) =>
-  value
-    ? new Intl.DateTimeFormat('en-CA', { timeZone: EAT_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(
-        new Date(value)
-      )
-    : '';
-
-const clockTime = (value) =>
-  new Date(value).toLocaleTimeString('en-GB', { timeZone: EAT_TIMEZONE, hour: 'numeric', minute: '2-digit', hour12: true });
 
 const matches = (visit, query) =>
   !query ||
   [visit.visitor_name, visit.visitor_phone, visit.staff_name, visit.department_name]
     .some((value) => value?.toLowerCase().includes(query));
 
-/**
- * Arrivals: today's visitors at reception. Who is expected, who is here now, and who has left.
- * Marking a visitor as arrived alerts their host by SMS and push.
- */
 export default function GateBoard({ appointments, onChanged, notify }) {
   const [query, setQuery] = useState('');
   const [busyId, setBusyId] = useState(null);
   const [tab, setTab] = useState(null);
 
-  const today = schoolDay(new Date());
+  const today = eatDateKey();
   const search = query.trim().toLowerCase();
   const visible = appointments.filter((visit) => matches(visit, search));
 
@@ -39,11 +25,11 @@ export default function GateBoard({ appointments, onChanged, notify }) {
   const expected = visible
     .filter(
       (visit) =>
-        !visit.checked_in_at && !CLOSED_STATUSES.includes(visit.status) && schoolDay(visit.appointment_date) === today
+        !visit.checked_in_at && !CLOSED_STATUSES.includes(visit.status) && eatDateKey(visit.appointment_date) === today
     )
     .sort((a, b) => new Date(a.appointment_date) - new Date(b.appointment_date));
   const leftToday = visible
-    .filter((visit) => visit.checked_out_at && schoolDay(visit.checked_out_at) === today)
+    .filter((visit) => visit.checked_out_at && eatDateKey(visit.checked_out_at) === today)
     .sort((a, b) => new Date(b.checked_out_at) - new Date(a.checked_out_at));
 
   const act = async (visit, action) => {
@@ -92,22 +78,21 @@ export default function GateBoard({ appointments, onChanged, notify }) {
       label: 'Expected',
       visits: expected,
       empty: 'No more visitors expected today.',
-      row: (visit) => renderRow(visit, { time: clockTime(visit.appointment_date), action: 'check-in', label: 'Mark arrived', tone: 'ad-btn-primary' }),
+      row: (visit) => renderRow(visit, { time: formatClockTime(visit.appointment_date), action: 'check-in', label: 'Mark arrived', tone: 'ad-btn-primary' }),
     },
     onsite: {
       label: 'Here now',
       visits: onSite,
       empty: 'No visitors are here right now.',
-      row: (visit) => renderRow(visit, { time: `Arrived ${clockTime(visit.checked_in_at)}`, action: 'check-out', label: 'Mark left', tone: 'ad-btn-ghost' }),
+      row: (visit) => renderRow(visit, { time: `Arrived ${formatClockTime(visit.checked_in_at)}`, action: 'check-out', label: 'Mark left', tone: 'ad-btn-ghost' }),
     },
     left: {
       label: 'Left',
       visits: leftToday,
       empty: 'Nobody has left yet today.',
-      row: (visit) => renderRow(visit, { time: `${clockTime(visit.checked_in_at)} – ${clockTime(visit.checked_out_at)}` }),
+      row: (visit) => renderRow(visit, { time: `${formatClockTime(visit.checked_in_at)} – ${formatClockTime(visit.checked_out_at)}` }),
     },
   };
-  /** Until the desk picks a tab, show whoever is on site, otherwise who is expected. */
   const activeTab = tab || (onSite.length ? 'onsite' : 'expected');
   const current = lists[activeTab];
 
@@ -124,12 +109,12 @@ export default function GateBoard({ appointments, onChanged, notify }) {
         <button type="button" className="ad-stat ad-stat-button" onClick={() => setTab('expected')}>
           <span>Expected today</span>
           <strong className={expected.length ? 'gold' : ''}>{expected.length}</strong>
-          <small>{expected[0] ? `Next at ${clockTime(expected[0].appointment_date)}` : 'Nobody else due'}</small>
+          <small>{expected[0] ? `Next at ${formatClockTime(expected[0].appointment_date)}` : 'Nobody else due'}</small>
         </button>
         <button type="button" className="ad-stat ad-stat-button" onClick={() => setTab('onsite')}>
           <span>Here now</span>
           <strong>{onSite.length}</strong>
-          <small>{onSite.length ? `Since ${clockTime(onSite[0].checked_in_at)}` : 'Nobody here yet'}</small>
+          <small>{onSite.length ? `Since ${formatClockTime(onSite[0].checked_in_at)}` : 'Nobody here yet'}</small>
         </button>
         <button type="button" className="ad-stat ad-stat-button" onClick={() => setTab('left')}>
           <span>Left today</span>

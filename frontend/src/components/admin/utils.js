@@ -75,7 +75,6 @@ export function formatVisitDate(value) {
   });
 }
 
-/** The top-bar clock, e.g. "Sunday, 8 November 2026 - 11:39 pm EAT". */
 export function formatTopbarDateTime(value = new Date()) {
   const date = new Date(value).toLocaleDateString('en-GB', {
     timeZone: EAT_TIMEZONE,
@@ -87,7 +86,6 @@ export function formatTopbarDateTime(value = new Date()) {
   return `${date} - ${formatClockTime(value)} EAT`;
 }
 
-/** A time of day in Nairobi on the 12-hour clock, e.g. "2:00 pm". */
 export function formatClockTime(value = new Date()) {
   if (!value) return '';
   const date = new Date(value);
@@ -121,7 +119,6 @@ export const VISIT_FILTERS = [
   { id: 'all', label: 'All', statuses: null },
 ];
 
-/** Whether a visit belongs under the given status tab id. */
 export function matchesVisitFilter(visit, filterId) {
   const statuses = VISIT_FILTERS.find((filter) => filter.id === filterId)?.statuses;
   return !statuses || statuses.includes(visit.status);

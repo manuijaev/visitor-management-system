@@ -64,7 +64,6 @@ const toMinutes = (clock) => {
   return Number.isFinite(hh) && Number.isFinite(mm) ? hh * 60 + mm : null;
 };
 
-/** Turns the /office-hours/ response into minutes since midnight and weekday numbers (Mon=0). */
 const toHours = (data) => {
   const opens = toMinutes(data?.opens_at);
   const closes = toMinutes(data?.closes_at);
@@ -131,7 +130,6 @@ const toStaff = (member) => ({
   bookedTimes: (Array.isArray(member.booked_times) ? member.booked_times : []).map((value) => new Date(value).getTime()),
 });
 
-/** True when the host already has a visit overlapping a 30-minute visit starting at `slotValue`. */
 const isSlotTaken = (host, slotValue) => {
   if (!host || !slotValue) return false;
   const start = new Date(slotValue).getTime();
@@ -243,7 +241,6 @@ function ReviewRow({ icon, label, value, sub, onEdit }) {
 
 const emptyVisitor = { name: '', phone: '', email: '', studentName: '', studentClass: '', purpose: '', message: '' };
 
-/** A fresh form, prefilled with the parent's saved details unless this is a shared reception device. */
 const startingVisitor = (receptionMode) => {
   const saved = receptionMode ? null : loadVisitorDetails();
   return saved ? { ...emptyVisitor, name: saved.name, phone: saved.phone, email: saved.email || '' } : emptyVisitor;

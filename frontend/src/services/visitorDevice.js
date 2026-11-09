@@ -51,11 +51,10 @@ export function forgetVisitor() {
     localStorage.removeItem(DETAILS_KEY);
     localStorage.removeItem(VISITS_KEY);
   } catch {
-    // Nothing to forget.
   }
 }
 
-export const RECEPTION_KEY = 'gp_reception_mode';
+const RECEPTION_KEY = 'gp_reception_mode';
 
 export function isReceptionMode() {
   try {

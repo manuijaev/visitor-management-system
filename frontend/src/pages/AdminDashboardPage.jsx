@@ -35,7 +35,6 @@ const NAV_ITEMS = [
   { id: 'departments', label: 'Departments', icon: 'building' },
 ];
 
-/** The views on the phone tab bar; the rest stay under More. */
 const TAB_ITEMS = ['overview', 'visitors', 'gate'];
 
 const STATUS_TONE = { Pending: 'gold', Accepted: 'green', Approved: 'green', Declined: 'red', Rejected: 'red', Rescheduled: 'purple', Cancelled: 'muted', Expired: 'muted' };
@@ -191,7 +190,6 @@ export default function AdminDashboardPage() {
       document.removeEventListener('keydown', closeOnEscape);
     };
   }, [profileOpen]);
-  /** Cards suit phones; desktops start with the compact table. */
   const [layout, setLayout] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia?.('(max-width: 768px)').matches ? 'grid' : 'list'
   );

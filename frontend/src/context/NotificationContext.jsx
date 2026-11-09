@@ -43,8 +43,8 @@ export function NotificationProvider({ children }) {
   );
 
   const value = useMemo(
-    () => ({ fcmToken, registerDevice, subscribeToForegroundMessages }),
-    [fcmToken, registerDevice, subscribeToForegroundMessages]
+    () => ({ registerDevice, subscribeToForegroundMessages }),
+    [registerDevice, subscribeToForegroundMessages]
   );
   return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;
 }

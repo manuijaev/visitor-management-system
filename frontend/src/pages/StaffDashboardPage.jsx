@@ -9,7 +9,7 @@ import NotificationsMenu from '../components/NotificationsMenu';
 import ViewToggle from '../components/ViewToggle';
 import { sendVisitorResponseEmail } from '../services/emailjs';
 import api from '../services/api';
-import { eatDateKey, formatClockTime, formatTopbarDateTime, matchesVisitFilter, orderVisitsForReview, VISIT_FILTERS } from '../components/admin/utils';
+import { eatDateKey, formatClockTime, formatTopbarDateTime, getRelativeTimeLabel, matchesVisitFilter, orderVisitsForReview, VISIT_FILTERS } from '../components/admin/utils';
 
 const studentLabel = (visit) =>
   [visit?.student_name?.trim(), visit?.student_class?.trim() && `(${visit.student_class.trim()})`].filter(Boolean).join(' ');
@@ -18,7 +18,6 @@ const pad2 = (value) => String(value).padStart(2, '0');
 const toLocalInputValue = (date) =>
   `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
 
-/** Returns an error message for a proposed reschedule time, or '' when it is usable. */
 function rescheduleTimeError(value, appointment) {
   if (!value) return 'Pick a new date and time.';
   const proposed = new Date(value);
@@ -33,7 +32,6 @@ function rescheduleTimeError(value, appointment) {
 const formatRescheduleTime = (value) =>
   new Date(value).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true });
 
-/** Screen names shown in the phone top bar. */
 const TAB_TITLES = {
   dashboard: 'Home',
   appointments: 'Requests',
@@ -196,7 +194,7 @@ const ICONS = {
 export default function StaffDashboardPage() {
   const navigate = useNavigate();
   const { user, logout, updateUser } = useAuth();
-  const { appointments, loadMyAppointments, updateAppointment, deleteAppointment, deleteAppointmentsBulk } = useAppointments();
+  const { appointments, loadMyAppointments, updateAppointment } = useAppointments();
   const { subscribeToForegroundMessages } = useNotification();
 
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -207,20 +205,14 @@ export default function StaffDashboardPage() {
   const [rescheduleTo, setRescheduleTo] = useState({});
   const [responseAction, setResponseAction] = useState({});
   const [pendingStatusUpdate, setPendingStatusUpdate] = useState(null);
-  const [pendingDelete, setPendingDelete] = useState(null);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [toast, setToast] = useState('');
   const [isSendingResponse, setIsSendingResponse] = useState(false);
-  const [selectionMode, setSelectionMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState([]);
   const [previewItem, setPreviewItem] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [dateFilter, setDateFilter] = useState('all');
   const [isCurrentlyAvailable, setIsCurrentlyAvailable] = useState(user?.is_available ?? true);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [overdueDismissedKey, setOverdueDismissedKey] = useState('');
-  // Initialize notifications from localStorage for persistence
   const [notifications, setNotifications] = useState(() => {
     try {
       const saved = localStorage.getItem('staff_notifications');
@@ -232,10 +224,8 @@ export default function StaffDashboardPage() {
     }
   });
 
-  // Current time for clock display
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Persist notifications to localStorage whenever they change
   useEffect(() => {
     try {
       localStorage.setItem('staff_notifications', JSON.stringify(notifications));
@@ -244,18 +234,14 @@ export default function StaffDashboardPage() {
     }
   }, [notifications]);
 
-  // Subscribe to foreground push notifications
   useEffect(() => {
     let unsubscribe = null;
 
     const setupSubscription = async () => {
       unsubscribe = await subscribeToForegroundMessages((payload) => {
-        // Handle incoming push notification
         const { notification, data } = payload;
-        const title = notification?.title || 'Visitor waiting';
         const body = notification?.body || 'You have a visitor waiting for you';
 
-        // Create notification object
         const newNotification = {
           id: Date.now(),
           message: body,
@@ -265,10 +251,8 @@ export default function StaffDashboardPage() {
           data: data
         };
 
-        // Add to notifications list
         setNotifications(prev => [newNotification, ...prev].slice(0, 50));
 
-        // Show toast notification
         setToast(body);
         setTimeout(() => setToast(''), 5000);
       });
@@ -323,7 +307,7 @@ export default function StaffDashboardPage() {
 
   useEffect(() => {
     loadMyAppointments().catch(() => {
-      setError('Session expired. Please log in again.');
+      showToast('Session expired. Please log in again.');
     });
   }, []);
 
@@ -334,7 +318,6 @@ export default function StaffDashboardPage() {
     return () => clearInterval(intervalId);
   }, [loadMyAppointments]);
 
-// Update the clock every 15 seconds; it shows minutes only.
   useEffect(() => {
     const timerId = setInterval(() => {
       setCurrentTime(new Date());
@@ -351,33 +334,6 @@ export default function StaffDashboardPage() {
   const formatDate = (dateStr) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-  };
-
-  const formatTime = (dateStr) => {
-    const date = new Date(dateStr);
-    return formatClockTime(date);
-  };
-
-  const getRelativeTimeLabel = (timestamp) => {
-    if (!timestamp) return 'just now';
-    const createdTime = new Date(timestamp).getTime();
-    if (Number.isNaN(createdTime)) return 'just now';
-    const diffSeconds = Math.max(Math.round((Date.now() - createdTime) / 1000), 0);
-    if (diffSeconds < 10) return 'just now';
-    const units = [
-      { label: 'day', seconds: 86400 },
-      { label: 'hour', seconds: 3600 },
-      { label: 'minute', seconds: 60 },
-    ];
-
-    for (const unit of units) {
-      if (diffSeconds >= unit.seconds) {
-        const value = Math.floor(diffSeconds / unit.seconds);
-        return `${value} ${unit.label}${value > 1 ? 's' : ''} ago`;
-      }
-    }
-
-    return `${diffSeconds} second${diffSeconds === 1 ? '' : 's'} ago`;
   };
 
   const filteredAppointments = orderVisitsForReview(appointments.filter(a => {
@@ -406,7 +362,6 @@ export default function StaffDashboardPage() {
     upcoming: appointments.filter(a => ['Accepted', 'Rescheduled'].includes(a.status) && new Date(a.appointment_date) > new Date()).length,
   };
 
-  /** Confirmed visits still to come, soonest first. */
   const upcomingVisits = appointments
     .filter(a => ['Accepted', 'Rescheduled'].includes(a.status) && new Date(a.appointment_date) > new Date())
     .sort((a, b) => new Date(a.appointment_date) - new Date(b.appointment_date))
@@ -452,31 +407,23 @@ export default function StaffDashboardPage() {
       ...(newTime ? { appointment_date: newTime } : {}),
     });
 
-    if (appointment && !appointment.visitor_email) {
-      setNotice('Status updated. The visitor has no email, so they were notified by SMS.');
-      setToast(status === 'Accepted' ? "Visitor notified — they've been paged" : `Response submitted to ${appointment.visitor_name}.`);
-    } else if (appointment) {
-      const emailResult = await sendVisitorResponseEmail({
-        visitor_name: appointment.visitor_name,
-        visitor_email: appointment.visitor_email,
-        status,
-        response_note: note,
-        appointment_date: newTime || appointment.appointment_date,
-        staff_name: appointment.staff_name || 'Staff',
-        staff_email: appointment.staff_email || '',
-      });
-      const toastMessage =
-        status === 'Accepted'
-          ? "Visitor notified — they've been paged"
-          : `Response submitted to ${appointment.visitor_name}.`;
-      if (!emailResult?.sent) {
-        setNotice(`Status updated, but email was not sent: ${emailResult?.error || 'EmailJS error'}`);
-        setToast(toastMessage);
-      } else {
-        setNotice('Status updated and visitor email sent.');
-        setToast(toastMessage);
-      }
+    if (!appointment) return;
+    const confirmation =
+      status === 'Accepted' ? "Visitor notified — they've been paged" : `Response submitted to ${appointment.visitor_name}.`;
+    if (!appointment.visitor_email) {
+      setToast(confirmation);
+      return;
     }
+    const emailResult = await sendVisitorResponseEmail({
+      visitor_name: appointment.visitor_name,
+      visitor_email: appointment.visitor_email,
+      status,
+      response_note: note,
+      appointment_date: newTime || appointment.appointment_date,
+      staff_name: appointment.staff_name || 'Staff',
+      staff_email: appointment.staff_email || '',
+    });
+    setToast(emailResult?.sent ? confirmation : `${confirmation} The email could not be sent.`);
   };
 
   const requestStatusUpdate = (appointmentId, visitorName, status) => {
@@ -485,11 +432,10 @@ export default function StaffDashboardPage() {
       const appointment = appointments.find((item) => item.id === appointmentId);
       const problem = rescheduleTimeError(newTime, appointment);
       if (problem) {
-        setError(problem);
+        showToast(problem);
         return false;
       }
     }
-    setError('');
     setPendingStatusUpdate({ appointmentId, visitorName, status, newTime });
     return true;
   };
@@ -503,8 +449,6 @@ export default function StaffDashboardPage() {
   const confirmStatusUpdate = async () => {
     if (!pendingStatusUpdate) return;
     const { appointmentId, status } = pendingStatusUpdate;
-    setError('');
-    setNotice('');
     setIsSendingResponse(true);
     try {
       await updateStatus(appointmentId, status);
@@ -520,25 +464,11 @@ export default function StaffDashboardPage() {
         err?.response?.data?.appointment_date?.[0] ||
         err?.response?.data?.detail ||
         'Unable to update appointment or send email.';
-      setError(message);
+      showToast(message);
       setPendingStatusUpdate(null);
     } finally {
       setIsSendingResponse(false);
     }
-  };
-
-  const confirmDelete = async () => {
-    if (!pendingDelete) return;
-    if (pendingDelete.type === 'single') {
-      await deleteAppointment(pendingDelete.ids[0]);
-    } else {
-      await deleteAppointmentsBulk(pendingDelete.ids);
-    }
-    setSelectedIds([]);
-    setSelectionMode(false);
-    setPendingDelete(null);
-    setPreviewItem(null);
-    setNotice('Appointment(s) deleted successfully.');
   };
 
   const handleLogout = () => {
@@ -564,7 +494,6 @@ export default function StaffDashboardPage() {
     setPreviewItem(null);
   };
 
-  /** A short pop-up message. Only visit alerts go into the notifications list. */
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(''), 4000);
@@ -638,7 +567,6 @@ export default function StaffDashboardPage() {
 
   return (
     <div className="sd-container">
-      {/* Toast Notification */}
       {toast && (
         <div className="sd-toast">
           <span>{toast}</span>
@@ -646,7 +574,6 @@ export default function StaffDashboardPage() {
         </div>
       )}
 
-      {/* Sidebar */}
       {sidebarOpen && <div className="sd-sidebar-backdrop" onClick={() => setSidebarOpen(false)} aria-hidden="true"></div>}
       <aside className={`sd-sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sd-sidebar-header">
@@ -682,9 +609,7 @@ export default function StaffDashboardPage() {
         </nav>
       </aside>
 
-      {/* Main Content */}
       <main className="sd-main">
-        {/* Top Bar */}
         <header className="sd-topbar">
           <div className="sd-topbar-left">
             <button className="sd-menu-btn" onClick={() => setSidebarOpen(!sidebarOpen)}>
@@ -790,11 +715,9 @@ export default function StaffDashboardPage() {
           </div>
         )}
 
-        {/* Dashboard Content */}
         <div className="sd-content">
           {activeTab === 'dashboard' && (
             <>
-              {/* Stats Grid */}
               <div className="sd-stats-grid">
                 <div className="sd-stat-card">
                   <div className="sd-stat-icon" style={{ background: 'var(--gold-light)', color: 'var(--gold-dark)' }}>
@@ -834,7 +757,6 @@ export default function StaffDashboardPage() {
                 </div>
               </div>
 
-              {/* Up next: confirmed visits still to come */}
               <div className="sd-section">
                 <div className="sd-panel">
                   <div className="sd-panel-header">
@@ -857,7 +779,7 @@ export default function StaffDashboardPage() {
                           <div className="sd-list-info">
                             <div className="sd-list-name">{apt.visitor_name}</div>
                             <div className="sd-list-meta">
-                              {formatDate(apt.appointment_date)} · {formatTime(apt.appointment_date)}
+                              {formatDate(apt.appointment_date)} · {formatClockTime(apt.appointment_date)}
                               {studentLabel(apt) && <span className="sd-list-sub">Student: {studentLabel(apt)}</span>}
                             </div>
                           </div>
@@ -869,7 +791,6 @@ export default function StaffDashboardPage() {
                 </div>
               </div>
 
-              {/* Recent Activity */}
               <div className="sd-section">
                 <div className="sd-panel">
                   <div className="sd-panel-header">
@@ -892,7 +813,7 @@ export default function StaffDashboardPage() {
                           <div className="sd-list-info">
                             <div className="sd-list-name">{apt.visitor_name}</div>
                             <div className="sd-list-meta">
-                              {formatDate(apt.appointment_date)} - {formatTime(apt.appointment_date)}
+                              {formatDate(apt.appointment_date)} - {formatClockTime(apt.appointment_date)}
                               <span className="sd-list-time-since">Sent {getRelativeTimeLabel(apt.created_at)}</span>
                             </div>
                           </div>
@@ -908,7 +829,6 @@ export default function StaffDashboardPage() {
 
           {activeTab === 'appointments' && (
             <>
-              {/* Filter Bar */}
               <div className="sd-filter-bar">
                 <div className="sd-mobile-search">
                   {ICONS.search}
@@ -954,7 +874,6 @@ export default function StaffDashboardPage() {
                 </div>
               </div>
 
-              {/* Appointments Grid/List */}
               <div className="sd-appointments-container">
                 {filteredAppointments.length === 0 ? (
                   <div className="sd-empty-state">
@@ -997,7 +916,7 @@ export default function StaffDashboardPage() {
                               </div>
                               <div className="sd-appt-detail">
                                 {ICONS.clock}
-                                <span>{formatTime(apt.appointment_date)}</span>
+                                <span>{formatClockTime(apt.appointment_date)}</span>
                               </div>
                               {studentLabel(apt) && (
                                 <div className="sd-appt-detail">
@@ -1092,7 +1011,7 @@ export default function StaffDashboardPage() {
                             {apt.appointment_date && (
                               <div className="sd-appointments-list-when">
                                 {ICONS.calendar}
-                                <span>{formatDate(apt.appointment_date)} · {formatTime(apt.appointment_date)}</span>
+                                <span>{formatDate(apt.appointment_date)} · {formatClockTime(apt.appointment_date)}</span>
                               </div>
                             )}
                             <div className="sd-appointments-list-meta">
@@ -1126,7 +1045,7 @@ export default function StaffDashboardPage() {
                       .sort((a, b) => new Date(a.appointment_date) - new Date(b.appointment_date))
                       .map(apt => (
                         <div key={apt.id} className="sd-timeline-item">
-                          <div className="sd-timeline-time">{formatTime(apt.appointment_date)}</div>
+                          <div className="sd-timeline-time">{formatClockTime(apt.appointment_date)}</div>
                           <div className="sd-timeline-dot"></div>
                           <div className="sd-timeline-content">
                             <div className="sd-timeline-name">{apt.visitor_name}</div>
@@ -1205,7 +1124,6 @@ export default function StaffDashboardPage() {
         </button>
       </nav>
 
-      {/* Preview Modal */}
       {previewItem && (
         <div className="sd-modal-overlay" onClick={closePreview}>
           <div className="sd-modal" onClick={(e) => e.stopPropagation()}>
@@ -1232,7 +1150,7 @@ export default function StaffDashboardPage() {
                 </div>
                 <div className="sd-modal-detail">
                   <span>Time</span>
-                  <strong>{formatTime(previewItem.appointment_date)}</strong>
+                  <strong>{formatClockTime(previewItem.appointment_date)}</strong>
                 </div>
                 {studentLabel(previewItem) && (
                   <div className="sd-modal-detail">
@@ -1307,7 +1225,6 @@ export default function StaffDashboardPage() {
         </div>
       )}
 
-      {/* Confirm Modal */}
       <ConfirmModal
         isOpen={Boolean(pendingStatusUpdate)}
         title={`Confirm ${pendingStatusUpdate?.status || ''}`}
@@ -1329,20 +1246,6 @@ export default function StaffDashboardPage() {
         }}
       />
 
-      {/* Delete Modal */}
-      <ConfirmModal
-        isOpen={Boolean(pendingDelete)}
-        title="Delete visit request(s)?"
-        message={
-          pendingDelete?.type === 'single'
-            ? 'Delete this visit request?'
-            : `Delete ${pendingDelete?.ids?.length || 0} selected visit requests?`
-        }
-        confirmText="Delete"
-        tone="danger"
-        onConfirm={confirmDelete}
-        onCancel={() => setPendingDelete(null)}
-      />
     </div>
   );
 }

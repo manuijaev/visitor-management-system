@@ -67,7 +67,6 @@ export default function VisitStatusPage() {
 
   useEffect(() => {
     if (state?.phone && params.get('ref')) lookUp();
-    // Runs once, when opened from My visits with the saved phone number.
   }, []);
 
   const cancelVisit = async () => {

@@ -37,22 +37,20 @@ self.addEventListener('push', (event) => {
   let raw = {};
   try {
     raw = event.data ? event.data.json() : {};
-  } catch (_err) {
+  } catch {
     try {
       const fallbackText = event.data ? event.data.text() : '';
       raw = fallbackText ? JSON.parse(fallbackText) : {};
-    } catch (_fallbackErr) {
+    } catch {
       raw = {};
     }
   }
 
-  // Extract notification data from various possible formats
   let title = 'Visitor waiting';
   let body = 'You have a visitor waiting for you';
   let icon = '/icons/icon-192.png';
   let clickPath = '/staff/dashboard';
   
-  // Handle different payload formats
   if (raw.notification) {
     title = raw.notification.title || title;
     body = raw.notification.body || body;

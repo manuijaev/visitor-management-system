@@ -14,11 +14,9 @@ const app = initializeApp(firebaseConfig);
 let messagingInstance = null;
 let cachedVapidKey = null;
 
-// Fetch VAPID public key from backend
 async function getVapidKey() {
   if (cachedVapidKey) return cachedVapidKey;
   
-  // First try to get from backend
   try {
     const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
     const response = await fetch(`${baseUrl}/vapid-public-key/`);
@@ -33,7 +31,6 @@ async function getVapidKey() {
     console.warn('Failed to fetch VAPID key from backend:', e);
   }
   
-  // Fallback to environment variable
   cachedVapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
   return cachedVapidKey;
 }

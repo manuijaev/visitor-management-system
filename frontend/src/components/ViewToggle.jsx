@@ -1,4 +1,3 @@
-/** Switches a list between cards ("grid") and compact rows ("list"). Shared by the staff and admin apps. */
 export default function ViewToggle({ value, onChange }) {
   return (
     <div className="sd-view-toggle" role="group" aria-label="Layout">
