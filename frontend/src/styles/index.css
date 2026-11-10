@@ -1,0 +1,7 @@
+@layer theme, base, legacy, components, utilities;
+@import "./fonts.css";
+@import "tailwindcss/theme.css" layer(theme);
+@import "./app/index.css" layer(legacy);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "./theme.css";
+@import "./visitor.css";

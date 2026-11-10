@@ -34,9 +34,6 @@ SMS_PROVIDERS = [
     ) if configured
 ]
 
-print(f"SMS SERVICE INIT — providers: {', '.join(SMS_PROVIDERS) or 'none configured'}")
-
-
 def normalize_phone(number):
     """Return the number in 2547XXXXXXXX form, assuming Kenya when no country code is given."""
     if not number:
@@ -67,9 +64,8 @@ def _send_talksasa(normalized, message):
     try:
         result = response.json()
     except ValueError:
-        print(f"SMS RESPONSE — HTTP {response.status_code}: {response.text[:200]}")
+        logger.warning("Talksasa returned HTTP %s: %s", response.status_code, response.text[:200])
         return False
-    print(f"SMS RESPONSE — {result}")
     return response.ok and result.get("status") == "success"
 
 
@@ -84,7 +80,8 @@ def _send_textbee(normalized, message):
         headers={"x-api-key": TEXTBEE_API_KEY},
         timeout=10,
     )
-    print(f"SMS RESPONSE — HTTP {response.status_code}: {response.text[:200]}")
+    if not response.ok:
+        logger.warning("TextBee returned HTTP %s: %s", response.status_code, response.text[:200])
     return response.ok
 
 
@@ -102,9 +99,8 @@ def _send_africastalking(normalized, message):
     try:
         result = response.json()
     except ValueError:
-        print(f"SMS RESPONSE — HTTP {response.status_code}: {response.text[:200]}")
+        logger.warning("Africa's Talking returned HTTP %s: %s", response.status_code, response.text[:200])
         return False
-    print(f"SMS RESPONSE — {result}")
     recipients = result.get("SMSMessageData", {}).get("Recipients", [])
     return any(r.get("statusCode") in (100, 101, 102) for r in recipients)
 
@@ -118,7 +114,6 @@ def _send_ums(normalized, message):
         "phone": normalized,
     }
     result = requests.post(UMS_URL, json=payload, timeout=10).json()
-    print(f"SMS RESPONSE — {result}")
     return result.get("status") == "complete"
 
 
@@ -134,17 +129,18 @@ def send_sms(phone_number, message):
     """Send one SMS, trying each configured provider in order until one accepts it."""
     normalized = normalize_phone(phone_number)
     if not normalized:
-        print("SMS ABORTED — phone number empty or invalid")
+        logger.info("SMS skipped: no valid phone number")
         return False
 
     if not SMS_PROVIDERS:
-        print("SMS ABORTED — no SMS provider configured "
-              "(set TALKSASA_API_TOKEN, TEXTBEE_API_KEY, AT_USERNAME/AT_API_KEY or UMS_API_KEY/UMS_APP_ID)")
+        logger.warning(
+            "SMS not sent: no provider configured "
+            "(set TALKSASA_API_TOKEN, TEXTBEE_API_KEY, AT_USERNAME/AT_API_KEY or UMS_API_KEY/UMS_APP_ID)"
+        )
         return False
 
     for provider in SMS_PROVIDERS:
         try:
-            print(f"SMS SENDING — via {provider} to: {normalized}")
             if SENDERS[provider](normalized, message):
                 logger.info("SMS sent via %s to %s", provider, normalized)
                 return True
@@ -184,8 +180,6 @@ def send_staff_arrival_sms(phone_number, staff_name, visitor_name):
 
 def send_visitor_sms(phone_number, visitor_name, staff_name, status, response_note, visit_time=""):
     """Send response notification to visitor."""
-    print(f"SMS ATTEMPT — phone: {phone_number}, visitor: {visitor_name}, status: {status}")
-
     first = _first_name(visitor_name)
     note = (response_note or "").strip()
     when = f" for {visit_time}" if visit_time else ""
@@ -211,8 +205,6 @@ def send_visitor_sms(phone_number, visitor_name, staff_name, status, response_no
 
 def send_staff_sms(phone_number, staff_name, message):
     """Send alert to staff when a visitor checks in."""
-    print(f"Staff SMS CALLED — phone: {phone_number}, staff: {staff_name}")
-
     return send_sms(phone_number, _fit(f"Hi {_first_name(staff_name)}, {message} - Gatepass"))
 
 

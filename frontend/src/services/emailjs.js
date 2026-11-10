@@ -1,11 +1,11 @@
-import axios from 'axios';
+import axios from "axios";
 
 async function sendViaEmailJs(templateId, params) {
   const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID;
   const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
 
   if (!serviceId || !templateId || !publicKey) {
-    return { skipped: true, reason: 'missing_emailjs_config' };
+    return { skipped: true, reason: "missing_emailjs_config" };
   }
 
   const payload = {
@@ -16,35 +16,38 @@ async function sendViaEmailJs(templateId, params) {
   };
 
   try {
-    const res = await axios.post('https://api.emailjs.com/api/v1.0/email/send', payload, {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const res = await axios.post(
+      "https://api.emailjs.com/api/v1.0/email/send",
+      payload,
+      {
+        headers: { "Content-Type": "application/json" },
+      },
+    );
     return { sent: true, status: res.status };
   } catch (err) {
     const raw = err?.response?.data;
     const textFromRaw =
-      typeof raw === 'string'
+      typeof raw === "string"
         ? raw
         : raw?.text || raw?.message || raw?.error || JSON.stringify(raw || {});
-    const detail =
-      textFromRaw ||
-      err?.message ||
-      'EmailJS send failed';
-    const code = err?.response?.status ? `HTTP ${err.response.status}` : 'HTTP ?';
+    const detail = textFromRaw || err?.message || "EmailJS send failed";
+    const code = err?.response?.status
+      ? `HTTP ${err.response.status}`
+      : "HTTP ?";
     return { sent: false, error: `${code}: ${detail}` };
   }
 }
 
 const formatForNairobi = (dt) => {
-  if (!dt) return '';
-  return new Date(dt).toLocaleString('en-KE', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: 'numeric',
-    minute: '2-digit',
+  if (!dt) return "";
+  return new Date(dt).toLocaleString("en-KE", {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "numeric",
+    minute: "2-digit",
     hour12: true,
-    timeZone: 'Africa/Nairobi',
+    timeZone: "Africa/Nairobi",
   });
 };
 
@@ -86,16 +89,16 @@ export async function sendVisitorResponseEmail({
     import.meta.env.VITE_EMAILJS_RESPONSE_TEMPLATE_ID ||
     import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
   return sendViaEmailJs(responseTemplateId, {
-      to_email: visitor_email,
-      to_name: visitor_name,
-      from_name: staff_name,
-      staff_email,
-      message: response_note,
-      visitor_name,
-      visitor_email,
-      status,
-      response_note,
-      appointment_date: formatForNairobi(appointment_date),
-      staff_name,
-    });
+    to_email: visitor_email,
+    to_name: visitor_name,
+    from_name: staff_name,
+    staff_email,
+    message: response_note,
+    visitor_name,
+    visitor_email,
+    status,
+    response_note,
+    appointment_date: formatForNairobi(appointment_date),
+    staff_name,
+  });
 }

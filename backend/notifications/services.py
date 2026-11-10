@@ -8,73 +8,6 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
-def _build_email_connection():
-    # Keep SMTP failures bounded so web workers do not hang.
-    from django.core.mail import get_connection
-    return get_connection(timeout=getattr(settings, 'EMAIL_TIMEOUT', 8))
-
-
-def _get_vapid_public_key():
-    """Get the VAPID public key for the frontend to use."""
-    return getattr(settings, 'VAPID_PUBLIC_KEY', None)
-
-
-def send_appointment_email(staff_email, visitor_name, appointment_date, message):
-    from django.core.mail import send_mail
-    
-    if not staff_email:
-        logger.warning('send_appointment_email skipped: no staff_email provided')
-        return {'sent': False, 'reason': 'missing_staff_email'}
-
-    subject = 'New visit request'
-    body = (
-        f'Visitor Name: {visitor_name}\n'
-        f'Date: {appointment_date}\n'
-        f'Message: {message or "No message provided."}\n\n'
-        'Please log in to your dashboard to approve or reject this visit request.'
-    )
-
-    try:
-        send_mail(
-            subject,
-            body,
-            settings.DEFAULT_FROM_EMAIL,
-            [staff_email],
-            fail_silently=False,
-            connection=_build_email_connection(),
-        )
-        logger.info(f'Visit request email sent successfully to {staff_email}')
-        return {'sent': True}
-    except Exception as e:
-        logger.error(f'Failed to send email to {staff_email}: {str(e)}')
-        return {'sent': False, 'reason': str(e)[:200]}
-
-
-def send_appointment_response_email(visitor_email, visitor_name, status, response_note, appointment_date, staff_name):
-    from django.core.mail import send_mail
-    
-    if not visitor_email:
-        return
-
-    subject = f'Update on Your Visit Request ({status})'
-    body = (
-        f'Hello {visitor_name},\n\n'
-        f'Your visit request has been updated to: {status}\n'
-        f'Date: {appointment_date}\n'
-        f'Staff: {staff_name}\n\n'
-        f'Staff response:\n{response_note}\n\n'
-        'Thank you.'
-    )
-    send_mail(
-        subject,
-        body,
-        settings.DEFAULT_FROM_EMAIL,
-        [visitor_email],
-        fail_silently=True,
-        connection=_build_email_connection(),
-    )
-
-
 def _urlsafe_b64encode(data):
     """Encode bytes to URL-safe base64 without padding."""
     if isinstance(data, str):
@@ -91,34 +24,26 @@ def _create_vapid_jwt():
     if not vapid_public_key or not vapid_private_key:
         return None, None
     
-    # JWT header
     header = {
         'typ': 'JWT',
         'alg': 'ES256',
     }
     
-    # JWT payload
     payload = {
         'aud': 'https://fcm.googleapis.com',
-        'exp': int(time.time()) + 3600,  # 1 hour expiry
+        'exp': int(time.time()) + 3600,
         'sub': vapid_subject,
     }
     
-    # For ES256, we need to sign the header.payload with the private key
-    # Using a simplified approach with the crypto library
     try:
         import ecdsa
-        from ecdsa import NIST256p
         
-        # Create signing key from private key
         private_key_bytes = _urlsafe_b64decode(vapid_private_key)
         signing_key = ecdsa.SigningKey.from_pem(private_key_bytes)
         
-        # Encode header and payload
         header_b64 = _urlsafe_b64encode(json.dumps(header))
         payload_b64 = _urlsafe_b64encode(json.dumps(payload))
         
-        # Create signature
         message = f"{header_b64}.{payload_b64}".encode('utf-8')
         signature = signing_key.sign(message, hashfunc=__import__('hashlib').sha256)
         signature_b64 = _urlsafe_b64encode(signature)
@@ -139,7 +64,6 @@ def send_fcm_push_notification(fcm_token, title, body):
     if not fcm_token:
         return {'sent': False, 'reason': 'missing_staff_fcm_token'}
 
-    # Try FCM HTTP v1 API first (more reliable)
     fcm_project_id = getattr(settings, 'FIREBASE_PROJECT_ID', None)
     fcm_private_key = getattr(settings, 'FIREBASE_PRIVATE_KEY', None)
     
@@ -148,12 +72,10 @@ def send_fcm_push_notification(fcm_token, title, body):
         if result.get('sent'):
             return result
     
-    # Fallback to legacy FCM server key
     firebase_server_key = getattr(settings, 'FIREBASE_SERVER_KEY', None)
     if firebase_server_key:
         return _send_fcm_legacy(fcm_token, title, body, firebase_server_key)
     
-    # Try VAPID-based Web Push as last resort
     vapid_public_key = getattr(settings, 'VAPID_PUBLIC_KEY', None)
     vapid_private_key = getattr(settings, 'VAPID_PRIVATE_KEY', None)
     
@@ -167,12 +89,10 @@ def send_fcm_push_notification(fcm_token, title, body):
 
 def _send_fcm_http_v1(fcm_token, title, body, project_id, private_key):
     """Send push notification using FCM HTTP v1 API."""
-    import google.auth
     from google.auth import jwt
     from google.auth.transport import requests
     
     try:
-        # Create JWT for authentication
         credentials = jwt.Credentials.from_service_account_info({
             'private_key': private_key,
             'client_email': f'{project_id}@firebase-adminsdk.iam.gserviceaccount.com',
@@ -250,12 +170,10 @@ def _send_web_push_vapid(fcm_token, title, body, jwt, vapid_public_key):
     headers = {
         'Authorization': f'vapid t={jwt}',
         'Content-Encoding': 'aesgcm',
-        'TTL': '2419200',  # 4 weeks in seconds
+        'TTL': '2419200',
     }
     
-    # The body must be encrypted for Web Push
-    # For simplicity, we'll send as aesgcm with plaintext (limited browser support)
-    # For full production, you'd need to encrypt the payload
+    # Sent unencrypted, which most browsers reject; Web Push needs an encrypted payload to be reliable.
     payload = json.dumps({
         'notification': {
             'title': title,

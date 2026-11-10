@@ -1,4 +1,3 @@
-/** Line icons for the visitor app. */
 const ICON_PATHS = {
   ticket: (
     <>
@@ -56,7 +55,9 @@ const ICON_PATHS = {
       <path d="M12 7.5V12l3 2" />
     </>
   ),
-  message: <path d="M20.5 12a8.5 8.5 0 0 1-12.3 7.6L3.5 20.5l1-4.4A8.5 8.5 0 1 1 20.5 12z" />,
+  message: (
+    <path d="M20.5 12a8.5 8.5 0 0 1-12.3 7.6L3.5 20.5l1-4.4A8.5 8.5 0 1 1 20.5 12z" />
+  ),
   close: <path d="M6 6l12 12M18 6 6 18" />,
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   desk: <path d="M3 10.5h18v3H3zM5.5 13.5v6.5M18.5 13.5v6.5M8.5 6.5h7v4h-7z" />,
@@ -69,10 +70,10 @@ const ICON_PATHS = {
   ),
 };
 
-export default function Icon({ name, className = '' }) {
+export default function Icon({ name, className = "size-5" }) {
   return (
     <svg
-      className={`gp-icon ${className}`}
+      className={`flex-none ${className}`}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"

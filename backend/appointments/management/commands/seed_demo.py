@@ -164,7 +164,6 @@ class Command(BaseCommand):
             visits.append(visit)
             return visit
 
-        # Past fortnight: answered visits, most of them signed in and out.
         for day in self._weekdays(today, 8, -1):
             for _ in range(3):
                 host = rng.choice(hosts)
@@ -176,7 +175,6 @@ class Command(BaseCommand):
                     extra = {'checked_in_at': arrived, 'checked_out_at': arrived + timedelta(minutes=rng.randint(20, 50))}
                 book(host, when, status, **extra)
 
-        # Today, if it's a school day: someone on site now, someone gone, and some still expected.
         if today.weekday() < 5:
             book(hosts[0], now - timedelta(minutes=20), Appointment.Status.ACCEPTED,
                            checked_in_at=now - timedelta(minutes=25))
@@ -185,7 +183,6 @@ class Command(BaseCommand):
             for offset, status in [(1, Appointment.Status.ACCEPTED), (2, Appointment.Status.PENDING), (3, Appointment.Status.PENDING)]:
                 book(rng.choice(hosts), (now + timedelta(hours=offset)).replace(minute=0, second=0, microsecond=0), status)
 
-        # Next fortnight: mostly waiting for a reply, some confirmed or moved.
         for day in self._weekdays(today, 8, 1):
             for _ in range(3):
                 host = rng.choice(hosts)

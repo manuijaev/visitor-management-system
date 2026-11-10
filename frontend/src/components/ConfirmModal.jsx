@@ -1,42 +1,72 @@
+import Button from "./ui/Button";
+import Dialog, { DialogTitle } from "./ui/Dialog";
+
+const DOT =
+  "inline-block w-1.5 text-center motion-safe:animate-[dotBlink_1.2s_infinite]";
+
 export default function ConfirmModal({
   isOpen,
   title,
   message,
-  confirmText = 'Confirm',
-  loadingText = 'Processing',
-  cancelText = 'Cancel',
+  confirmText = "Confirm",
+  loadingText = "Processing",
+  cancelText = "Cancel",
   onConfirm,
   onCancel,
-  tone = 'default',
+  tone = "default",
   isLoading = false,
 }) {
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label={title || 'Confirmation dialog'}>
-      <div className="modal-card">
-        <h3>{title || 'Please Confirm'}</h3>
-        <p>{message || 'Are you sure you want to continue?'}</p>
-        <div className="modal-actions">
-          <button type="button" className="btn-muted" onClick={onCancel} disabled={isLoading}>
-            {cancelText}
-          </button>
-          <button type="button" className={tone === 'danger' ? 'btn-danger' : ''} onClick={onConfirm} disabled={isLoading}>
-            {isLoading ? (
-              <span className="loading-label">
-                {loadingText}
-                <span className="loading-dots" aria-hidden="true">
-                  <span>.</span>
-                  <span>.</span>
-                  <span>.</span>
+    <Dialog
+      look="card"
+      aria-label={title || "Confirmation dialog"}
+      aria-labelledby={undefined}
+      onClose={onCancel}
+      dismissible={!isLoading}
+    >
+      <DialogTitle asChild>
+        <h3 className="m-0 mb-2 font-serif text-[18px] font-bold text-ink">
+          {title || "Please Confirm"}
+        </h3>
+      </DialogTitle>
+      <p className="m-0 mb-5 leading-[1.6] text-ink-light">
+        {message || "Are you sure you want to continue?"}
+      </p>
+      <div className="mt-5 flex justify-end gap-2.5">
+        <Button
+          variant="muted"
+          className="flex-1"
+          onClick={onCancel}
+          disabled={isLoading}
+        >
+          {cancelText}
+        </Button>
+        <Button
+          variant={tone === "danger" ? "danger" : "secondary"}
+          className="flex-1"
+          onClick={onConfirm}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <span className="inline-flex items-center">
+              {loadingText}
+              <span className="ml-0.5 inline-flex" aria-hidden="true">
+                <span className={DOT}>.</span>
+                <span className={`${DOT} motion-safe:[animation-delay:0.2s]`}>
+                  .
+                </span>
+                <span className={`${DOT} motion-safe:[animation-delay:0.4s]`}>
+                  .
                 </span>
               </span>
-            ) : (
-              confirmText
-            )}
-          </button>
-        </div>
+            </span>
+          ) : (
+            confirmText
+          )}
+        </Button>
       </div>
-    </div>
+    </Dialog>
   );
 }

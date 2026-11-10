@@ -43,7 +43,7 @@ The application feels like a native app thanks to:
 
 ## System Architecture & Data Flow
 
-```
+```text
 Visitor Browser ↔ Frontend React PWA ↔ (Axios) ↔ Django REST API ↔ PostgreSQL
                                    |                              |
                                  EmailJS                        Firebase FCM
@@ -69,14 +69,14 @@ Data flows prioritize eventual consistency: dashboards poll every 8–10 seconds
 Visitors traverse a guided 7-step form that enforces validation before moving to each subsequent question.
 
 | Step | Input | Purpose | Validation |
-|------|-------|---------|------------|
-| 1 | Full Name | Identify visitor | Required, text only, max length 120
-| 2 | Email Address | Contact channel | Required, must be valid email
-| 3 | Department | Routing category | Required, options pulled from `/api/departments/`
-| 4 | Division | Narrow team | Required after department selection, filtered via `/api/divisions/?department_id=`
-| 5 | Staff Member | Assignee | Required, filters by department/division
-| 6 | Appointment Date & Time | Scheduling | Required, future date/time; rejects past dates
-| 7 | Note | Optional context | Text area (max 600 chars) for visitor message
+| ------ | ------- | --------- | ------------ |
+| 1 | Full Name | Identify visitor | Required, text only, max length 120 |
+| 2 | Email Address | Contact channel | Required, must be valid email |
+| 3 | Department | Routing category | Required, options pulled from `/api/departments/` |
+| 4 | Division | Narrow team | Required after department selection, filtered via `/api/divisions/?department_id=` |
+| 5 | Staff Member | Assignee | Required, filters by department/division |
+| 6 | Appointment Date & Time | Scheduling | Required, future date/time; rejects past dates |
+| 7 | Note | Optional context | Text area (max 600 chars) for visitor message |
 
 - Each step shows progress with a header/badge and prevents rollback without explicit "Back" clicks
 - On submit, an animation confirms delivery and invites another request
@@ -139,7 +139,7 @@ The admin dashboard (`/admin/login`, `/admin/dashboard`) is where organizational
 ## Technology Stack
 
 | Area | Technology | Notes |
-|------|------------|-------|
+| ------ | ------------ | ------- |
 | Backend Framework | Django 4.x (Python) | Django REST Framework, Celery-ready settings, custom user model |
 | API Layer | Django REST Framework | ViewSets + serializers, JWT auth via `djangorestframework-simplejwt` |
 | Database | PostgreSQL | Configurable via env vars, migrations managed through Django |
@@ -161,7 +161,7 @@ The application uses a carefully crafted color system with CSS custom properties
 #### Dark Theme (Default)
 
 | Variable | Value | Usage |
-|---------|-------|-------|
+| --------- | ------- | ------- |
 | `--bg` | `#050505` | Primary background |
 | `--bg-soft` | `#101010` | Secondary background areas |
 | `--surface` | `rgba(255, 255, 255, 0.06)` | Card backgrounds |
@@ -178,7 +178,7 @@ The application uses a carefully crafted color system with CSS custom properties
 #### Light Theme (Home & Staff Dashboard)
 
 | Variable | Value | Usage |
-|---------|-------|-------|
+| --------- | ------- | ------- |
 | `--ink` | `#1a1714` | Primary text on light backgrounds |
 | `--ink-mid` | `#3d3832` | Secondary text |
 | `--ink-light` | `#6b6560` | Muted text |
@@ -202,7 +202,7 @@ The application uses a carefully crafted color system with CSS custom properties
 #### Status Colors
 
 | Status | Color | CSS Variable |
-|--------|-------|--------------|
+| -------- | ------- | -------------- |
 | Pending | Amber | `--amber: #c9922a` |
 | Accepted | Green | `--green: #1e7e4a` |
 | Declined | Red | `--red: #c0392b` |
@@ -215,7 +215,7 @@ The application features smooth, purposeful animations that enhance the user exp
 #### Page Transitions
 
 | Animation | Duration | Description |
-|-----------|----------|-------------|
+| ----------- | ---------- | ------------- |
 | `heroFade` | 0.6s | Hero section entrance animation |
 | `cardIn` | 0.55s | Staggered card entrance with fade and slide |
 | `authIn` | 0.6s | Authentication panel entrance |
@@ -226,7 +226,7 @@ The application features smooth, purposeful animations that enhance the user exp
 #### Interactive Animations
 
 | Animation | Trigger | Description |
-|-----------|---------|-------------|
+| ----------- | --------- | ------------- |
 | `nav-link` hover | Hover | Translate Y(-2px) with glow effect |
 | `card` hover | Hover | Enhanced shadow and border transition |
 | `confirmPulse` | Click | Button press feedback |
@@ -241,7 +241,7 @@ The application features smooth, purposeful animations that enhance the user exp
 #### Loading & Feedback Animations
 
 | Animation | Usage |
-|-----------|-------|
+| ----------- | ------- |
 | `dotBlink` | Loading indicator dots |
 | `drawCircle` | SVG circle drawing effect |
 | `drawCheck` | SVG checkmark drawing |
@@ -268,7 +268,7 @@ The application features smooth, purposeful animations that enhance the user exp
 #### Shadow System
 
 | Variable | Usage |
-|---------|-------|
+| --------- | ------- |
 | `--shadow-sm` | Small elements, inputs |
 | `--shadow-md` | Cards, panels |
 | `--shadow-lg` | Modals, hero sections |

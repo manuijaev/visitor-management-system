@@ -1,0 +1,42 @@
+@theme {
+  --font-sans: "Outfit", system-ui, sans-serif;
+  --font-serif: "Cormorant Garamond", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --color-bg: #f9f7f4;
+  --color-surface: #ffffff;
+  --color-surface-2: #f3f0ec;
+  --color-surface-hover: #faf8f5;
+  --color-line: #e8e2d9;
+  --color-line-strong: #d4cdc3;
+
+  --color-ink: #1a1714;
+  --color-ink-mid: #3d3832;
+  --color-ink-light: #6b6560;
+  --color-ink-faint: #726d69;
+
+  --color-gold: #c9922a;
+  --color-gold-light: #fdf3e3;
+  --color-gold-mid: #e8b96a;
+  --color-gold-dark: #8a6018;
+  --color-gold-strong: #986e1f;
+
+  --color-teal: #1a7a72;
+  --color-teal-light: #e6f4f2;
+  --color-green: #1e7e4a;
+  --color-green-light: #e8f5ee;
+  --color-red: #c0392b;
+  --color-red-dark: #a93226;
+  --color-red-light: #fdecea;
+  --color-purple: #6f5a92;
+
+  --color-chrome: #1a1714;
+  --color-chrome-hover: #282522;
+  --color-chrome-active: #372e20;
+  --color-chrome-text: #f3f0ec;
+  --color-chrome-muted: #a39d96;
+
+  --shadow-soft: 0 2px 8px rgba(26, 23, 20, 0.07);
+  --shadow-card: 0 8px 32px rgba(26, 23, 20, 0.1);
+  --shadow-float: 0 20px 60px rgba(26, 23, 20, 0.14);
+}

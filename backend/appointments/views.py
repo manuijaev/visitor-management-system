@@ -109,73 +109,46 @@ def _visit_request_params(appointment):
     return params
 
 
-def _notify_new_appointment(appointment):
-    logger.info(f'Starting notification for appointment_id={appointment.id}, staff_member={appointment.staff_member}')
-    body = _get_visit_message(appointment)
-    
+def _push_to_staff(staff, title, body):
+    """Push to every device the staff member has registered, retiring tokens the push service rejects."""
+    tokens = set(UserDeviceToken.objects.filter(user=staff, is_active=True).values_list('token', flat=True))
+    if staff.fcm_token:
+        tokens.add(staff.fcm_token)
+    if not tokens:
+        return {'sent': False, 'reason': 'no_registered_devices'}
+
+    delivered = 0
+    for token in tokens:
+        result = send_fcm_push_notification(fcm_token=token, title=title, body=body)
+        if result.get('sent'):
+            delivered += 1
+        if result.get('invalid_token'):
+            UserDeviceToken.objects.filter(token=token).update(is_active=False)
+            if token == staff.fcm_token:
+                staff.fcm_token = ''
+                staff.save(update_fields=['fcm_token'])
+            logger.warning('Deactivated stale push token for staff_id=%s', staff.id)
+    return {'sent': delivered > 0, 'delivered': delivered, 'devices': len(tokens)}
+
+
+def _send_request_email(appointment):
     try:
-        staff_email = appointment.staff_member.email
-        logger.info(f'Sending email to staff: {staff_email}')
-        send_emailjs(REQUEST_TEMPLATE_ID, _visit_request_params(appointment))
-        logger.info(f'EmailJS request email queued for staff {staff_email}')
-    except Exception as e:
-        logger.exception('Failed to send appointment request email for appointment_id=%s: %s', appointment.id, str(e))
+        sent = send_emailjs(REQUEST_TEMPLATE_ID, _visit_request_params(appointment))
+        return {'sent': sent, 'reason': 'sent' if sent else 'failed'}
+    except Exception as error:
+        logger.exception('Failed to send request email for appointment_id=%s', appointment.id)
+        return {'sent': False, 'reason': str(error)[:100]}
 
+
+def _push_new_visit(appointment):
     try:
-        token_set = set(
-            UserDeviceToken.objects.filter(user=appointment.staff_member, is_active=True).values_list('token', flat=True)
-        )
-        if appointment.staff_member.fcm_token:
-            token_set.add(appointment.staff_member.fcm_token)
-
-        if not token_set:
-            logger.info('Push skipped for appointment_id=%s reason=no_registered_device_tokens', appointment.id)
-            return
-
-        sent_count = 0
-        failed_count = 0
-        for token in token_set:
-            local_appt_time = timezone.localtime(appointment.appointment_date).strftime('%b %d, %Y at %I:%M %p')
-            push_result = send_fcm_push_notification(
-                fcm_token=token,
-                title='Visitor Waiting',
-                body=body,
-            )
-            if push_result.get('sent'):
-                sent_count += 1
-            else:
-                failed_count += 1
-            if push_result.get('invalid_token'):
-                UserDeviceToken.objects.filter(token=token).update(is_active=False)
-                if token == appointment.staff_member.fcm_token:
-                    appointment.staff_member.fcm_token = ''
-                    appointment.staff_member.save(update_fields=['fcm_token'])
-                logger.warning(
-                    'Deactivated stale FCM token for staff_id=%s appointment_id=%s',
-                    appointment.staff_member_id,
-                    appointment.id,
-                )
-            logger.info(
-                'Push dispatch result appointment_id=%s staff_id=%s token_prefix=%s result=%s',
-                appointment.id,
-                appointment.staff_member_id,
-                token[:12],
-                push_result,
-            )
-        logger.info(
-            'Push fanout summary appointment_id=%s sent=%s failed=%s total_tokens=%s',
-            appointment.id,
-            sent_count,
-            failed_count,
-            len(token_set),
-        )
-    except Exception:
-        logger.exception('Failed to send FCM push for appointment_id=%s', appointment.id)
+        return _push_to_staff(appointment.staff_member, 'Visitor Waiting', _get_visit_message(appointment))
+    except Exception as error:
+        logger.exception('Failed to send push for appointment_id=%s', appointment.id)
+        return {'sent': False, 'reason': str(error)[:100]}
 
 
 def _notify_appointment_response(appointment, staff_name=None):
-    print("=== RESPONSE NOTIFICATION TRIGGERED ===")
-    print(f"=== appointment_id: {appointment.id}, status: {appointment.status} ===")
     formatted_date = _format_local_time(appointment.appointment_date)
     resolved_staff_name = staff_name or appointment.staff_member.full_name or "Staff"
 
@@ -188,9 +161,6 @@ def _notify_appointment_response(appointment, staff_name=None):
         logger.exception("Failed to send response email for appointment_id=%s", appointment.id)
 
     try:
-        print(f"SMS ATTEMPT — phone: {appointment.visitor_phone}, visitor: {appointment.visitor_name}, status: {appointment.status}")
-        if not appointment.visitor_phone:
-            print("SMS SKIPPED — visitor_phone is empty on this appointment")
         send_visitor_sms(
             phone_number=appointment.visitor_phone,
             visitor_name=appointment.visitor_name,
@@ -233,7 +203,8 @@ def _send_response_email(appointment, resolved_staff_name, formatted_date):
 
 def _notify_reassignment(appointment):
     """Alert the newly assigned staff member (email, push, SMS) and tell the visitor who they will now see."""
-    _notify_new_appointment(appointment)
+    _send_request_email(appointment)
+    _push_new_visit(appointment)
 
     staff = appointment.staff_member
     staff_name = staff.full_name or staff.email
@@ -277,42 +248,9 @@ class AppointmentCreateView(generics.CreateAPIView):
 
     def perform_create(self, serializer):
         appointment = serializer.save()
-        # Send email and push synchronously to ensure delivery
-        logger.info(
-            "AppointmentCreateView.perform_create saved visitor_phone=%s appointment_id=%s",
-            appointment.visitor_phone,
-            appointment.id,
-        )
-        self._email_result = {'sent': False, 'reason': 'unknown'}
-        self._push_result = {'sent': False, 'reason': 'unknown'}
-        
-        # Send email immediately (synchronously)
-        try:
-            success = send_emailjs(REQUEST_TEMPLATE_ID, _visit_request_params(appointment))
-            self._email_result = {'sent': success, 'reason': 'sent' if success else 'failed'}
-        except Exception as e:
-            logger.exception('Failed to send appointment email: %s', str(e))
-            self._email_result = {'sent': False, 'reason': str(e)[:100]}
-        
+        self._email_result = _send_request_email(appointment)
+        self._push_result = _push_new_visit(appointment)
         notification_message = _get_visit_message(appointment)
-        # Send push notification
-        try:
-            token_set = set(
-                UserDeviceToken.objects.filter(user=appointment.staff_member, is_active=True).values_list('token', flat=True)
-            )
-            if appointment.staff_member.fcm_token:
-                token_set.add(appointment.staff_member.fcm_token)
-
-            if token_set:
-                push_result = send_fcm_push_notification(
-                    fcm_token=list(token_set)[0],  # Send to first token
-                    title='Visitor Waiting',
-                    body=notification_message,
-                )
-                self._push_result = push_result
-        except Exception as e:
-            logger.exception('Failed to send push notification: %s', str(e))
-            self._push_result = {'sent': False, 'reason': str(e)[:100]}
 
         self._sms_result = {'staff': False, 'visitor': False}
         try:
@@ -395,8 +333,6 @@ class AppointmentUpdateView(generics.UpdateAPIView):
 
     def perform_update(self, serializer):
         appointment = serializer.save()
-        print("=== PERFORM UPDATE CALLED ===")
-        print(f"=== phone: {appointment.visitor_phone}, status: {appointment.status} ===")
         _notify_appointment_response(
             appointment,
             getattr(self.request.user, 'full_name', None)
@@ -467,11 +403,7 @@ def _notify_staff_of_cancellation(appointment):
         logger.exception('Failed to send cancellation SMS for appointment_id=%s', appointment.id)
 
     try:
-        tokens = set(UserDeviceToken.objects.filter(user=staff, is_active=True).values_list('token', flat=True))
-        if staff.fcm_token:
-            tokens.add(staff.fcm_token)
-        for token in tokens:
-            send_fcm_push_notification(fcm_token=token, title='Visit cancelled', body=body)
+        _push_to_staff(staff, 'Visit cancelled', body)
     except Exception:
         logger.exception('Failed to send cancellation push for appointment_id=%s', appointment.id)
 
@@ -521,15 +453,7 @@ def _notify_host_of_arrival(appointment):
         logger.exception('Failed to send arrival SMS for appointment_id=%s', appointment.id)
 
     try:
-        tokens = set(UserDeviceToken.objects.filter(user=staff, is_active=True).values_list('token', flat=True))
-        if staff.fcm_token:
-            tokens.add(staff.fcm_token)
-        for token in tokens:
-            send_fcm_push_notification(
-                fcm_token=token,
-                title='Visitor arrived',
-                body=f'{appointment.visitor_name} has arrived at reception.',
-            )
+        _push_to_staff(staff, 'Visitor arrived', f'{appointment.visitor_name} has arrived at reception.')
     except Exception:
         logger.exception('Failed to send arrival push for appointment_id=%s', appointment.id)
 
